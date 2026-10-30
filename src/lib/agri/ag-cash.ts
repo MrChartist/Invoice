@@ -10,7 +10,7 @@
 export const isCultivatorPayee = (p: { principal_kind?: string; ag?: { code?: string } | { cycle_id?: string } } | null | undefined): boolean =>
   !!p && (p.principal_kind === 'agriculturist' || !!(p.ag as { cycle_id?: string } | undefined)?.cycle_id);
 
-export const RULE_6DDE_NOTE = 'Cash to a cultivator / producer — Rule 6DD(e); keep the farmer\'s acknowledgement (verify with your CA, AG14).';
+export const RULE_6DDE_NOTE = 'Cash to a cultivator / producer: Rule 6DD(e); keep the farmer\'s acknowledgement (verify with your CA, AG14).';
 
 /**
  * The note for a cash payment of `paidToday` (to one person, that day) above `limit`: the Rule 6DD(e) note for a

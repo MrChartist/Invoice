@@ -17,7 +17,7 @@ import { checkGstin } from './gstin';
 import { isoDay } from './dates';
 
 export const CEWB_LAYOUT = { version: '1.0.0621', wrapper: 'tripSheets' } as const;
-export const CEWB_NOTE = 'Consolidated e-Way Bill (EWB-02) JSON prepared offline — layout not verified against the portal. Every e-Way Bill included must be valid for the trip; verify before upload.';
+export const CEWB_NOTE = 'Consolidated e-Way Bill (EWB-02) JSON prepared offline: layout not verified against the portal. Every e-Way Bill included must be valid for the trip; verify before upload.';
 /** e-Way Bill numbers are 12 digits. */
 export const EWB_NO = /^\d{12}$/;
 /** Upper bound kept for an untrusted pasted list. */
@@ -79,7 +79,7 @@ export function buildConsolidatedEway(i: ConsolidatedInput): ConsolidatedResult 
   for (const raw of i.ewbNos) {
     const n = String(raw ?? '').replace(/\s+/g, '');
     if (!EWB_NO.test(n)) errors.push(`"${n.slice(0, 20)}" is not a 12-digit e-Way Bill number.`);
-    else if (bills.includes(n)) warnings.push(`e-Way Bill ${n} is listed twice — included once.`);
+    else if (bills.includes(n)) warnings.push(`e-Way Bill ${n} is listed twice: included once.`);
     else bills.push(n);
   }
   if (!bills.length) errors.push('Add at least one e-Way Bill number.');
@@ -104,7 +104,7 @@ export function buildConsolidatedEway(i: ConsolidatedInput): ConsolidatedResult 
   if (today && i.validUpto) {
     for (const b of bills) {
       const v = isoDay(i.validUpto[b]);
-      if (v && v < today) warnings.push(`e-Way Bill ${b} expired on ${v} — extend it before consolidating.`);
+      if (v && v < today) warnings.push(`e-Way Bill ${b} expired on ${v}: extend it before consolidating.`);
     }
   }
   if (errors.length) return { payload: null, bills, errors, warnings };

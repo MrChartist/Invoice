@@ -187,7 +187,7 @@ export default function DeferralsTab({ period, notify }: { period: Period; notif
                   <span className={controls.label}>{br2T('document')}</span>
                   <select className={controls.select} value={docId} onChange={(e) => pickDoc(e.target.value)} data-defer-doc>
                     <option value="">{docs.length ? br2T('chooseDoc') : br2T('noDocs')}</option>
-                    {docs.map((d) => <option key={d.id} value={d.id}>{d.number || '—'} · {d.party} · {formatDate(d.date)}</option>)}
+                    {docs.map((d) => <option key={d.id} value={d.id}>{d.number || '-'} · {d.party} · {formatDate(d.date)}</option>)}
                   </select>
                 </label>
                 {lines.length > 1 && (
@@ -281,7 +281,7 @@ export default function DeferralsTab({ period, notify }: { period: Period; notif
                 {rows.map((d) => (
                   <tr key={d.id}>
                     <td>
-                      <span className={surface.mono}>{d.source.number || '—'}</span> {d.source.name}
+                      <span className={surface.mono}>{d.source.number || '-'}</span> {d.source.name}
                       <div className={books.muted}>{d.kind === 'revenue' ? br2T('fromInvoice') : br2T('fromBill')} · {d.source.party}</div>
                     </td>
                     <td className={surface.numeric}>{rs(d.amount_paise)}</td>

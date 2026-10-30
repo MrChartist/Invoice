@@ -102,7 +102,7 @@ export function OrderForm({ ctx, order, boms, salesOrders, onClose, onSaved }: {
           <div className={controls.field}>
             <label className={controls.label} htmlFor="wo-so">{pT('salesOrder')}</label>
             <select id="wo-so" className={controls.select} value={soId} onChange={(e) => { setSoId(e.target.value); setSoLine(''); }}>
-              <option value="">—</option>
+              <option value="">-</option>
               {salesOrders.map((d) => <option key={d.id} value={d.id}>{d.invoice_number} · {d.client?.name ?? ''}</option>)}
             </select>
           </div>
@@ -110,7 +110,7 @@ export function OrderForm({ ctx, order, boms, salesOrders, onClose, onSaved }: {
             <div className={controls.field}>
               <label className={controls.label} htmlFor="wo-soline">{pT('soLine')}</label>
               <select id="wo-soline" className={controls.select} value={soLine} onChange={(e) => setSoLine(e.target.value)}>
-                <option value="">—</option>
+                <option value="">-</option>
                 {(so.items ?? []).map((l) => <option key={l.id} value={l.id}>{l.name} × {l.quantity}</option>)}
               </select>
             </div>
@@ -119,7 +119,7 @@ export function OrderForm({ ctx, order, boms, salesOrders, onClose, onSaved }: {
             <div className={controls.field}>
               <label className={controls.label} htmlFor="wo-cc">{pT('costCentre')}</label>
               <select id="wo-cc" className={controls.select} value={centre} onChange={(e) => setCentre(e.target.value)}>
-                <option value="">—</option>
+                <option value="">-</option>
                 {centres.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
@@ -129,14 +129,14 @@ export function OrderForm({ ctx, order, boms, salesOrders, onClose, onSaved }: {
           <div className={controls.field}>
             <label className={controls.label} htmlFor="wo-store">{pT('storeGodown')}</label>
             <select id="wo-store" className={controls.select} value={store} onChange={(e) => setStore(e.target.value)}>
-              <option value="">—</option>
+              <option value="">-</option>
               {stores.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="wo-outg">{pT('outputGodown')}</label>
             <select id="wo-outg" className={controls.select} value={outGodown} disabled={toQc} onChange={(e) => setOutGodown(e.target.value)}>
-              <option value="">—</option>
+              <option value="">-</option>
               {stores.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>

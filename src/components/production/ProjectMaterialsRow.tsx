@@ -25,7 +25,7 @@ export default function ProjectMaterialsRow({ columns, period, cellClass }: { co
   return (
     <tr>
       <td className={cellClass}>{pT('materialsMemo')}</td>
-      {columns.map((c) => <td key={c.key} className={surface.numeric}>{memo.get(c.key) ? money(memo.get(c.key) ?? 0) : '—'}</td>)}
+      {columns.map((c) => <td key={c.key} className={surface.numeric}>{memo.get(c.key) ? money(memo.get(c.key) ?? 0) : '-'}</td>)}
       <td className={surface.numeric}>{money(total)}</td>
     </tr>
   );

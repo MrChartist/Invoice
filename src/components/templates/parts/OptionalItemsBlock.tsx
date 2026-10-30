@@ -30,7 +30,7 @@ export function OptionalItemsBlock({ invoice }: { invoice: InvoiceRecord }) {
             <tr key={r.item.id}>
               <td>
                 {r.option && <span className={styles.optTag}>{r.option}</span>}
-                {r.item.name || '—'}
+                {r.item.name || '-'}
                 {r.item.description && <div className={styles.optNote}>{r.item.description}</div>}
               </td>
               <td className={styles.num}>{formatQuantity(Number(r.item.quantity) || 0)}{r.item.unit ? ` ${r.item.unit}` : ''}</td>

@@ -64,8 +64,8 @@ export function DscRegister({ onChanged }: { onChanged?: () => void }) {
                   <tr key={r.id}>
                     <td>{r.holder}</td>
                     <td>{dkT(`dsc.r.${r.role}` as const)}</td>
-                    <td>{r.dsc_class ?? '—'}</td>
-                    <td>{[r.token, r.issuer].filter(Boolean).join(' · ') || '—'}</td>
+                    <td>{r.dsc_class ?? '-'}</td>
+                    <td>{[r.token, r.issuer].filter(Boolean).join(' · ') || '-'}</td>
                     <td className={TONE[st]}>{formatDate(r.valid_to)} <span className={styles.note}>{d < 0 ? dkT('dsc.expiredAgo', { n: -d }) : dkT('dsc.daysLeft', { n: d })}</span></td>
                     <td><button type="button" className={controls.btnIcon} aria-label={dkT('remove')} onClick={() => { dscDb.remove(r.id); reload(); }}><Trash2 size={14} /></button></td>
                   </tr>

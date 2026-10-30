@@ -81,7 +81,7 @@ export default function BillsView({ notify }: HsViewProps) {
                   <td>{r.levy?.name ?? r.period}</td><td>{r.date}</td>
                   <td>{r.counts.bos + r.counts.tax + r.counts.plain + r.counts.outsider} ({r.counts.bos} / {r.counts.tax} / {r.counts.plain} / {r.counts.outsider})</td>
                   <td className={surface.numeric}>{formatCurrency(Object.values(r.totals).reduce((t, x) => t + x, 0))}</td>
-                  <td>{r.undone ? `${hsbT('undone')} — ${r.undone.reason}` : hsbT('done')}</td>
+                  <td>{r.undone ? `${hsbT('undone')}: ${r.undone.reason}` : hsbT('done')}</td>
                   <td>
                     <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => setOpen(open === r.id ? '' : r.id)}>{hsT('open')}</button>
                     {!r.undone && <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} data-hs-undo onClick={() => act(() => { undoRun(r.id, reason); return hsbT('undone'); })}>{hsbT('undo')}</button>}

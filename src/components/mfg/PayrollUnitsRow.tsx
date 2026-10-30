@@ -10,8 +10,8 @@ import { defineArea } from '../../i18n/area';
 import controls from '../../styles/controls.module.css';
 
 const uT = defineArea(
-  { import: 'Import production units from job cards', into: 'Into column', done: '{n} employee(s) filled from job cards — check and save.' } as const,
-  { import: 'जॉब कार्ड से उत्पादन इकाइयाँ लाएँ', into: 'किस कॉलम में', done: '{n} कर्मचारियों की इकाइयाँ जॉब कार्ड से भरीं — जाँचें और सहेजें।' },
+  { import: 'Import production units from job cards', into: 'Into column', done: '{n} employee(s) filled from job cards: check and save.' } as const,
+  { import: 'जॉब कार्ड से उत्पादन इकाइयाँ लाएँ', into: 'किस कॉलम में', done: '{n} कर्मचारियों की इकाइयाँ जॉब कार्ड से भरीं: जाँचें और सहेजें।' },
 );
 
 export default function PayrollUnitsRow({ month, cols, onUnits }: { month: string; cols: { id: string; label: string }[]; onUnits: (col: string, units: Record<string, number>, note: string) => void }) {

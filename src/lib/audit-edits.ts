@@ -254,7 +254,7 @@ export function refOf(r: Row | null): string {
 }
 
 function summarize(changes: AuditChange[], max = 3): string {
-  const shown = changes.slice(0, max).map((c) => `${c.field} ${c.from ?? '—'} → ${c.to ?? '—'}`);
+  const shown = changes.slice(0, max).map((c) => `${c.field} ${c.from ?? '-'} → ${c.to ?? '-'}`);
   const rest = changes.length - max;
   return shown.join('; ') + (rest > 0 ? `; +${rest} more` : '');
 }

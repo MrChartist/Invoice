@@ -36,7 +36,7 @@ export function payrollTdsChallans(rawPayments: readonly unknown[], detail: bool
     minor_head: '200' as const,
     method: g[0].method,
     deduction_keys: [],
-    notes: `Section 192 — Payroll (${g.length} ${g.length === 1 ? 'entry' : 'entries'})`,
+    notes: `Section 192: Payroll (${g.length} ${g.length === 1 ? 'entry' : 'entries'})`,
     created_at: g[0].created_at,
   }));
 }
@@ -54,7 +54,7 @@ function payrollTdsDetail(rawPayments: readonly unknown[]): TdsChallan[] {
       minor_head: '200' as const,
       method: p.paid_from === 'cash' ? 'Cash' : 'Bank transfer',
       deduction_keys: [],
-      notes: `Section 192 — TDS on salary (payroll payment ${p.number}${p.period ? `, ${p.period}` : ''})`,
+      notes: `Section 192: TDS on salary (payroll payment ${p.number}${p.period ? `, ${p.period}` : ''})`,
       created_at: p.created_at,
     }));
 }

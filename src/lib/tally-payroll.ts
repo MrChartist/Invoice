@@ -106,7 +106,7 @@ export function payrollTallyVouchers(src: TallyBooksSource, o: BooksLedgerNames,
     const net = entries.reduce((s, x) => s + (x.side === 'Cr' ? x.paise : -x.paise), 0);
     if (net > 0) entries.push({ ledger: ledgerOf(A.roundOff), side: 'Dr', paise: net });
     else if (net < 0) entries.push({ ledger: ledgerOf(A.roundOff), side: 'Cr', paise: -net });
-    out.push(voucher('Journal', run.date, run.number, `Payroll for ${run.month} · ${run.lines.length} employee${run.lines.length === 1 ? '' : 's'} (payroll working — verify with your CA)`, entries));
+    out.push(voucher('Journal', run.date, run.number, `Payroll for ${run.month} · ${run.lines.length} employee${run.lines.length === 1 ? '' : 's'} (payroll working: verify with your CA)`, entries));
   }
 
   const PAYABLE: Record<string, string> = { pf: A.pfPayable, esi: A.esiPayable, pt: A.ptPayable, tds: A.tdsSalaryPayable, loan: A.staffAdvances };

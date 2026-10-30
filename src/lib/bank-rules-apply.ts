@@ -66,7 +66,7 @@ export function applyProblem(item: ApplyItem, statements: readonly BankStatement
     if (!action.category) return `${d}: choose the expense head.`;
     const { totals } = expenseFor(item);
     if (Math.abs(totals.total - line.debit) > 0.01) return `${d}: at ${action.gst_rate}% GST the expense comes to ${totals.total.toFixed(2)}, not ${line.debit.toFixed(2)}.`;
-    if (billApprovalRequired({ total: totals.total }, undefined, readPurchaseApprovalPolicy(), can('doc.approve'))) return `${d}: an expense of ${totals.total.toFixed(2)} needs the owner's approval — record it from the expense form.`;
+    if (billApprovalRequired({ total: totals.total }, undefined, readPurchaseApprovalPolicy(), can('doc.approve'))) return `${d}: an expense of ${totals.total.toFixed(2)} needs the owner's approval, record it from the expense form.`;
   }
   if (action.kind === 'voucher' || action.kind === 'contra') {
     const chart = chartOf(loadUserAccounts());
@@ -209,7 +209,7 @@ export function applyBankBatch(items: readonly ApplyItem[]): BankStatement[] {
       entity: 'settings',
       entity_id: 'bank_rules',
       action: 'update',
-      summary: `Categorised ${work.length} bank line(s) — ${bySource('rule')} by rule, ${bySource('memory')} from memory, ${bySource('manual')} by hand`,
+      summary: `Categorised ${work.length} bank line(s): ${bySource('rule')} by rule, ${bySource('memory')} from memory, ${bySource('manual')} by hand`,
     });
   } catch {
     /* logging never blocks */

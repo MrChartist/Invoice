@@ -40,7 +40,7 @@ export default function StylesView({ ctx }: { ctx: MfgContext }) {
           <div style={row}>
             <F label={gT('fabric')}><Sel v={d.fabric} set={(x) => set({ fabric: x })} o={opts(fabrics)} data-mfc="style-fabric" /></F>
             <F label={gT('perPiece')} w={130}><In v={d.per} set={(x) => set({ per: x })} inputMode="decimal" data-mfc="style-per" /></F>
-            <F label={gT('cls')}><Sel v={d.cls} set={(x) => set({ cls: x })} o={[['', '—'], ...TEXTILE_CLASSES.map((c) => [c, gT(`c.${c}`)] as const)]} /></F>
+            <F label={gT('cls')}><Sel v={d.cls} set={(x) => set({ cls: x })} o={[['', '-'], ...TEXTILE_CLASSES.map((c) => [c, gT(`c.${c}`)] as const)]} /></F>
           </div>
           <div style={row}>
             <F label={gT('colourMap')}><In v={d.map} set={(x) => set({ map: x })} placeholder="Green=Green cambric" /></F>
@@ -57,9 +57,9 @@ export default function StylesView({ ctx }: { ctx: MfgContext }) {
         return [
           ctx.canMasters ? <Btn kind="btnGhost" on={() => open(p.id)}>{p.name}</Btn> : p.name,
           `${ax.sizes.join(' ')} × ${ax.colours.filter(Boolean).length || 1}`,
-          f ? `${ctx.items.find((i) => i.id === f.item_id)?.name ?? '—'} · ${f.per_piece_m} m` : '—',
-          (p as { mf_class?: string }).mf_class ? gT(`c.${(p as { mf_class?: string }).mf_class}` as 'c.garment') : '—',
-          m.above.length ? gT('bandMemo', { sizes: m.above.join(', '), limit: m.limit, rate: m.rate }) : '—',
+          f ? `${ctx.items.find((i) => i.id === f.item_id)?.name ?? '-'} · ${f.per_piece_m} m` : '-',
+          (p as { mf_class?: string }).mf_class ? gT(`c.${(p as { mf_class?: string }).mf_class}` as 'c.garment') : '-',
+          m.above.length ? gT('bandMemo', { sizes: m.above.join(', '), limit: m.limit, rate: m.rate }) : '-',
         ];
       })} />
     </section>

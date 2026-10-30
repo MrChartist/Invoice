@@ -116,7 +116,7 @@ function mustLive(id: string): TableOrder {
 
 function mustOpen(id: string): TableOrder {
   const o = mustLive(id);
-  if (o.status === 'printed') throw new Error('The bill is printed — reopen the order to change it.');
+  if (o.status === 'printed') throw new Error('The bill is printed: reopen the order to change it.');
   return o;
 }
 
@@ -202,7 +202,7 @@ export function patchLine(orderId: string, lineId: string, patch: { rate?: numbe
 export class OwnerPinRequired extends Error {
   readonly code = 'OWNER_PIN';
   constructor() {
-    super('This cancellation is above the limit for your role — the owner must confirm it with the PIN.');
+    super('This cancellation is above the limit for your role: the owner must confirm it with the PIN.');
     this.name = 'OwnerPinRequired';
   }
 }
@@ -257,7 +257,7 @@ export function printBill(orderId: string): { order: TableOrder; kots: Kot[] } {
 
 export function reopenOrder(orderId: string, note?: string): TableOrder {
   const order = mustLive(orderId);
-  if (order.payers?.some((p) => p.paid)) throw new Error('A part is already paid — finish the split settlement.');
+  if (order.payers?.some((p) => p.paid)) throw new Error('A part is already paid: finish the split settlement.');
   const at = now().toISOString();
   const out: TableOrder = { ...order, status: 'open', log: [...order.log, { at, by: who(), kind: 'reopen', ...(note?.trim() ? { note: note.trim() } : {}) }] };
   delete out.printed_at;
@@ -381,7 +381,7 @@ export interface SettleResult extends PosSaveResult {
 export function settleOrder(orderId: string, tenders: Tender[], opts: { day?: string; expiredOk?: boolean; allowCredit?: boolean } = {}): SettleResult {
   const order = mustLive(orderId);
   if (!order.lines.length) return { ok: false, errors: ['Add items before settling.'] };
-  if (order.payers?.length) return { ok: false, errors: ['This order is being settled by payer — take the remaining payers.'] };
+  if (order.payers?.length) return { ok: false, errors: ['This order is being settled by payer: take the remaining payers.'] };
   const day = opts.day ?? localDay();
   const client = savedClient(order);
   try {
@@ -449,7 +449,7 @@ export function payPayer(orderId: string, index: number, tender: Tender, opts: {
         invoiceIds = [res.record.id];
         // The payer rows must add up to the bill as saved (round-off may differ from the preview).
         const sum = round2((order.payers ?? []).reduce((s, p) => s + num(p.amount), 0));
-        if (Math.abs(sum - res.record.total) > 0.004) throw new SettleRefused({ ok: false, errors: [`The payers add up to ₹${sum.toFixed(2)} but the bill is ₹${res.record.total.toFixed(2)} — split again.`] });
+        if (Math.abs(sum - res.record.total) > 0.004) throw new SettleRefused({ ok: false, errors: [`The payers add up to ₹${sum.toFixed(2)} but the bill is ₹${res.record.total.toFixed(2)}: split again.`] });
       } else {
         payment = localDb.payments.record({ invoiceId: invoiceIds[0], amount: t.amount, method: t.method, reference: t.reference, date: day, note: 'POS', bankAccountId: t.bank_account_id });
         record = localDb.invoices.getById(invoiceIds[0]) ?? undefined;

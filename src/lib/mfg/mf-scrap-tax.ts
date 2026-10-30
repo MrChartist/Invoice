@@ -18,7 +18,7 @@ const METAL_SCRAP: readonly ScrapClass[] = ['metal_ferrous', 'metal_nonferrous']
 /** HSN headings of metal waste and scrap (ch 72–81): a line with one of these is metal scrap without a class. */
 const METAL_SCRAP_HSN: readonly string[] = ['7204', '7404', '7503', '7602', '7802', '7902', '8002', ...Array.from({ length: 13 }, (_, i) => String(8101 + i))];
 
-export const TCS_SCOPE_NOTE = 'TCS u/s 394(1) (206C(1)) applies to scrap from manufacture or mechanical working (High Court rulings); the app does not decide the scope — verify with your CA (MF9).';
+export const TCS_SCOPE_NOTE = 'TCS u/s 394(1) (206C(1)) applies to scrap from manufacture or mechanical working (High Court rulings); the app does not decide the scope: verify with your CA (MF9).';
 
 /** The class suggestion on a date (`rate: null` = type the rate). */
 export const scrapClassRate = (cls: ScrapClass, date?: string): MfClassRate => ruleAt(SCRAP_CLASS_RULES[cls] ?? SCRAP_CLASS_RULES.other, date);
@@ -45,7 +45,7 @@ export function scrapTcsPreset(date: string, declaration: boolean): TradeTcsPres
 export function gstTdsNote(date: string, o: { buyerGstin?: string; metal: boolean; taxable: number }): string {
   const r = ruleAt(SCRAP_TAX_RULES, date);
   if (!o.metal || !(r.gst_tds_pct > 0) || !String(o.buyerGstin ?? '').trim() || !(num(o.taxable) > r.gst_tds_above)) return '';
-  return `Buyer deducts GST TDS ${r.gst_tds_pct}% u/s 51 (${r.tds_ref}) — credit after GSTR-7; record it on the receipt as a short payment to "GST TDS receivable". Verify with your CA (MF7).`;
+  return `Buyer deducts GST TDS ${r.gst_tds_pct}% u/s 51 (${r.tds_ref}): credit after GSTR-7; record it on the receipt as a short payment to "GST TDS receivable". Verify with your CA (MF7).`;
 }
 
 /** The RCM prompt on a bill: metal scrap from an unregistered supplier on / after 10 Oct 2024 (null otherwise). */

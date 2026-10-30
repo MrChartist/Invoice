@@ -26,7 +26,7 @@ export function PropertiesPanel({ props, notify, refresh }: { props: readonly Pr
       <div className={styles.toolbar}>
         <T l={iT('property')} v={p.name} on={(name) => setP({ ...p, name })} d="property-name" />
         <T l={iT('address')} v={p.address} on={(address) => setP({ ...p, address })} />
-        <S l={iT('state')} v={p.state} o={[['', '—'], ...INDIAN_STATES.map((s) => [s.code, s.name] as const)]} on={(state) => setP({ ...p, state })} />
+        <S l={iT('state')} v={p.state} o={[['', '-'], ...INDIAN_STATES.map((s) => [s.code, s.name] as const)]} on={(state) => setP({ ...p, state })} />
       </div>
       {p.units.map((u, i) => (
         <div key={i} className={styles.toolbar}>

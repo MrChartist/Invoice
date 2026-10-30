@@ -153,7 +153,7 @@ export function wipStatement(
 export function wipSheet(s: { rows: readonly WipOrderRow[]; total: number }, date: string): (string | number)[][] {
   const r = (p: number) => p / 100;
   return [
-    [`Year-end WIP statement on ${date} — material at average cost; conversion is a memo (not in stock value unless absorption is on) — verify MF24`],
+    [`Year-end WIP statement on ${date}: material at average cost; conversion is a memo (not in stock value unless absorption is on), verify MF24`],
     ['Order', 'Item', 'Status', 'Material issued ₹', 'Output reported', 'WIP material ₹', 'Memo conversion ₹', 'Total ₹'],
     ...s.rows.map((x) => [x.number, x.item, x.status, r(x.issued), x.outputQty, r(x.wipMaterial), r(x.memoConversion), r(x.total)]),
     ['Total', '', '', '', '', '', '', r(s.total)],

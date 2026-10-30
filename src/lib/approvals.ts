@@ -124,7 +124,7 @@ function decide(id: string, decision: 'approved' | 'rejected', note?: string): I
       entity_id: doc.id,
       action: 'update',
       doc_number: doc.invoice_number,
-      summary: `${decision === 'approved' ? 'Approved' : 'Rejected'} ${doc.invoice_number} (${formatCurrency(doc.total, doc.currency)}) requested by ${doc.approval.requested_by || 'a clerk'}${note?.trim() ? ` — ${note.trim()}` : ''}`,
+      summary: `${decision === 'approved' ? 'Approved' : 'Rejected'} ${doc.invoice_number} (${formatCurrency(doc.total, doc.currency)}) requested by ${doc.approval.requested_by || 'a clerk'}${note?.trim() ? `: ${note.trim()}` : ''}`,
     });
   } catch {
     /* logging never blocks */

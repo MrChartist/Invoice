@@ -66,7 +66,7 @@ test('estimate + supplementary estimate, approvals logged, merged on one bill; p
   assert.deepEqual([j.quote_ids?.length, j.approvals?.map((a) => a.how)], [3, ['phone', 'whatsapp']]);
   const inv = billWorkshopJob(job.id, DAY);
   assert.equal(inv.status, 'Sent');
-  assert.deepEqual(inv.items.map((l) => [l.name, l.quantity, l.rate, l.tax_rate]), [['Brake pads (front)', 1, 2150, 18], ['Front brake pad replace', 0.8, 900, 18], ['Disc', 2, 1000, 5], ['Outside work — Disc skimming', 1, 500, 18]]);
+  assert.deepEqual(inv.items.map((l) => [l.name, l.quantity, l.rate, l.tax_rate]), [['Brake pads (front)', 1, 2150, 18], ['Front brake pad replace', 0.8, 900, 18], ['Disc', 2, 1000, 5], ['Outside work: Disc skimming', 1, 500, 18]]);
   assert.equal(inv.sv?.job?.number, job.number);
   assert.ok(!inv.items.some((l) => l.quantity === 9), 'the unapproved estimate stays out');
   const links = getTable<{ from_id: string; to_id: string }>('doc_links');

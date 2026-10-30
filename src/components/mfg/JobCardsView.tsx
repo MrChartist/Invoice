@@ -41,16 +41,16 @@ export function EntryForm({ ctx, value, set, people }: { ctx: MfgContext; value:
       </div>
       <div style={row}>
         <F label={fT('operator')} w={130}><Sel v={value.opKind ?? 'employee'} set={(x) => set({ opKind: x, opId: '' })} o={[['employee', fT('employee')], ['karigar', fT('karigar')]]} /></F>
-        <F label={fT('who')}><Sel v={value.opId ?? ''} set={(x) => set({ opId: x })} o={[['', '—'], ...list]} /></F>
+        <F label={fT('who')}><Sel v={value.opId ?? ''} set={(x) => set({ opId: x })} o={[['', '-'], ...list]} /></F>
         <F label={fT('machine')} w={120}><In v={value.machine ?? ''} set={(x) => set({ machine: x })} /></F>
       </div>
       <div style={row}>
         <F label={fT('good')} w={90}><In v={value.good === undefined ? '' : String(value.good)} set={(x) => set({ good: num(x) })} inputMode="decimal" data-mf="e-good" /></F>
         <F label={fT('rejected')} w={90}><In v={value.rejected === undefined ? '' : String(value.rejected)} set={(x) => set({ rejected: num(x) })} inputMode="decimal" /></F>
-        {num(value.rejected) > 0 && <F label={fT('reason')} w={150}><Sel v={value.reason ?? ''} set={(x) => set({ reason: x })} o={[['', '—'], ...rejectReasons().map((r) => [r, r] as const)]} /></F>}
+        {num(value.rejected) > 0 && <F label={fT('reason')} w={150}><Sel v={value.reason ?? ''} set={(x) => set({ reason: x })} o={[['', '-'], ...rejectReasons().map((r) => [r, r] as const)]} /></F>}
         <F label={fT('rework')} w={90}><In v={value.rework === undefined ? '' : String(value.rework)} set={(x) => set({ rework: num(x) })} inputMode="decimal" /></F>
         <F label={fT('scrapKg')} w={90}><In v={value.scrap_kg === undefined ? '' : String(value.scrap_kg)} set={(x) => set({ scrap_kg: num(x) })} inputMode="decimal" data-mf="e-scrap" /></F>
-        {num(value.scrap_kg) > 0 && <F label={fT('scrapItem')} w={180}><Sel v={value.scrap_item_id ?? ''} set={(x) => set({ scrap_item_id: x })} o={[['', '—'], ...scrapItems.map((i) => [i.id, i.name] as const)]} data-mf="e-scrap-item" /></F>}
+        {num(value.scrap_kg) > 0 && <F label={fT('scrapItem')} w={180}><Sel v={value.scrap_item_id ?? ''} set={(x) => set({ scrap_item_id: x })} o={[['', '-'], ...scrapItems.map((i) => [i.id, i.name] as const)]} data-mf="e-scrap-item" /></F>}
       </div>
     </div>
   );
@@ -129,7 +129,7 @@ export default function JobCardsView({ ctx }: { ctx: MfgContext }) {
       <h4>{fT('dayReport')}</h4>
       <div style={row}><F label={fT('date')} w={160}><In type="date" v={day} set={setDay} /></F></div>
       <Grid attr="day" head={[fT('centre'), fT('available'), fT('run'), fT('setup'), fT('idle'), fT('good'), fT('rejected'), fT('scrapKg')]} rows={report.centres.filter((c) => c.available || c.run || c.setup).map((c) => [c.name, fmt(c.available), fmt(c.run), fmt(c.setup), fmt(c.idle), fmt(c.good), fmt(c.rejected), fmt(c.scrapKg)])} />
-      <Grid attr="operators" head={[fT('who'), fT('hours'), fT('good'), fT('rejected')]} rows={report.operators.map((o) => [[...people.employees, ...people.karigars].find(([id]) => id === o.id)?.[1] ?? (o.id || '—'), fmt(o.hours), fmt(o.good), fmt(o.rejected)])} />
+      <Grid attr="operators" head={[fT('who'), fT('hours'), fT('good'), fT('rejected')]} rows={report.operators.map((o) => [[...people.employees, ...people.karigars].find(([id]) => id === o.id)?.[1] ?? (o.id || '-'), fmt(o.hours), fmt(o.good), fmt(o.rejected)])} />
     </section>
   );
 }

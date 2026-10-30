@@ -28,7 +28,7 @@ export default function TanksView({ onDone }: { onDone: Done }) {
   const tanks = godownsDb.stored().filter((g) => g.fu);
   const items = stockDb.items();
   const nozzles = readNozzles();
-  const name = (id: string) => items.find((i) => i.id === id)?.name ?? '—';
+  const name = (id: string) => items.find((i) => i.id === id)?.name ?? '-';
   const act = (fn: () => void) => { try { fn(); setN(n + 1); onDone(fuT('saved')); } catch (e) { onDone((e as Error).message, true); } };
   const addTank = () => act(() => {
     const kind = (t.kind || 'ms') as FuProduct;
@@ -74,7 +74,7 @@ export default function TanksView({ onDone }: { onDone: Done }) {
         <div className={surface.tableWrap}>
           <table className={surface.table}>
             <thead><tr><th>{fuT('nozzle')}</th><th>{fuT('tank')}</th><th>{fuT('product')}</th><th>{fuT('totaliser')}</th><th>{fuT('wmDue')}</th><th /></tr></thead>
-            <tbody>{nozzles.map((x) => <tr key={x.id}><td>{nozzleLabel(x)}</td><td>{tanks.find((g) => g.id === x.tank_id)?.name ?? '—'}</td><td>{name(x.item_id)}</td><td>{x.totaliser_start}</td><td>{x.wm_due ?? ''}</td><td><button type="button" className={controls.btnGhost} onClick={() => act(() => removeNozzle(x.id))}>{fuT('del')}</button></td></tr>)}</tbody>
+            <tbody>{nozzles.map((x) => <tr key={x.id}><td>{nozzleLabel(x)}</td><td>{tanks.find((g) => g.id === x.tank_id)?.name ?? '-'}</td><td>{name(x.item_id)}</td><td>{x.totaliser_start}</td><td>{x.wm_due ?? ''}</td><td><button type="button" className={controls.btnGhost} onClick={() => act(() => removeNozzle(x.id))}>{fuT('del')}</button></td></tr>)}</tbody>
           </table>
         </div>
       )}

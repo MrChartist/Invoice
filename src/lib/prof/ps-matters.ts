@@ -17,7 +17,7 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const ROLES: readonly MatterParty['role'][] = ['client', 'opposite', 'related', 'witness', 'other'];
 
 export const isMatter = (c: Pick<CostCentre, 'ps'> | undefined): c is CostCentre & { ps: MatterInfo } => !!c?.ps?.code;
-export const matterLabel = (c: Pick<CostCentre, 'name' | 'ps'>): string => (c.ps?.code ? `${c.ps.code} — ${c.name}` : c.name);
+export const matterLabel = (c: Pick<CostCentre, 'name' | 'ps'>): string => (c.ps?.code ? `${c.ps.code}: ${c.name}` : c.name);
 export const isOpen = (c: Pick<CostCentre, 'ps'>): boolean => !c.ps?.closed;
 
 /** The client's code: `Client.ps.code`, else the initials of its name (2–4 letters). */

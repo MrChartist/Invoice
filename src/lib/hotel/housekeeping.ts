@@ -39,13 +39,13 @@ export function setOoo(roomId: string, ooo: { from: string; to: string; reason: 
   if (!ooo.from || !ooo.to || ooo.to < ooo.from) throw new HotelError('Choose from and to dates.');
   if (!ooo.reason.trim()) throw new HotelError('Give a reason.');
   const clash = reservations.find((r) => isLiveRes(r) && r.lines.some((l) => isLiveLine(l) && l.room_id === roomId && lineDates(r, l).arrival <= ooo.to && ooo.from < lineDates(r, l).departure));
-  if (clash) throw new HotelError(`Booking ${clash.number} uses this room then — move it first.`);
+  if (clash) throw new HotelError(`Booking ${clash.number} uses this room then: move it first.`);
   hotelDb.patchRooms({ [roomId]: { hk_status: 'ooo', ooo: { ...ooo, reason: ooo.reason.trim() }, hk_at: at.toISOString(), hk_by: who() } });
 }
 
 /** Board rows grouped by floor (floor order, then room number). */
 export function byFloor(rooms: readonly Room[]): [string, Room[]][] {
   const m = new Map<string, Room[]>();
-  for (const r of rooms) m.set(r.floor || '—', [...(m.get(r.floor || '—') ?? []), r]);
+  for (const r of rooms) m.set(r.floor || '-', [...(m.get(r.floor || '-') ?? []), r]);
   return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }));
 }

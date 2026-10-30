@@ -32,7 +32,7 @@ export default function PapersView({ onDone }: { onDone: Done }) {
           <Tbl head={['head', 'profit', 'membersPct', 'membersPart']} rows={coop.rows.map((r) => [r.label, fmt(r.profit), `${r.membersPct}%`, fmt(r.membersPart)])} />
           <Hint k="coopNote" />
         </section>
-      ) : <p data-agd-80pa><strong>{agdT('paTitle', { ay: prod.ay })} — {agdT('deduction')}: ₹{fmt(prod.deduction)}</strong> — {prod.note}</p>}
+      ) : <p data-agd-80pa><strong>{agdT('paTitle', { ay: prod.ay })} : {agdT('deduction')}: ₹{fmt(prod.deduction)}</strong> : {prod.note}</p>}
       <h3>{agdT('calendar')}</h3>
       <Tbl head={['what', 'dueOn', 'typedDate']} rows={rows.map((c) => [c.label, c.due,
         <input key={`${c.key}${tick}`} className={controls.input} style={{ maxWidth: 90 }} defaultValue={s.calendar?.[c.key] ?? ''} placeholder={c.due.slice(5)} onBlur={(e) => setDate(c.key, e.target.value.trim())} aria-label={`${agdT('typedDate')}: ${c.label}`} data-agd-cal={c.key} />])} />

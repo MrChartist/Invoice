@@ -122,7 +122,7 @@ test('1: the paper prints the tax as payable by the recipient (Rule 46(p)) only 
   assert.equal(isRcmTotals(t), true);
   const note = rcmTaxNote(t, (n) => `₹${n.toFixed(2)}`);
   assert.match(note, /Tax payable by the recipient under reverse charge/);
-  assert.match(note, /CGST ₹25\.00, SGST ₹25\.00 — total ₹50\.00/);
+  assert.match(note, /CGST ₹25\.00, SGST ₹25\.00, total ₹50\.00/);
   assert.match(note, /Not included in the amount payable/);
   const legacy = calculateInvoice(calcInputFromRecord(doc({ reverse_charge: true, items: [item('Transport', 1, 1000, 5, '996511')] })));
   assert.equal(rcmTaxNote(legacy, String), '');
@@ -166,7 +166,7 @@ test('2: Books net GST includes the reverse-charge liability (customs IGST is no
 
 /* ── 3. Set-off (Sec 49A / Rule 88A) ─────────────────────────────────── */
 
-test('3: leftover IGST credit covers the head its own credit cannot — no needless cash', () => {
+test('3: leftover IGST credit covers the head its own credit cannot, no needless cash', () => {
   const r = computeSetOff({ igst: 0, cgst: 100, sgst: 100 }, { igst: 100, cgst: 100, sgst: 0 });
   assert.deepEqual(r.cash, { igst: 0, cgst: 0, sgst: 0 });
   assert.deepEqual(r.itcUsed.igst, { igst: 0, cgst: 0, sgst: 100 });

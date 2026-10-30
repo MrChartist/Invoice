@@ -49,7 +49,7 @@ export default function ManpowerRows() {
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }} data-mp-rows>
       <select className={controls.select} aria-label={mpT('site')} value={siteId ?? ''} onChange={(e) => pick(e.target.value)} data-mp-pick-site>
-        <option value="">{mpT('site')} —</option>
+        <option value="">{mpT('site')} -</option>
         {sites.map((x) => <option key={x.id} value={x.id}>{siteLabel(x)}</option>)}
       </select>
       {s.mp && (
@@ -59,7 +59,7 @@ export default function ManpowerRows() {
             {REGS.map((r) => <option key={r} value={r}>{mpList('regs', REGS, r)}</option>)}
           </select>
           {forced && <input className={controls.input} aria-label={mpT('note')} placeholder={mpT('note')} value={note} onChange={(e) => setNote(e.target.value)} onBlur={() => apply(forced, note)} data-mp-regime-note />}
-          {!forced && ((r) => <span className={controls.hint} data-mp-regime={r.regime}>{mpT(`reg.${r.regime}`, { r: r.rate })}{r.split ? ` — ${mpT('split')}` : ''}</span>)(mpRegime({ date: s.date, entityType: entity, client }, sacs()))}
+          {!forced && ((r) => <span className={controls.hint} data-mp-regime={r.regime}>{mpT(`reg.${r.regime}`, { r: r.rate })}{r.split ? `: ${mpT('split')}` : ''}</span>)(mpRegime({ date: s.date, entityType: entity, client }, sacs()))}
         </>
       )}
     </div>

@@ -22,7 +22,7 @@ export function LabReportPrint({ o, signers, onPrint }: { o: LabOrder; signers: 
         <tbody>
           {reportRows(o).map((r, i) => (
             <tr key={i} style={r.flag ? { fontWeight: 600 } : undefined}>
-              <td>{r.dept}</td><td>{r.test === r.name ? r.name : `${r.test} — ${r.name}`}</td><td>{r.value || '—'}</td><td>{r.unit}</td><td>{r.range}</td><td data-flag>{r.flag}</td>
+              <td>{r.dept}</td><td>{r.test === r.name ? r.name : `${r.test}: ${r.name}`}</td><td>{r.value || '-'}</td><td>{r.unit}</td><td>{r.range}</td><td data-flag>{r.flag}</td>
             </tr>
           ))}
         </tbody>

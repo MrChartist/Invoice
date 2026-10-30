@@ -673,7 +673,7 @@ export function buildHsnRows(lines: CalcLine[]): HsnSummaryRow[] {
   const map = new Map<string, HsnSummaryRow>();
   for (const l of lines) {
     if (l.taxable === 0 && l.tax === 0) continue;
-    const hsn = l.hsn || '—';
+    const hsn = l.hsn || '-';
     const key = `${hsn}@${l.tax_rate}`;
     const row =
       map.get(key) ??

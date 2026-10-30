@@ -3,7 +3,7 @@ import { ca, rel, t, type HelpTopic } from './types';
 
 export const TOPICS: readonly HelpTopic[] = [
   t('dashboard', 'Dashboard', 'डैशबोर्ड', "Today's position: sales, money due, quick actions and the setup checklist.", 'Start here each day; the tiles follow your business type.', {
-    steps: ['Use the quick-action row for a new invoice, money received, POS or an expense.', 'Work through "Get set up" — skip any step that does not apply.', 'Ctrl+K finds any screen, client or document.'],
+    steps: ['Use the quick-action row for a new invoice, money received, POS or an expense.', 'Work through "Get set up": skip any step that does not apply.', 'Ctrl+K finds any screen, client or document.'],
     related: rel(['New invoice', '/invoice'], ['Receivables', '/receivables'], ['Settings', '/settings']),
   }),
   t('invoice', 'Invoice editor', 'इनवॉइस एडिटर', 'Create or edit a sales document: invoice, quotation, order, challan, credit / debit note.', 'Whenever you bill a customer. A saved invoice keeps a snapshot of your business details, so old invoices never change.', {

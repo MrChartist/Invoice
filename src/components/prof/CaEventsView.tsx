@@ -43,7 +43,7 @@ export default function CaEventsView({ ctx }: { ctx: PsDeskCtx }) {
       </div>
       <div style={row}>
         <Fld l={caT('client')}>
-          <select className={controls.select} value={t.client} onChange={(e) => setT({ ...t, client: e.target.value })}><option value="">—</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+          <select className={controls.select} value={t.client} onChange={(e) => setT({ ...t, client: e.target.value })}><option value="">-</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
         </Fld>
         <Fld l={caT('event')}>
           <select className={controls.select} value={t.kind} onChange={(e) => setT({ ...t, kind: e.target.value as CaFeeEvent })}>{CA_FEE_EVENTS.map((k) => <option key={k} value={k}>{caT(`e.${k}`)}</option>)}</select>
@@ -60,7 +60,7 @@ export default function CaEventsView({ ctx }: { ctx: PsDeskCtx }) {
             <p className={controls.label}>{name(cid)}</p>
             <Tbl empty="" head={['', caT('event'), caT('period'), caT('date')]} rows={list.map((e) => [
               e.billedBy ? caT('billed') : <input key="c" type="checkbox" checked={picked[e.key] !== false} onChange={(x) => setPicked({ ...picked, [e.key]: x.target.checked })} aria-label={e.label} />,
-              `${caT(`e.${e.kind}`)} — ${e.label}`, e.period, e.date])} />
+              `${caT(`e.${e.kind}`)}: ${e.label}`, e.period, e.date])} />
             <button type="button" className={controls.btnPrimary} disabled={!chosen.length && !disb} onClick={() => ctx.run(() => { const inv = billFromBoard(cid, chosen, { disbursements: disb }); setLast(inv); return caT('made', { number: inv.invoice_number }); })} data-ps-b="ca-bill">{caT('bill')}</button>
           </div>
         );

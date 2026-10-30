@@ -185,7 +185,7 @@ export function buildCmp08(invoices: InvoiceRecord[], rawPurchases: unknown[], p
     r.base = round2(r.base + t.base);
     rateMap.set(t.rate, r);
     if (num(rec.tax_amount) > 0 || num(rec.cgst_amount) + num(rec.sgst_amount) + num(rec.igst_amount) > 0) {
-      issues.push({ severity: 'warning', code: 'TAX_COLLECTED', message: `${label}: GST was charged on a composition dealer's document. A composition dealer cannot collect tax (Sec 10(4)); tax collected must still be paid over — reissue it as a Bill of Supply and check with your CA.`, invoiceId: rec.id });
+      issues.push({ severity: 'warning', code: 'TAX_COLLECTED', message: `${label}: GST was charged on a composition dealer's document. A composition dealer cannot collect tax (Sec 10(4)); tax collected must still be paid over: reissue it as a Bill of Supply and check with your CA.`, invoiceId: rec.id });
     }
   }
 

@@ -37,7 +37,7 @@ export const SECURITY_RCM_RULES: readonly MpRule<SecurityRcm | null>[] = [
   { from: '2017-07-01', value: null, source: 'No reverse charge on security services before 1 Jan 2019 (N 29/2018-CT(R) para 2)', verified: false },
   {
     from: '2019-01-01',
-    value: { sac: '99852', exclude: ['gst_tds_only', 'composition'], decl: 'Tax payable on reverse charge by the recipient — security services supplied by a person other than a body corporate (N 13/2017-CT(R) entry 14, inserted by N 29/2018-CT(R)). Verify with your CA.' },
+    value: { sac: '99852', exclude: ['gst_tds_only', 'composition'], decl: 'Tax payable on reverse charge by the recipient: security services supplied by a person other than a body corporate (N 13/2017-CT(R) entry 14, inserted by N 29/2018-CT(R)). Verify with your CA.' },
     source: 'N 29/2018-CT(R) dated 31 Dec 2018, entry 14, provisos (i)(a)–(c) and (ii), para 2. Read (R17): gstcouncil.gov.in PDF (MP1)',
     verified: true,
   },
@@ -52,7 +52,7 @@ export const BODY_CORPORATE_RULES: readonly MpRule<readonly string[]>[] = [
 export interface EduExempt { sacs: readonly string[]; decl: string }
 
 export const EDU_EXEMPT_RULES: readonly MpRule<EduExempt>[] = [
-  { from: '2017-07-01', value: { sacs: ['99852', '99853'], decl: 'Exempt — security / cleaning / house-keeping services performed in an educational institution up to higher secondary (N 12/2017-CT(R) Sl. 66(b)(iii)). Verify with your CA.' }, source: 'N 12/2017-CT(R) Sl. 66(b)(iii) and proviso. Read (R17): 2017 text, gstcouncil.gov.in; amendments after 2017 not read (MP7)', verified: true },
+  { from: '2017-07-01', value: { sacs: ['99852', '99853'], decl: 'Exempt: security / cleaning / house-keeping services performed in an educational institution up to higher secondary (N 12/2017-CT(R) Sl. 66(b)(iii)). Verify with your CA.' }, source: 'N 12/2017-CT(R) Sl. 66(b)(iii) and proviso. Read (R17): 2017 text, gstcouncil.gov.in; amendments after 2017 not read (MP7)', verified: true },
 ];
 
 /** N 5/2017-CT: a supplier of only reverse-charge supplies need not register (note only, MP9). */

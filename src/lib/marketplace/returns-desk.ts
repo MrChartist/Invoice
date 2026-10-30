@@ -25,8 +25,8 @@ import { MARKETPLACE_RETURNS_TABLE } from './channels';
 
 /** Platform claim windows in days, by effective date (marketplace policy — verify on the seller portal). */
 export const CLAIM_WINDOW_RULES: Readonly<Record<ChannelPlatform, readonly Versioned<number>[]>> = {
-  amazon: [{ from: '2017-07-01', value: 60, source: 'Amazon SAFE-T / FBA reimbursement window as published — verify' }],
-  flipkart: [{ from: '2017-07-01', value: 14, source: 'Flipkart SPF claim window as published — verify' }],
+  amazon: [{ from: '2017-07-01', value: 60, source: 'Amazon SAFE-T / FBA reimbursement window as published: verify' }],
+  flipkart: [{ from: '2017-07-01', value: 14, source: 'Flipkart SPF claim window as published: verify' }],
   meesho: [{ from: '2017-07-01', value: 0, source: 'typed on the channel' }],
   other: [{ from: '2017-07-01', value: 0, source: 'typed on the channel' }],
 };
@@ -212,7 +212,7 @@ export function restockReturn(id: string, opts: { day: string; godownId?: string
   if (!r) throw new DeskError('Return not found.');
   if (r.credit_note_id) return { row: patch(id, (x) => ({ ...x, received_on: x.received_on ?? opts.day, condition: x.condition ?? 'good' })) };
   const inv = r.doc_id ? localDb.invoices.getById(r.doc_id) : undefined;
-  if (!inv || inv.status === 'Cancelled') throw new DeskError('The invoice for this order is not in the books — import the sales report first.');
+  if (!inv || inv.status === 'Cancelled') throw new DeskError('The invoice for this order is not in the books: import the sales report first.');
   const damaged = !!r.condition && r.condition !== 'good';
   const godown = damaged ? opts.channel.damaged_godown_id || opts.godownId : opts.godownId || opts.channel.godown_id;
   return withTablesRollback(['invoices', 'doc_links', 'clients', 'items_catalog', MARKETPLACE_RETURNS_TABLE, 'transactions'], () => {

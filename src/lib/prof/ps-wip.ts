@@ -45,7 +45,7 @@ export function wipRows(time: readonly TimeEntry[], costs: readonly PurchaseReco
   const map = new Map<string, WipRow>();
   const keyOf = (cc: string | undefined, client: string) => {
     const c = cc ? centre.get(cc) : undefined;
-    if (o.by === 'matter') return c ? [c.id, c.ps?.code ? `${c.ps.code} — ${c.name}` : c.name] : [`client:${client}`, client];
+    if (o.by === 'matter') return c ? [c.id, c.ps?.code ? `${c.ps.code}: ${c.name}` : c.name] : [`client:${client}`, client];
     if (o.by === 'partner') return [c?.ps?.responsible_id ?? '', c?.ps?.responsible_id ?? ''];
     return [`client:${client}`, client];
   };
@@ -94,7 +94,7 @@ export function writeOffWip(timeIds: readonly string[], costIds: readonly string
   if (!reason.trim()) throw new Error('Give the reason for the write-off.');
   const wo: PsWriteOff = { date, reason: reason.trim(), ...(currentActor()?.name ? { by: currentActor()!.name } : {}) };
   const n = stamp(TIME_TABLE, new Set(timeIds), wo).length + stamp(PURCHASES_TABLE, new Set(costIds), wo).length;
-  audit.record({ entity: 'settings', entity_id: 'time_entries', action: 'update', summary: `WIP written off: ${n} row(s) — ${wo.reason}` });
+  audit.record({ entity: 'settings', entity_id: 'time_entries', action: 'update', summary: `WIP written off: ${n} row(s), ${wo.reason}` });
   return n;
 }
 

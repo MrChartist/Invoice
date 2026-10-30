@@ -64,7 +64,7 @@ export function todaySummary(input: { invoices: readonly InvoiceRecord[]; paymen
 export function todayText(s: TodaySummary, business: string): string {
   const m = (n: number) => formatCurrency(n, 'INR');
   return [
-    `*${business || 'Business'} — today (${s.day})*`,
+    `*${business || 'Business'}: today (${s.day})*`,
     `Sales: ${m(s.sales)} (${s.bills} bill${s.bills === 1 ? '' : 's'})`,
     `Collected: cash ${m(s.cash)} · UPI ${m(s.upi)} · bank ${m(s.bank)}`,
     `Udhaar given: ${m(s.udhaar)}`,

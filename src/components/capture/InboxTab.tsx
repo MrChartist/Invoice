@@ -153,8 +153,8 @@ export default function InboxTab({ onPost, onChanged, businessState, focusId }: 
 
   const sourceTag = (d: PurchaseDraft) => {
     const ap = d.draft.approval;
-    if (ap?.state === 'pending') return <span className={css.tagWarn}>{capT('srcPending', { by: ap.requested_by || '—' })}</span>;
-    if (ap?.state === 'rejected') return <span className={css.tagWarn}>{capT('srcRejected', { note: ap.note || '—' })}</span>;
+    if (ap?.state === 'pending') return <span className={css.tagWarn}>{capT('srcPending', { by: ap.requested_by || '-' })}</span>;
+    if (ap?.state === 'rejected') return <span className={css.tagWarn}>{capT('srcRejected', { note: ap.note || '-' })}</span>;
     return <span className={css.tag}>{capT(d.draft.source === 'capture' ? 'srcCapture' : d.draft.source === 'recurring' ? 'srcRecurring' : 'srcManual')}</span>;
   };
 

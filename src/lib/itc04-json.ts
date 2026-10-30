@@ -22,7 +22,7 @@ import { round2 } from './invoice-calc';
  */
 export const ITC04_JSON_LAYOUT = { verified: false, checked: '2026-10-29', ca: 'G43' } as const;
 
-export const ITC04_JSON_NOTE = 'ITC-04 JSON — layout unverified (not validated against the GST portal / offline tool); verify with your CA before uploading.';
+export const ITC04_JSON_NOTE = 'ITC-04 JSON: layout unverified (not validated against the GST portal / offline tool); verify with your CA before uploading.';
 
 const ddmmyyyy = (iso: string) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? '');

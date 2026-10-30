@@ -52,13 +52,13 @@ export function dueList(assets: readonly ServiceAsset[], today: string, horizon 
 
 const TEXT = {
   en: {
-    service: 'Hello {name}, your {what} is due for service on {date}{km}. Reply to book a slot. — {business}',
-    insurance: 'Hello {name}, the insurance of your {what} expires on {date}. Renew it in time. — {business}',
+    service: 'Hello {name}, your {what} is due for service on {date}{km}. Reply to book a slot. {business}',
+    insurance: 'Hello {name}, the insurance of your {what} expires on {date}. Renew it in time. {business}',
     km: ' or at {km} km',
   },
   hi: {
-    service: 'नमस्ते {name}, आपकी {what} की सर्विस {date}{km} को देय है। समय बुक करने के लिए जवाब दें। — {business}',
-    insurance: 'नमस्ते {name}, आपकी {what} का बीमा {date} को ख़त्म होता है। समय पर रिन्यू करें। — {business}',
+    service: 'नमस्ते {name}, आपकी {what} की सर्विस {date}{km} को देय है। समय बुक करने के लिए जवाब दें। {business}',
+    insurance: 'नमस्ते {name}, आपकी {what} का बीमा {date} को ख़त्म होता है। समय पर रिन्यू करें। {business}',
     km: ' या {km} km पर',
   },
 } as const;

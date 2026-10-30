@@ -211,7 +211,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                   aria-label={t('items.itemDesc', { n: index + 1 })}
                 />
                 {item.price_basis || item.free_of ? (
-                  <div className={styles.customLine} title={item.free_of ? 'Free under a scheme' : 'Rate set by the price level / quantity slab — type a rate to override'}>
+                  <div className={styles.customLine} title={item.free_of ? 'Free under a scheme' : 'Rate set by the price level / quantity slab: type a rate to override'}>
                     {item.free_of ? 'Free (scheme)' : `${item.price_basis} price`}
                   </div>
                 ) : null}
@@ -260,7 +260,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                   inputMode="numeric"
                   maxLength={8}
                   onChange={(e) => updateItem(item.id, 'hsn', e.target.value.replace(/\D/g, ''))}
-                  placeholder="—"
+                  placeholder="-"
                   aria-label={t('items.itemHsn', { n: index + 1 })}
                 />
               </div>

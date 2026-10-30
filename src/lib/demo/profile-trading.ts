@@ -24,7 +24,7 @@ import type { ProfileContext } from './profiles';
 const fyOf = (d: string) => getIndianFY(d).label;
 
 function agencyExtras({ today, base }: ProfileContext): DemoExtras {
-  const godown: Demo<Godown> = { id: 'demo-godown-agency', demo: true, name: 'Agency (principals’ goods) — demo', kind: 'consignment' };
+  const godown: Demo<Godown> = { id: 'demo-godown-agency', demo: true, name: 'Agency (principals’ goods): demo', kind: 'consignment' };
   const principal = base.vendors[0];
   const day = shiftDay(today, -6);
   const arrival: Demo<Arrival> = {
@@ -69,7 +69,7 @@ function agencyExtras({ today, base }: ProfileContext): DemoExtras {
       po_number: undefined,
       amount_paid: 0,
       agency: true,
-      notes: 'Sale on behalf of the principal (kachi aadat) — sample.',
+      notes: 'Sale on behalf of the principal (kachi aadat): sample.',
       created_at: `${d}T11:00:00.000Z`,
     } as Demo<InvoiceRecord>);
   };
@@ -159,7 +159,7 @@ function commodityExtras({ today, base }: ProfileContext): DemoExtras {
     po_number: undefined,
     amount_paid: 0,
     broker_id: broker.id,
-    notes: 'Weighed sale with mandi charges and a broker — sample.',
+    notes: 'Weighed sale with mandi charges and a broker: sample.',
     created_at: `${d}T12:00:00.000Z`,
   } as Demo<InvoiceRecord>);
   return { invoices: [sale], tables: { stock_items: [item], trade_charge_heads: heads, sales_agents: [broker] } };

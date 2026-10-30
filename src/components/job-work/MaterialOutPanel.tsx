@@ -233,7 +233,7 @@ function OutModal({ data, doc, prefill, onClose, onPrint }: { data: JwData; doc:
             <input id="jwc-state" className={controls.input} inputMode="numeric" maxLength={2} value={party.party_state_code ?? ''} onChange={(e) => setParty({ ...party, party_state_code: e.target.value.replace(/\D/g, '') || undefined })} />
           </div>
         </div>
-        <p className={styles.muted}>{jwT('jwGodown')}: <strong>{existingGodown?.name ?? (party.party_name.trim() ? `${party.party_name.trim()} (job worker)` : '—')}</strong></p>
+        <p className={styles.muted}>{jwT('jwGodown')}: <strong>{existingGodown?.name ?? (party.party_name.trim() ? `${party.party_name.trim()} (job worker)` : '-')}</strong></p>
         <p className={styles.section}>{jwT('sendLabel')}</p>
         <JwLinesGrid lines={lines} items={tracked} onChange={setLines} opts={{ label: jwT('sendLabel'), godowns: data.ownGodowns, batch: tracked.some((i) => i.track_batches), value: true, units: data.units, serials: 'out', serialPool }} />
         {warnings.length > 0 && <div className={styles.notice} role="status"><ul>{warnings.map((w) => <li key={w}>{w}</li>)}</ul></div>}

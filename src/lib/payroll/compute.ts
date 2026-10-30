@@ -390,7 +390,7 @@ export function computePayslip(input: ComputeInput): PayslipLine | null {
   const esi = esiOn ? esiContribution(esiWages, decidedRate, date, coveredBefore) : { covered: false, ee: 0, er: 0 };
   // 7T: no employee share when the average daily wage is within the low-wage limit (employer still pays).
   const lowWage = esiOn && esi.covered && esi.ee > 0 && payable > 0 && esiWages / payable <= esiLowWageLimit(date);
-  if (lowWage) notes.push(`ESI: average daily wage ₹${round2(esiWages / payable)} is within ₹${esiLowWageLimit(date)} — no employee share; the employer pays its share.`);
+  if (lowWage) notes.push(`ESI: average daily wage ₹${round2(esiWages / payable)} is within ₹${esiLowWageLimit(date)}, no employee share; the employer pays its share.`);
   const esi_ee = esiOn ? pick('esi', lowWage ? 0 : esi.ee) : 0;
   const esi_er = esiOn && stat('esi_er') ? pick('esi_er', esi.er) : 0;
 
@@ -440,7 +440,7 @@ export function computePayslip(input: ComputeInput): PayslipLine | null {
     if (stat('pf_er')) pushIf(arrEmployer, 'arr:pf_er', 'PF on arrears (employer)', 'pf_er', round2(s.eps + s.epf_er), A.pfEmployer);
     if (stat('pf_admin')) pushIf(arrEmployer, 'arr:pf_admin', 'PF admin & EDLI on arrears', 'pf_admin', round2(s.edli + s.pf_admin), A.pfAdmin);
     if (stat('esi_er')) pushIf(arrEmployer, 'arr:esi_er', 'ESI on arrears (employer)', 'esi_er', s.esi_er, A.esiEmployer);
-    if (s.earlier_fy) notes.push('Arrears include salary of an earlier financial year: relief u/s 89 (Form 10E) may be available to the employee — verify with your CA.');
+    if (s.earlier_fy) notes.push('Arrears include salary of an earlier financial year: relief u/s 89 (Form 10E) may be available to the employee, verify with your CA.');
   }
 
   // Non-statutory deductions / employer heads (after gross)
@@ -511,7 +511,7 @@ export function computePayslip(input: ComputeInput): PayslipLine | null {
     if (noPan && taxBeforeRelief > tax.total) notes.push(`No PAN: TDS at ${noPanRate(fyStart)}% of income (s. 206AA) instead of the average rate.`);
     // 7T relief u/s 89(1) allowed by the employer (s. 192(2A), Form 10E furnished).
     const relief = Math.min(taxBeforeRelief, round2(Math.max(0, extras.relief89 ?? 0)));
-    if (relief > 0) notes.push(`Relief u/s 89(1) of ₹${relief} allowed in the year's TDS (Form 10E working) — verify with your CA.`);
+    if (relief > 0) notes.push(`Relief u/s 89(1) of ₹${relief} allowed in the year's TDS (Form 10E working): verify with your CA.`);
     const annualTax = round2(taxBeforeRelief - relief);
     const due = Math.max(0, round2(annualTax - ytdTds - (e.prev_tds ?? 0)));
     const computed = remainingMonths.length <= 1 || extras.fnfId ? Math.round(due) : Math.round(due / remainingMonths.length);
@@ -547,7 +547,7 @@ export function computePayslip(input: ComputeInput): PayslipLine | null {
   if (pfOn && !e.uan) warnings.push(`${e.name}: no UAN for the PF return.`);
   if (esiOn && esi.covered && !e.esi_no) warnings.push(`${e.name}: covered by ESI but has no IP number.`);
   if (ptOn && e.state && !['27', '29', '19', '33', '24', '37', '36'].includes(e.state)) warnings.push(`${e.name}: no Professional Tax slabs for this state; enter PT by hand.`);
-  if (tdsHead && !e.pan && tds > 0) warnings.push(`${e.name}: no PAN — TDS at 20% may apply (s. 206AA).`);
+  if (tdsHead && !e.pan && tds > 0) warnings.push(`${e.name}: no PAN, TDS at 20% may apply (s. 206AA).`);
 
   return {
     employee_id: e.id,

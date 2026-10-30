@@ -296,7 +296,7 @@ export function assignParties(ids: readonly string[], patch: { [K in keyof Party
   });
   if (!n) return 0;
   setTable('clients', rows);
-  logMaster('Parties', ids.join(','), 'update', `${n} part${n === 1 ? 'y' : 'ies'} assigned (${Object.entries(patch).filter(([, v]) => v !== undefined).map(([k, v]) => `${k}=${v || '—'}`).join(', ')})`);
+  logMaster('Parties', ids.join(','), 'update', `${n} part${n === 1 ? 'y' : 'ies'} assigned (${Object.entries(patch).filter(([, v]) => v !== undefined).map(([k, v]) => `${k}=${v || '-'}`).join(', ')})`);
   return n;
 }
 

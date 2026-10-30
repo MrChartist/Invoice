@@ -51,7 +51,7 @@ export default function PartnersView({ ctx }: { ctx: PsDeskCtx }) {
       </div>
       <Tbl empty={fdT('none')} head={[fdT('name'), fdT('pan'), fdT('kind'), fdT('joined'), fdT('share'), fdT('remMode'), fdT('interestPct'), fdT('ratioFrom'), '']} rows={partners.map((p) => {
         const t = termOn(p, today) ?? p.terms[0];
-        return [p.name, p.pan ?? '—', p.kind === 'working' ? fdT('working') : fdT('nonWorking'), p.joined, `${t?.share_pct ?? 0}`, t ? (t.remuneration.mode === 'fixed' ? inr(t.remuneration.amount ?? 0) : t.remuneration.mode === 'pct_book_profit' ? `${t.remuneration.pct} %` : fdT('maxAllow')) : '—', `${t?.interest_pct ?? 0}`,
+        return [p.name, p.pan ?? '-', p.kind === 'working' ? fdT('working') : fdT('nonWorking'), p.joined, `${t?.share_pct ?? 0}`, t ? (t.remuneration.mode === 'fixed' ? inr(t.remuneration.amount ?? 0) : t.remuneration.mode === 'pct_book_profit' ? `${t.remuneration.pct} %` : fdT('maxAllow')) : '-', `${t?.interest_pct ?? 0}`,
           num(ratio.shares[p.id] ?? t?.share_pct ?? 0, (v) => setRatio({ ...ratio, shares: { ...ratio.shares, [p.id]: v } }), 'r-share'),
           // R16-B5: refused while a partner posting or a ledger line names the partner (recycle bin)
           can('settings.manage') && <button type="button" className={sm} onClick={() => window.confirm(r16bT('delAsk', { name: p.name })) && ctx.run(() => deletePartner(p.id), r16bT('deleted'))} data-ps-b="p-del">{r16bT('del')}</button>];
@@ -66,7 +66,7 @@ export default function PartnersView({ ctx }: { ctx: PsDeskCtx }) {
       <div style={row}>
         <Fld l={fdT('kind')}>
           <select className={controls.select} value={dr.partner} onChange={(e) => setDr({ ...dr, partner: e.target.value })} data-ps="d-partner">
-            <option value="">—</option>{partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            <option value="">-</option>{partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Fld>
         <Fld l={fdT('amount')}>{num(dr.amount, (v) => setDr({ ...dr, amount: v }), 'd-amount')}</Fld>

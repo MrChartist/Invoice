@@ -107,7 +107,7 @@ export default function AnnexureBlock({ invoice }: { invoice: InvoiceRecord }) {
                       {x.description}
                       {x.pure_agent && <span className={styles.flag}> · pure agent (Rule 33), outside the taxable value</span>}
                     </td>
-                    <td className={styles.n}>{x.markup_pct ? `${x.markup_pct}%` : '–'}</td>
+                    <td className={styles.n}>{x.markup_pct ? `${x.markup_pct}%` : '-'}</td>
                     <td className={styles.n}>{cfg.money(x.amount, invoice.currency)}</td>
                   </tr>
                 ))}

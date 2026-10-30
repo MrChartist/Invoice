@@ -147,7 +147,7 @@ export function JwLinesGrid({ lines, items, onChange, opts }: {
                   <td>
                     {l.kind === 'scrap'
                       ? <input className={cn(controls.input, controls.inputNumeric)} inputMode="decimal" disabled={opts.disabled} aria-label={jwT('lineRate', { label: L, n })} value={l.rate ? String(l.rate) : ''} onChange={(e) => patch(l.id, { rate: Number(e.target.value) || undefined })} />
-                      : <span className={styles.muted}>—</span>}
+                      : <span className={styles.muted}>-</span>}
                   </td>
                 )}
                 {opts.challans && (
@@ -161,7 +161,7 @@ export function JwLinesGrid({ lines, items, onChange, opts }: {
                 {multi && (
                   <td>
                     <select className={controls.select} disabled={opts.disabled} aria-label={jwT('lineGodown', { label: L, n })} value={l.godown_id ?? ''} onChange={(e) => patch(l.id, { godown_id: e.target.value || undefined })}>
-                      <option value="">—</option>
+                      <option value="">-</option>
                       {opts.godowns?.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                     </select>
                   </td>
@@ -170,7 +170,7 @@ export function JwLinesGrid({ lines, items, onChange, opts }: {
                   <td>
                     {it?.track_batches
                       ? <input className={controls.input} disabled={opts.disabled} aria-label={jwT('lineBatch', { label: L, n })} value={l.batch_no ?? ''} onChange={(e) => patch(l.id, { batch_no: e.target.value || undefined })} />
-                      : <span className={styles.muted}>—</span>}
+                      : <span className={styles.muted}>-</span>}
                   </td>
                 )}
                 {anySerial && (
@@ -182,7 +182,7 @@ export function JwLinesGrid({ lines, items, onChange, opts }: {
                         pool={serialDir(l) === 'out' && opts.serialPool ? () => opts.serialPool!(l.item_id, l) : undefined}
                         onChange={(serials) => patch(l.id, { serials })}
                       />
-                    ) : <span className={styles.muted}>—</span>}
+                    ) : <span className={styles.muted}>-</span>}
                   </td>
                 )}
                 <td>

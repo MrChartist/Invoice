@@ -211,7 +211,7 @@ export function yearEndChecklist(input: YearEndInput): YearEndStep[] {
       id: 'agency_lots',
       status: !lots.length ? 'done' : marks.agency_lots ? 'done' : 'warn',
       facts: lots.length
-        ? [`${lots.length} agency lot${lots.length === 1 ? ' has' : 's have'} sales not settled on a posted bikri patti: ${lots.slice(0, 10).map((l) => `${l.lot_no} (${l.number}, ${l.principal})`).join(', ')}${lots.length > 10 ? ' …' : ''}. Their sales still sit in Sales: post the pattis in Distribution → Agency (turn the agency pack on if it is off) — verify with your CA.`]
+        ? [`${lots.length} agency lot${lots.length === 1 ? ' has' : 's have'} sales not settled on a posted bikri patti: ${lots.slice(0, 10).map((l) => `${l.lot_no} (${l.number}, ${l.principal})`).join(', ')}${lots.length > 10 ? ' …' : ''}. Their sales still sit in Sales: post the pattis in Distribution → Agency (turn the agency pack on if it is off), verify with your CA.`]
         : ['Every agency lot sold up to the year end is settled on a posted bikri patti.'],
     });
   }
@@ -224,20 +224,20 @@ export function yearEndChecklist(input: YearEndInput): YearEndStep[] {
       status: !w.orders || marks.wip_statement ? 'done' : 'todo',
       amount: w.value,
       facts: w.orders
-        ? [`${w.orders} open production order${w.orders === 1 ? '' : 's'} hold ${rs(w.value)} of work-in-progress at the year end (material; conversion is a memo unless absorption is on). Download the WIP statement for the auditor (Schedule III, AS 2) — verify MF24 / MF25 with your CA.`]
+        ? [`${w.orders} open production order${w.orders === 1 ? '' : 's'} hold ${rs(w.value)} of work-in-progress at the year end (material; conversion is a memo unless absorption is on). Download the WIP statement for the auditor (Schedule III, AS 2): verify MF24 / MF25 with your CA.`]
         : ['No production order holds work-in-progress at the year end.'],
     });
   }
 
   /* 6. Lock */
   const locked = !!input.lockUntil && input.lockUntil >= end;
-  steps.push({ id: 'lock', status: locked ? 'done' : 'todo', facts: [locked ? `Books are locked up to ${input.lockUntil}.` : input.lockUntil ? `Locked only up to ${input.lockUntil}.` : 'The year is not locked.', ...(input.rxRetained ? [`${input.rxRetained.count} bill(s) with Schedule H1 / X drugs must be kept until ${input.rxRetained.until} (Drugs Rules retention, RT7) — do not delete them; verify with your drug inspector / CA.`] : [])] });
+  steps.push({ id: 'lock', status: locked ? 'done' : 'todo', facts: [locked ? `Books are locked up to ${input.lockUntil}.` : input.lockUntil ? `Locked only up to ${input.lockUntil}.` : 'The year is not locked.', ...(input.rxRetained ? [`${input.rxRetained.count} bill(s) with Schedule H1 / X drugs must be kept until ${input.rxRetained.until} (Drugs Rules retention, RT7): do not delete them; verify with your drug inspector / CA.`] : [])] });
 
   /* 7. Carry forward */
   steps.push({ id: 'carry_forward', status: marks.carry_forward ? 'done' : 'todo', facts: ['Opening balances of the new year = closing balances of this year (the profit moves to Reserves & surplus).'] });
 
   /* 8. Auditor pack (R4-C5, mark only) */
-  steps.push({ id: 'auditor_pack', status: marks.auditor_pack ? 'done' : 'todo', facts: [marks.auditor_pack ? `Auditor pack generated on ${marks.auditor_pack.slice(0, 10)}.` : 'Generate the auditor pack (edit log, deletions, back-dated entries, integrity) in Settings → Activity — Rule 11(g), verify with your CA.'] });
+  steps.push({ id: 'auditor_pack', status: marks.auditor_pack ? 'done' : 'todo', facts: [marks.auditor_pack ? `Auditor pack generated on ${marks.auditor_pack.slice(0, 10)}.` : 'Generate the auditor pack (edit log, deletions, back-dated entries, integrity) in Settings → Activity: Rule 11(g), verify with your CA.'] });
   return steps;
 }
 
@@ -270,7 +270,7 @@ export function carryForward(ledger: Ledger, fyStart: number): { rows: CarryRow[
 }
 
 export function carryForwardCsv(c: ReturnType<typeof carryForward>, fyStart: number): string {
-  const rows: unknown[][] = [[`Opening balances for ${fyId(fyStart + 1)} (working paper — verify with your CA)`], ['Code', 'Ledger', 'Group', 'Dr', 'Cr']];
+  const rows: unknown[][] = [[`Opening balances for ${fyId(fyStart + 1)} (working paper: verify with your CA)`], ['Code', 'Ledger', 'Group', 'Dr', 'Cr']];
   for (const r of c.rows) rows.push([r.account.code, r.account.name, groupOf(r.account.group).label, r.balance > 0 ? (r.balance / 100).toFixed(2) : '', r.balance < 0 ? (-r.balance / 100).toFixed(2) : '']);
   rows.push(['', 'Total', '', (c.dr / 100).toFixed(2), (c.cr / 100).toFixed(2)]);
   rows.push(['', `${c.profit >= 0 ? 'Profit' : 'Loss'} for ${fyId(fyStart)} carried to Reserves & surplus`, '', '', (Math.abs(c.profit) / 100).toFixed(2)]);

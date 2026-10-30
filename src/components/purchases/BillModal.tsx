@@ -374,7 +374,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
           <select id="bill-pos" className={controls.select} value={pos} onChange={(e) => setPos(e.target.value)}>
             <option value="">{purT('notSpecified')}</option>
             {INDIAN_STATES.map((s) => (
-              <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
+              <option key={s.code} value={s.code}>{s.code} : {s.name}</option>
             ))}
           </select>
           <span className={controls.hint}>

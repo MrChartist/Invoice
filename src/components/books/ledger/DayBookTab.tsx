@@ -60,7 +60,7 @@ export function DayBookTab({ ledger, period }: { ledger: Ledger; period: Period 
 
   const csv = () =>
     toCsv([
-      ['Day Book', `${period.start} to ${period.end}`, 'Working paper — verify with your CA'],
+      ['Day Book', `${period.start} to ${period.end}`, 'Working paper: verify with your CA'],
       ['Date', 'Voucher type', 'Vch no.', 'Party', 'Debit ledger', 'Credit ledger', 'Narration', 'Amount'],
       // R20-C: rows hidden or filtered out on screen are left out (the total is of the rows exported).
       ...shown.map((e) => [e.voucher.date, e.voucher.kind, e.voucher.number, e.voucher.party, e.debitAccount, e.creditAccount, e.voucher.narration, e.amount / 100]),
@@ -117,7 +117,7 @@ export function DayBookTab({ ledger, period }: { ledger: Ledger; period: Period 
                         <td><span className={v.source === 'manual' ? styles.badgeManual : styles.badge}>{kindLabel(v.kind)}</span></td>
                         <td>
                           {target.type === 'none' ? (
-                            <span className={surface.mono}>{v.number || '—'}</span>
+                            <span className={surface.mono}>{v.number || '-'}</span>
                           ) : (
                             <button type="button" className={styles.rowButton} onClick={() => openVoucher(v)}>{v.number || reportsT('open')}</button>
                           )}
@@ -131,7 +131,7 @@ export function DayBookTab({ ledger, period }: { ledger: Ledger; period: Period 
                             <td style={{ paddingLeft: l.cr ? '2.5rem' : '1.25rem' }}>
                               {l.cr ? `${reportsT('to')} ` : `${reportsT('by')} `}
                               {name(l.account)}
-                              {l.party ? ` — ${l.party}` : ''}
+                              {l.party ? `: ${l.party}` : ''}
                             </td>
                             <td />
                             <td />

@@ -65,7 +65,7 @@ export function recordSecured(i: SecuredInput): SecuredAdvance {
   return withTablesRollback([SECURED_TABLE, 'vouchers', 'accounts'], () => {
     const p = rupeesToPaise(amount);
     const cash = i.mode === 'cash' ? A.cash : bankLedgerId(i.bank_account_id);
-    const v = saveVoucher({ type: 'RECEIPT', date: i.date, voucher_class: SECURED_CLASS, narration: `Secured advance ${pct}% on materials at site — ${i.party}`, lines: [{ account_id: cash, dr: p, cr: 0 }, { account_id: ensureAccountByName(...SECURED_ACCOUNT), dr: 0, cr: p }] });
+    const v = saveVoucher({ type: 'RECEIPT', date: i.date, voucher_class: SECURED_CLASS, narration: `Secured advance ${pct}% on materials at site: ${i.party}`, lines: [{ account_id: cash, dr: p, cr: 0 }, { account_id: ensureAccountByName(...SECURED_ACCOUNT), dr: 0, cr: p }] });
     const row: SecuredAdvance = { id: generateId(), contract_id: i.contract_id, date: i.date, materials, pct, amount, mode: i.mode || 'bank', ...(i.bank_account_id ? { bank_account_id: i.bank_account_id } : {}), voucher_id: v.id, status: 'open', created_at: new Date().toISOString() };
     setTable(SECURED_TABLE, [...getTable<SecuredAdvance>(SECURED_TABLE), row]);
     return row;

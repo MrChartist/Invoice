@@ -241,9 +241,9 @@ export function CatalogPanel({ notify }: { notify: Notify }) {
                         {[i.type === 'Product' ? setT('type.Product') : i.type && i.type !== 'Service' ? i.type : setT('type.Service'), i.sku && setT('skuN', { sku: i.sku }), i.barcode && setT('barcodeN', { code: i.barcode }), i.qty_slabs?.length ? setT(i.qty_slabs.length === 1 ? 'slabsOne' : 'slabsMany', { n: i.qty_slabs.length }) : ''].filter(Boolean).join(' · ')}
                       </div>
                     </td>
-                    <td className={surface.mono}>{i.hsn || '—'}</td>
-                    <td>{i.unit || '—'}</td>
-                    <td className={surface.numeric}>{typeof i.tax_rate === 'number' ? `${i.tax_rate}%` : '—'}</td>
+                    <td className={surface.mono}>{i.hsn || '-'}</td>
+                    <td>{i.unit || '-'}</td>
+                    <td className={surface.numeric}>{typeof i.tax_rate === 'number' ? `${i.tax_rate}%` : '-'}</td>
                     <td className={surface.numeric}>{formatCurrency(i.rate ?? 0)}</td>
                     <td>
                       <div className={surface.rowActions}>

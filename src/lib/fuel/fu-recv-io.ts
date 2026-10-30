@@ -35,7 +35,7 @@ function record(client: Client, day: string, docType: 'BILL_OF_SUPPLY' | 'TAX_IN
   return { ...rec, subtotal: t.subtotal, discount_amount: t.discount_amount, taxable_value: t.taxable_value, cgst_amount: t.cgst_amount, sgst_amount: t.sgst_amount, igst_amount: t.igst_amount, tax_amount: t.tax_amount, cess_amount: t.cess_amount, round_off: t.round_off, total: t.total, balance_due: t.balance_due, tcs_amount: t.tcs_amount, tds_amount: t.tds_amount };
 }
 
-const slipDoc = (d: SlipDoc, c: Client, day: string) => record(c, day, d.fuel ? 'BILL_OF_SUPPLY' : 'TAX_INVOICE', d.items, { fu: { lines: d.lines, slip_ids: d.slip_ids }, annexure: { kind: 'timesheet', rows: d.annexure, taken_at: new Date().toISOString() }, notes: 'Credit slips — vehicle-wise annexure attached.' }, !d.fuel);
+const slipDoc = (d: SlipDoc, c: Client, day: string) => record(c, day, d.fuel ? 'BILL_OF_SUPPLY' : 'TAX_INVOICE', d.items, { fu: { lines: d.lines, slip_ids: d.slip_ids }, annexure: { kind: 'timesheet', rows: d.annexure, taken_at: new Date().toISOString() }, notes: 'Credit slips: vehicle-wise annexure attached.' }, !d.fuel);
 
 /** Month-end (or daily) billing: every unbilled slip dated on or before `day`, one document per customer × kind, in one write. */
 export function billSlips(day: string): InvoiceRecord[] {

@@ -100,7 +100,7 @@ export function materialReco(i: RecoInput): RecoRow[] {
 }
 
 export const recoCsvRows = (rows: readonly RecoRow[], name: (id: string) => string): (string | number)[][] => [
-  ['Material', 'Opening', 'Received — own', 'Client issue — free', 'Client issue — recovery', 'Theoretical', 'Actual', 'Variation %', 'Band −%', 'Band +%', 'Beyond band', 'Recovery rate', 'Recovery', 'Closing at site'],
+  ['Material', 'Opening', 'Received: own', 'Client issue: free', 'Client issue: recovery', 'Theoretical', 'Actual', 'Variation %', 'Band −%', 'Band +%', 'Beyond band', 'Recovery rate', 'Recovery', 'Closing at site'],
   ...rows.map((r) => [name(r.itemId), r.opening, r.own, r.clientFree, r.clientRecovery, r.theoretical, r.actual, r.variancePct ?? '', r.lo, r.hi, r.excess, r.recoveryRate, r.recovery, r.closing]),
 ];
 
@@ -111,7 +111,7 @@ export function recoHtml(rows: readonly RecoRow[], name: (id: string) => string,
   return `<!doctype html><meta charset="utf-8"><title>Material reconciliation</title><style>${PRINT_FONT_FACE}body{font:12px ${PRINT_FONT};margin:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:3px;text-align:right}td:first-child,th:first-child{text-align:left}</style>
 <h2>Material reconciliation statement</h2><p>${e(head.company)} · Site ${e(head.site)} · ${e(head.from)} to ${e(head.to)}</p>
 <table><tr>${h.map((c) => `<th>${e(c)}</th>`).join('')}</tr>${body.map((r) => `<tr>${r.map((c) => `<td>${e(c)}</td>`).join('')}</tr>`).join('')}</table>
-<p><small>Free-issue materials are shown by quantity only (value 0). Band, issue rate and penal factor are contract terms. Working paper — verify with your CA (CN9).</small></p>`;
+<p><small>Free-issue materials are shown by quantity only (value 0). Band, issue rate and penal factor are contract terms. Working paper: verify with your CA (CN9).</small></p>`;
 }
 
 /* ── Site terms and client issues (on the site godown) ── */

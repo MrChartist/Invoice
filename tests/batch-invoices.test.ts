@@ -20,7 +20,7 @@ function source(over: Partial<InvoiceRecord> = {}): InvoiceRecord {
     id: 'src', invoice_number: 'INV/FY25-26/0009', doc_type: 'TAX_INVOICE', issue_date: '2026-02-01', due_date: '2026-02-15', status: 'Sent',
     currency: 'INR', template_id: 't', client: { name: 'Template party', email: '', address: '', city: '', zip: '' }, sender,
     items: [
-      { id: 'l1', name: 'Maintenance — {month}', type: 'service', hsn: '999598', quantity: 1, rate: 2500, tax_rate: 18, amount: 2500, serials: ['X'] },
+      { id: 'l1', name: 'Maintenance: {month}', type: 'service', hsn: '999598', quantity: 1, rate: 2500, tax_rate: 18, amount: 2500, serials: ['X'] },
       { id: 'l2', name: 'Water', type: 'service', quantity: 1, rate: 300, tax_rate: 0, amount: 300 },
       { id: 'l3', name: 'Gym (optional)', type: 'service', quantity: 1, rate: 500, tax_rate: 18, amount: 500, optional: true },
     ],
@@ -36,7 +36,7 @@ const parties = (list: Client[], over: Record<string, BatchParty['override']> = 
 
 test('template from a document: serials and unselected optional lines dropped', () => {
   const t = templateFromDocument(source());
-  assert.deepEqual(t.items.map((i) => i.name), ['Maintenance — {month}', 'Water']);
+  assert.deepEqual(t.items.map((i) => i.name), ['Maintenance: {month}', 'Water']);
   assert.equal(t.items[0].serials, undefined);
 });
 
@@ -129,7 +129,7 @@ test('QA5-2 F7 / F14: a party with no state gets the seller state (with a warnin
   assert.equal(x.stateWarning, '');
 });
 
-test('undo of issued invoices: never deleted — kept, or cancelled with a reason', () => {
+test('undo of issued invoices: never deleted, kept, or cancelled with a reason', () => {
   resetStorage();
   const t = templateFromDocument(source());
   const r = issueBatch(buildBatchDrafts(t, parties([member('a'), member('b')]), { date: '2026-06-01', dueDays: 10, sender }), { sourceId: 'src', sourceKind: 'invoice', date: '2026-06-01', mode: 'issue' });
@@ -181,7 +181,7 @@ test('save as batch recurring: one schedule per party with its own client', () =
   const s = recurringDb.getAll();
   assert.deepEqual(s.map((x) => x.template.client.name), ['Member a', 'Member b']);
   assert.equal(s[1].template.gst_mode, 'IGST');
-  assert.match(s[0].name, /Maintenance — Member a/);
+  assert.match(s[0].name, /Maintenance: Member a/);
 });
 
 test('wiring: batch_runs / proposal_snippets registered in backup, access, audit and sync', () => {

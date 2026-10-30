@@ -116,7 +116,7 @@ export function PharmaPanel({ notify, icon }: { notify: Notify; icon?: ReactNode
                     {rows.map((r, i) => (
                       <tr key={`${r.number}-${i}`}>
                         <td>{formatDate(r.date)}</td><td>{r.number}</td>
-                        <td>{r.patient || '—'}</td>
+                        <td>{r.patient || '-'}</td>
                         <td>{r.prescriber ? `${r.prescriber}${r.prescriber_reg ? ` (${r.prescriber_reg})` : ''}` : <span className={own.warn}>{x7T('missingRx')}</span>}</td>
                         <td>{r.drug} · {r.schedule}</td><td>{r.batch}</td><td className={surface.numeric}>{r.qty} {r.unit}</td>
                       </tr>

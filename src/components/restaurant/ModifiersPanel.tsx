@@ -30,7 +30,7 @@ export function ModifiersPanel({ groups, catalog, stockGroups, onSave }: Modifie
   const save = () => {
     for (const g of rows) {
       const e = validateGroup(g);
-      if (e.length) return setError(`${g.name || '—'}: ${e[0]}`);
+      if (e.length) return setError(`${g.name || '-'}: ${e[0]}`);
     }
     setError('');
     onSave(rows);

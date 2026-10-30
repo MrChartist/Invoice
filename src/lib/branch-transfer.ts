@@ -35,7 +35,7 @@ import { calcInputFromRecord, calculateInvoice, num, round2 } from './invoice-ca
 import { makeDraft } from '../store/invoice-defaults';
 
 export const BRANCH_TRANSFER_CATEGORY = 'Branch transfer';
-export const BRANCH_TRANSFER_CA_NOTE = 'Supply between distinct persons (Sec 25(4), Schedule I para 2 CGST Act). Value per Rule 28 — verify with your CA.';
+export const BRANCH_TRANSFER_CA_NOTE = 'Supply between distinct persons (Sec 25(4), Schedule I para 2 CGST Act). Value per Rule 28: verify with your CA.';
 
 const gstinOf = (b: Branch | undefined) => (b?.gstin ?? '').trim().toUpperCase();
 
@@ -99,7 +99,7 @@ export function buildTransferPair(x: TransferPairInput): { invoice: InvoiceRecor
   const sender: SenderProfile | null = base ? { ...base, companyGstin: gstinOf(x.from), stateCode: fromState, ...(x.from.address ? { companyAddress: x.from.address } : {}) } : null;
   const company = base?.companyName?.trim() || x.from.name;
   const client: Client = {
-    name: `${company} — ${x.to.name}`,
+    name: `${company}: ${x.to.name}`,
     company,
     email: '',
     address: x.to.address ?? '',
@@ -167,7 +167,7 @@ export function buildTransferPair(x: TransferPairInput): { invoice: InvoiceRecor
   const bill = {
     id: x.billId,
     kind: 'PURCHASE' as const,
-    vendor_name: `${company} — ${x.from.name}`,
+    vendor_name: `${company}: ${x.from.name}`,
     vendor_gstin: gstinOf(x.from),
     bill_number: x.invoiceNumber,
     date: t.date,

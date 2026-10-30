@@ -234,7 +234,7 @@ test('follow-up: grouped per supplier, ITC at risk, note text, marks and the pus
     books: 'books', in2b: '2B', taxable: 'taxable', tax: 'tax', diffs: { taxable: 'tv', tax: 'tax differs', heads: 'h', date: 'd', number: 'n' }, closing: 'Thanks',
   };
   const text = followUpText(list[0], 'August 2025', SELLER_GSTIN, w, 'Mr Chartist');
-  assert.match(text, /NOT IN 2B\n1\. N1 \(03-08-2025\) — books: taxable ₹500\.00, tax ₹50\.00/);
+  assert.match(text, /NOT IN 2B\n1\. N1 \(03-08-2025\): books: taxable ₹500\.00, tax ₹50\.00/);
   assert.match(text, /tax differs/);
   assert.ok(text.endsWith('Mr Chartist'));
   // Marks

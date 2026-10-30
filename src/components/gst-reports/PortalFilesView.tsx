@@ -91,11 +91,11 @@ function FindingsTable({ rec, onToggle }: { rec: PortalFileRecord; onToggle: (ke
                       {f.invoice_id ? <Link to={`/invoice/${f.invoice_id}`}>{f.number}</Link> : f.number}
                       <div className={styles.note}>{[f.date && formatDate(f.date), f.ctin].filter(Boolean).join(' · ')}</div>
                     </>
-                  ) : <span className={styles.muted}>{f.section.toUpperCase() || '—'}</span>}
+                  ) : <span className={styles.muted}>{f.section.toUpperCase() || '-'}</span>}
                 </td>
                 {isError ? (
                   <>
-                    <td><span className={styles.mono}>{f.code || '—'}</span> {f.msg}</td>
+                    <td><span className={styles.mono}>{f.code || '-'}</span> {f.msg}</td>
                     <td>{f.hint ? dkT(HINT_KEY[f.hint]) : ''}</td>
                     <td>{f.number ? fix(f) : ''}</td>
                   </>
@@ -223,7 +223,7 @@ export default function PortalFilesView({ g1, period, gstin, turnover, notify }:
       {open && (
         <section className={styles.section} data-portal-open={open.kind}>
           <h3 className={styles.head}>
-            {open.kind === 'gstr1_error' ? dkT('pf.errorReport') : dkT('pf.downloaded1')} · {open.period || '—'}{open.gstin ? ` · ${open.gstin}` : ''}
+            {open.kind === 'gstr1_error' ? dkT('pf.errorReport') : dkT('pf.downloaded1')} · {open.period || '-'}{open.gstin ? ` · ${open.gstin}` : ''}
           </h3>
           <p className={styles.note}>
             {open.kind === 'gstr1_error'
@@ -244,7 +244,7 @@ export default function PortalFilesView({ g1, period, gstin, turnover, notify }:
           {pending && (
             <div className={styles.warn} role="alert" data-portal-preflight>
               <strong>{dkT('pf.preflight')}</strong>
-              <ul>{pending.slice(0, 10).map((p, i) => <li key={i}>{p.number || '—'}: {dkT(ISSUE_KEY[p.problem])}</li>)}</ul>
+              <ul>{pending.slice(0, 10).map((p, i) => <li key={i}>{p.number || '-'}: {dkT(ISSUE_KEY[p.problem])}</li>)}</ul>
               <div className={styles.row}>
                 <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => download(true)}>{dkT('pf.anyway')}</button>
                 <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => setPending(null)}>{dkT('close')}</button>
@@ -265,7 +265,7 @@ export default function PortalFilesView({ g1, period, gstin, turnover, notify }:
             {[...records].reverse().map((r) => (
               <li key={r.id} className={styles.row}>
                 <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} aria-pressed={r.id === openId} onClick={() => setOpenId(r.id)}>
-                  {r.kind === 'gstr1_error' ? dkT('pf.errorReport') : dkT('pf.downloaded1')} · {r.period || '—'} · {formatDate(r.imported_at)}
+                  {r.kind === 'gstr1_error' ? dkT('pf.errorReport') : dkT('pf.downloaded1')} · {r.period || '-'} · {formatDate(r.imported_at)}
                 </button>
                 <span className={styles.note}>{r.file_name}</span>
                 <button type="button" className={controls.btnIcon} aria-label={dkT('remove')} onClick={() => { portalFilesDb.remove(r.id); reload(); if (openId === r.id) setOpenId(null); }}>

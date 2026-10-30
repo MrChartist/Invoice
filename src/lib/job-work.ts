@@ -214,7 +214,7 @@ export function jobWorkAlerts(b: ChallanBalances): JobWorkAlert[] {
   const out: JobWorkAlert[] = [];
   for (const l of b.lines) {
     if (l.status === 'expired') {
-      out.push({ level: 'danger', line: l, message: `${l.number}: ${l.pending} still with ${l.party} past ${l.deadline} — deemed supply on ${l.date} (Sec 143). Verify with your CA.` });
+      out.push({ level: 'danger', line: l, message: `${l.number}: ${l.pending} still with ${l.party} past ${l.deadline}, deemed supply on ${l.date} (Sec 143). Verify with your CA.` });
     } else if (l.status === 'due_soon') {
       out.push({ level: 'warning', line: l, message: `${l.number}: ${l.pending} due back from ${l.party} by ${l.deadline} (${l.daysLeft} days).` });
     }
@@ -374,7 +374,7 @@ export function jobChargesLine(o: Pick<JobWorkOrder, 'process' | 'rate' | 'numbe
   const q = Math.max(num(qty), 0) || 1;
   const rate = Math.max(num(o.rate), 0);
   return {
-    id: generateId(), name: `Job work charges${o.process ? ` — ${o.process}` : ''}${o.number ? ` (${o.number})` : ''}`,
+    id: generateId(), name: `Job work charges${o.process ? `: ${o.process}` : ''}${o.number ? ` (${o.number})` : ''}`,
     type: 'Service', hsn: JOB_WORK_SAC, unit: 'NOS', quantity: q, rate, tax_rate: taxRate, amount: round2(q * rate),
   } as InvoiceItem;
 }

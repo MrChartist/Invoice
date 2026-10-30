@@ -101,7 +101,7 @@ export default function BillAllocation({ party, total, voucherId, value, onChang
       {value.length > 0 && (
         <p className={styles.note}>
           {mastersT('onAccount')}: {formatMoney(Math.max(onAccount, 0))}
-          {onAccount < -0.004 ? ` — ${mastersT('overAllocated')}` : ''}
+          {onAccount < -0.004 ? `: ${mastersT('overAllocated')}` : ''}
         </p>
       )}
     </section>

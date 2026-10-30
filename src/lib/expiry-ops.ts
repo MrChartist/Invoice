@@ -330,7 +330,7 @@ export const claimsDb = {
       setTable(CLAIMS_TABLE, all.map((x) => (x.id === id ? next : x)));
     });
     try {
-      audit.record({ entity: 'purchase', entity_id: id, action: 'update', summary: `Expiry claim ${c.note_numbers.join(', ')} (${c.vendor_name}): ${state}${next.supplier_note_number ? ` — supplier credit note ${next.supplier_note_number}` : ''}${next.remarks ? ` — ${next.remarks}` : ''}` });
+      audit.record({ entity: 'purchase', entity_id: id, action: 'update', summary: `Expiry claim ${c.note_numbers.join(', ')} (${c.vendor_name}): ${state}${next.supplier_note_number ? `: supplier credit note ${next.supplier_note_number}` : ''}${next.remarks ? `: ${next.remarks}` : ''}` });
     } catch {
       /* logging never blocks */
     }
@@ -418,7 +418,7 @@ export function destroyExpiryStock(input: { date: string; godown_id: string; lin
   }));
   setTable('stock_moves', [...getTable<StockMove>('stock_moves'), ...moves]);
   try {
-    audit.record({ entity: 'stock_adjustment', entity_id: moves[0].id, action: 'create', summary: `Destroyed expired / breakage stock on ${input.date}: ${moves.length} line(s), cost ₹${moves.reduce((s, m) => s + Math.abs(m.qty) * m.rate, 0).toFixed(2)} — reverse ITC u/s 17(5)(h) (verify with your CA)${state === 'overridden' ? ' (period lock overridden)' : ''}` });
+    audit.record({ entity: 'stock_adjustment', entity_id: moves[0].id, action: 'create', summary: `Destroyed expired / breakage stock on ${input.date}: ${moves.length} line(s), cost ₹${moves.reduce((s, m) => s + Math.abs(m.qty) * m.rate, 0).toFixed(2)}, reverse ITC u/s 17(5)(h) (verify with your CA)${state === 'overridden' ? ' (period lock overridden)' : ''}` });
   } catch {
     /* logging never blocks */
   }

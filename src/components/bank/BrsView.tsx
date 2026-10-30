@@ -147,12 +147,12 @@ function Paper({ brs }: { brs: Brs }) {
       </div>
       <div className={styles.brsRow}>
         <span>{bankT('balBankStatement')}</span>
-        <span className={styles.amt}>{brs.statementBalance === null ? '—' : money(brs.statementBalance)}</span>
+        <span className={styles.amt}>{brs.statementBalance === null ? '-' : money(brs.statementBalance)}</span>
       </div>
       <div className={styles.brsTotal}>
         <span>{bankT('statDiff')}</span>
         <span className={`${styles.amt} ${diff === null ? '' : Math.abs(diff) <= 0.01 ? styles.diffOk : styles.diffBad}`}>
-          {diff === null ? '—' : money(diff)}
+          {diff === null ? '-' : money(diff)}
         </span>
       </div>
     </div>

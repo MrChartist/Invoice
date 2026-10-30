@@ -47,7 +47,7 @@ export default function ExportCheckChip() {
       <span className={`${surface.badge} ${v === 'export' ? surface.badgePaid : v === 'not' ? surface.badgeOverdue : surface.badgePartial}`} title={check.items.map((i) => `${pcT(`c.${i.id}`)}: ${pcT(`r.${i.reason}` as PcKey)}`).join('\n')}>{pcT('chip', { ok: check.ok })}</span>
       {draft && (
         <select className={controls.select} aria-label={pcT('purpose')} value={code} onChange={(e) => patch({ ps: { ...s.ps, purpose_code: e.target.value } })}>
-          {purposeCodes().map(([c, l]) => <option key={c} value={c}>{`${c} — ${l}`}</option>)}
+          {purposeCodes().map(([c, l]) => <option key={c} value={c}>{`${c}: ${l}`}</option>)}
         </select>
       )}
       {String(s.currency || 'INR').toUpperCase() !== 'INR' && <p className={controls.hint}>{pcT('rule342')}</p>}

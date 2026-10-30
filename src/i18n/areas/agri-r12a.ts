@@ -3,7 +3,7 @@ import { defineArea } from '../area';
 
 export const agT = defineArea(
   {
-    none: 'Nothing yet.', wp: 'Working papers — verify with your CA.',
+    none: 'Nothing yet.', wp: 'Working papers: verify with your CA.',
     'view.farmers': 'Farmers', 'view.vouchers': 'Vouchers', 'view.cycles': 'Payment cycles', 'view.quality': 'Quality cuts', 'view.batches': 'Batches',
     imported: '{n} farmer(s) imported.', search: 'Search code / phone / name', addFarmer: 'Add farmer', export: 'Export CSV', importCsv: 'Import CSV', cards: 'Farmer cards',
     name: 'Name', code: 'Code', village: 'Village', centre: 'Centre', memberNo: 'Member no.', member: 'Member', phone: 'Phone', account: 'Bank account', aadhaar4: 'Aadhaar (last 4)', language: 'Language',
@@ -17,7 +17,7 @@ export const agT = defineArea(
     param: 'Parameter', label: 'Label', cutOn: 'Cut on', weight: 'weight', price: 'price', perPoint: 'Cut % per point', maxCut: 'Max cut %', rejectAbove: 'Reject above %', addParam: 'Add parameter', params: 'Parameters',
     kind: 'Kind', 'b.flock': 'Flock', 'b.pond': 'Pond', 'b.herd': 'Herd', 'b.crop': 'Crop', start: 'Start', placed: 'Placed', startKg: 'Start weight kg', addBatch: 'Add batch', batch: 'Batch', event: 'Event',
     'e.mortality': 'Mortality', 'e.feed': 'Feed', 'e.weight': 'Live weight', 'e.harvest': 'Harvest', 'e.medicine': 'Medicine', qtyKg: 'Qty (kg / nos)', addEvent: 'Add event', mortality: 'Mortality', feedKg: 'Feed kg',
-    status: 'Status', active: 'Active', closed: 'Closed', agIncome: 'Create "Agricultural income (exempt)" ledger', agIncomeOk: 'Ledger ready under Other income (own cultivation only — AG15).',
+    status: 'Status', active: 'Active', closed: 'Closed', agIncome: 'Create "Agricultural income (exempt)" ledger', agIncomeOk: 'Ledger ready under Other income (own cultivation only: AG15).',
     cycleLength: 'Cycle', 'len.weekly': 'Weekly', 'len.10day': '10 days (1–10, 11–20, 21–end)', 'len.fortnight': 'Fortnight', 'len.monthly': 'Monthly', dayInCycle: 'A day in the cycle', period: 'Period {from} to {to}', periodCol: 'Period',
     qty: 'Qty', addLine: 'Add farmer line', deduction: 'Deduction for', 'd.feed': 'Cattle feed', 'd.input': 'Inputs', 'd.advance': 'Advance', 'd.loan': 'Loan', 'd.share': 'Share money', 'd.insurance': 'Insurance', 'd.union': 'Union', 'd.other': 'Other',
     addDeduction: 'Add deduction', deductions: 'Deductions', net: 'Net', mode: 'Pay by', carry: 'carried', bank: 'Bank', cash: 'Cash', totals: 'Gross {gross} − deductions {ded} = net {net}',
@@ -27,7 +27,7 @@ export const agT = defineArea(
     useFpv: 'Use our farmer voucher number (FPV)',
   } as const,
   {
-    none: 'अभी कुछ नहीं।', wp: 'कार्य पत्र — अपने CA से जाँच लें।',
+    none: 'अभी कुछ नहीं।', wp: 'कार्य पत्र: अपने CA से जाँच लें।',
     'view.farmers': 'किसान', 'view.vouchers': 'वाउचर', 'view.cycles': 'भुगतान चक्र', 'view.quality': 'गुणवत्ता कटौती', 'view.batches': 'बैच',
     imported: '{n} किसान आयात हुए।', search: 'कोड / फ़ोन / नाम खोजें', addFarmer: 'किसान जोड़ें', export: 'CSV निर्यात', importCsv: 'CSV आयात', cards: 'किसान कार्ड',
     name: 'नाम', code: 'कोड', village: 'गाँव', centre: 'केंद्र', memberNo: 'सदस्य सं.', member: 'सदस्य', phone: 'फ़ोन', account: 'बैंक खाता', aadhaar4: 'आधार (अंतिम 4)', language: 'भाषा',
@@ -41,7 +41,7 @@ export const agT = defineArea(
     param: 'मापदंड', label: 'नाम', cutOn: 'कटौती', weight: 'वज़न', price: 'दाम', perPoint: 'कटौती % प्रति अंक', maxCut: 'अधिकतम कटौती %', rejectAbove: 'इससे ऊपर अस्वीकार %', addParam: 'मापदंड जोड़ें', params: 'मापदंड',
     kind: 'प्रकार', 'b.flock': 'फ़्लॉक', 'b.pond': 'तालाब', 'b.herd': 'झुंड', 'b.crop': 'फ़सल', start: 'शुरुआत', placed: 'रखे गए', startKg: 'शुरुआती वज़न kg', addBatch: 'बैच जोड़ें', batch: 'बैच', event: 'घटना',
     'e.mortality': 'मृत्यु', 'e.feed': 'दाना', 'e.weight': 'जीवित वज़न', 'e.harvest': 'तुड़ाई / बिक्री', 'e.medicine': 'दवा', qtyKg: 'मात्रा (kg / नग)', addEvent: 'घटना जोड़ें', mortality: 'मृत्यु', feedKg: 'दाना kg',
-    status: 'स्थिति', active: 'चालू', closed: 'बंद', agIncome: '"कृषि आय (छूट)" खाता बनाएँ', agIncomeOk: 'अन्य आय में खाता तैयार (केवल अपनी खेती — AG15)।',
+    status: 'स्थिति', active: 'चालू', closed: 'बंद', agIncome: '"कृषि आय (छूट)" खाता बनाएँ', agIncomeOk: 'अन्य आय में खाता तैयार (केवल अपनी खेती: AG15)।',
     cycleLength: 'चक्र', 'len.weekly': 'साप्ताहिक', 'len.10day': 'दस दिनी (1–10, 11–20, 21–अंत)', 'len.fortnight': 'पखवाड़ा', 'len.monthly': 'मासिक', dayInCycle: 'चक्र का कोई दिन', period: 'अवधि {from} से {to}', periodCol: 'अवधि',
     qty: 'मात्रा', addLine: 'किसान की पंक्ति जोड़ें', deduction: 'कटौती किसकी', 'd.feed': 'पशु आहार', 'd.input': 'खाद-बीज', 'd.advance': 'अग्रिम', 'd.loan': 'ऋण', 'd.share': 'अंश राशि', 'd.insurance': 'बीमा', 'd.union': 'संघ', 'd.other': 'अन्य',
     addDeduction: 'कटौती जोड़ें', deductions: 'कटौती', net: 'शुद्ध', mode: 'भुगतान', carry: 'आगे ले जाया', bank: 'बैंक', cash: 'नक़द', totals: 'कुल {gross} − कटौती {ded} = शुद्ध {net}',

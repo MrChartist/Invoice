@@ -69,7 +69,7 @@ export function planFeeRun(plan: FeePlan, idx: number, students: readonly Client
     if (!e || !s.id) continue;
     const lines = applyConcessions(instalmentLines(plan, idx), e.concessions).filter((l) => l.amount - l.discount > 0);
     const { tax, byKind } = splitByTax(lines);
-    const notes = [`${plan.name}${plan.year_label ? ` (${plan.year_label})` : ''} — ${inst.label}`, s.roll_no ? `Roll no. ${s.roll_no}` : '', s.class_label ? `Class ${s.class_label}` : ''].filter(Boolean).join(' · ');
+    const notes = [`${plan.name}${plan.year_label ? ` (${plan.year_label})` : ''}: ${inst.label}`, s.roll_no ? `Roll no. ${s.roll_no}` : '', s.class_label ? `Class ${s.class_label}` : ''].filter(Boolean).join(' · ');
     const tag = { fee_plan_id: plan.id, fee_instalment: idx } as Partial<InvoiceRecord>;
     const kinds: [DocumentType, (DiscountedLine | FeeLine)[], Partial<InvoiceRecord>][] = [];
     for (const g of byKind) kinds.push(['BILL_OF_SUPPLY', g.lines as DiscountedLine[], { ...tag, exempt_kind: g.kind }]);
@@ -99,7 +99,7 @@ export function issueFeeRun(plan: FeePlan, idx: number, run: FeeRunPlan, date: s
   requireAccess('doc.create');
   if (!run.drafts.length) throw new R5cError('nothing');
   return withTablesRollback([FEE_RUNS_TABLE], () => {
-    const res = issueBatch(run.drafts, { sourceId: `fee:${plan.id}:${idx}`, sourceKind: 'recurring', sourceLabel: `${plan.name} — ${plan.instalments[idx]?.label ?? ''}`, date, mode: 'issue', force: true });
+    const res = issueBatch(run.drafts, { sourceId: `fee:${plan.id}:${idx}`, sourceKind: 'recurring', sourceLabel: `${plan.name}: ${plan.instalments[idx]?.label ?? ''}`, date, mode: 'issue', force: true });
     const row: FeeRun = { id: generateId(), plan_id: plan.id, instalment: idx, date, batch_run_id: res.run.id, student_ids: [...new Set(run.drafts.map((d) => str(d.party.client.id)))] };
     setTable(FEE_RUNS_TABLE, [...getTable<FeeRun>(FEE_RUNS_TABLE), row]);
     return { run: row, invoices: res.invoices, held: res.held.length };
@@ -129,7 +129,7 @@ export function addFine(plan: FeePlan, idx: number, student: Client, against: In
   const amount = fineDue(plan.fine, plan.instalments[idx]?.due_date ?? against.due_date, ctx.date);
   if (!(amount > 0)) throw new R5cError('noFine');
   const main = plan.heads.find((h) => h.frequency === 'per_instalment') ?? plan.heads[0];
-  const head = { ...main, name: `Late fee — ${plan.instalments[idx]?.label ?? ''}`.trim(), amount, frequency: 'once' as const };
+  const head = { ...main, name: `Late fee: ${plan.instalments[idx]?.label ?? ''}`.trim(), amount, frequency: 'once' as const };
   const kind: DocumentType = head.tax === 'taxable' ? 'TAX_INVOICE' : 'BILL_OF_SUPPLY';
   const extra: Partial<InvoiceRecord> = { fee_plan_id: plan.id, fee_instalment: idx, late_fee_for: against.id, ...(kind === 'BILL_OF_SUPPLY' ? { exempt_kind: head.tax === 'nil' ? 'NIL' : 'EXEMPT' } : {}) };
   const drafts = buildBatchDrafts(template(kind, student, [{ head, amount }], `Late fee on ${against.invoice_number}`, ctx, extra), [{ key: partyKey(student), client: student }], { date: ctx.date, dueDays: 0, sender: ctx.sender, newId: ctx.newId });

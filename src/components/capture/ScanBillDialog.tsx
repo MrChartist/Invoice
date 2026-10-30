@@ -38,7 +38,7 @@ export default function ScanBillDialog({ onClose, onDone }: ScanBillDialogProps)
     setBusy(true);
     try {
       const out = await openCaptureFromFile(file, { source });
-      onDone(out.draft ? capT('drafted', { no: out.qr?.docNo || '—' }) : out.note || bsT('kept'), out.draft ? 'success' : 'info', out.route);
+      onDone(out.draft ? capT('drafted', { no: out.qr?.docNo || '-' }) : out.note || bsT('kept'), out.draft ? 'success' : 'info', out.route);
     } catch (err) {
       onDone(`${file.name}: ${(err as Error).message}`, 'error');
     } finally {

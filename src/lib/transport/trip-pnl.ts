@@ -94,7 +94,7 @@ export interface PnlRollup {
 export function rollup(rows: readonly TripPnl[], by: 'vehicle' | 'month'): PnlRollup[] {
   const map = new Map<string, PnlRollup>();
   for (const r of rows) {
-    const key = by === 'vehicle' ? r.vehicle?.reg_no ?? '—' : r.trip.start_date.slice(0, 7);
+    const key = by === 'vehicle' ? r.vehicle?.reg_no ?? '-' : r.trip.start_date.slice(0, 7);
     const a = map.get(key) ?? { key, trips: 0, freight: 0, expenses: 0, hire: 0, margin: 0 };
     a.trips++;
     a.freight = round2(a.freight + r.freight);

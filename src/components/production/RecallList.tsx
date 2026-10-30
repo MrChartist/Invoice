@@ -99,7 +99,7 @@ export function RecallList({ ctx, forward }: { ctx: MfgContext; forward: Forward
               return (
                 <tr key={r.party}>
                   <td>{r.party}{told.has(r.party) ? ` ✓` : ''}</td>
-                  <td>{[r.phone, r.email].filter(Boolean).join(' · ') || '—'}</td>
+                  <td>{[r.phone, r.email].filter(Boolean).join(' · ') || '-'}</td>
                   <td>{r.docs.map((d) => `${d.refNumber} (${formatDate(d.date)}, ${d.batch} × ${qtyText(d.qty)})`).join('; ')}</td>
                   <td className={mfg.num}>{qtyText(r.qty)}</td>
                   <td className={mfg.num}>{qtyText(r.returned)}</td>
@@ -107,7 +107,7 @@ export function RecallList({ ctx, forward }: { ctx: MfgContext; forward: Forward
                     <span className={styles.links}>
                       {links.whatsapp && <a className={cn(controls.btnGhost, controls.btnSm)} href={links.whatsapp} target="_blank" rel="noreferrer" onClick={mark}>WhatsApp</a>}
                       {links.mail && <a className={cn(controls.btnGhost, controls.btnSm)} href={links.mail} onClick={mark}>{pT('email')}</a>}
-                      {!links.whatsapp && !links.mail && <span className={mfg.muted}>—</span>}
+                      {!links.whatsapp && !links.mail && <span className={mfg.muted}>-</span>}
                     </span>
                   </td>
                 </tr>

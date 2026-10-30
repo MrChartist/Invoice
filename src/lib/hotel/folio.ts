@@ -100,7 +100,7 @@ export function postCharge(target: { resId: string; lineId: string } | { folioId
 function sibling(folios: readonly Folio[], f: Folio, window: number, day: string): Folio {
   if (f.window === window) throw new HotelError('Pick another window.');
   const res = f.reservation_id ? hotelDb.reservation(f.reservation_id) : undefined;
-  if (!res || !f.line_id) throw new HotelError('A house folio has one window — transfer to another folio.');
+  if (!res || !f.line_id) throw new HotelError('A house folio has one window: transfer to another folio.');
   return windowFolio(folios, res, f.line_id, window, day);
 }
 
@@ -177,7 +177,7 @@ export function voidLine(folioId: string, lineId: string, reason: string, opts: 
   if (!l || !free(l)) throw new HotelError('This line cannot be voided.');
   if (!why) throw new HotelError('Give a reason.');
   if (l.key?.startsWith('stay:') && !ROOM_VOID_REASONS.includes(why.toLowerCase())) throw new HotelError(`A posted room night is voided only as "${ROOM_VOID_REASONS.join('" or "')}".`);
-  if (!opts.ownerOk && needsVoidPin(folios, l, who(), currentRole(), hotelDb.settings().clerk_void_cap, at)) throw new VoidPinRequired('Above the void limit — the owner\'s PIN is needed.');
+  if (!opts.ownerOk && needsVoidPin(folios, l, who(), currentRole(), hotelDb.settings().clerk_void_cap, at)) throw new VoidPinRequired('Above the void limit: the owner\'s PIN is needed.');
   const out = { ...f, lines: f.lines.map((x) => (x.id === lineId ? { ...x, void: { by: who(), at: at.toISOString(), reason: why } } : x)) };
   const order = l.src?.table_order_id ? ordersDb.get(l.src.table_order_id) : undefined;
   // QA9 H13: voiding a restaurant room charge reopens its order (settle it at the table or charge it again).

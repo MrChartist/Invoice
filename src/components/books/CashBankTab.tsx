@@ -40,7 +40,7 @@ export function CashBankTab({ vouchers, openings, period, onEditOpening }: CashB
     () => (bankAcc ? bankAccountBook(vouchers, openings, bankAcc, period) : cashBook(vouchers, openings, account, period)),
     [vouchers, openings, account, period, bankAcc],
   );
-  const name = account === 'cash' ? booksT('cashBook') : bankAcc ? `${booksT('bankBook')} — ${bankAcc.name}` : booksT('bankBook');
+  const name = account === 'cash' ? booksT('cashBook') : bankAcc ? `${booksT('bankBook')}: ${bankAcc.name}` : booksT('bankBook');
 
   return (
     <div className={styles.stack}>

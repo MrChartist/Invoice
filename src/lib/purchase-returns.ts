@@ -423,7 +423,7 @@ export const purchaseReturnsDb = {
     if (isoDay(date)) next.supplier_note_date = isoDay(date);
     else delete next.supplier_note_date;
     setTable(PURCHASE_RETURNS_TABLE, all.map((x) => (x.id === id ? next : x)));
-    audit.record({ entity: 'purchase', entity_id: id, action: 'update', doc_number: n.note_number, parent_id: n.purchase_id, summary: `${n.note_number}: supplier credit note ${next.supplier_note_number ?? '—'} ${next.supplier_note_date ?? ''}`.trim() });
+    audit.record({ entity: 'purchase', entity_id: id, action: 'update', doc_number: n.note_number, parent_id: n.purchase_id, summary: `${n.note_number}: supplier credit note ${next.supplier_note_number ?? '-'} ${next.supplier_note_date ?? ''}`.trim() });
     return next;
   },
 };

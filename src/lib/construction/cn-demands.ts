@@ -92,7 +92,7 @@ export function demandInvoice(d: CnDemandSnapshot & { amount: number }, b: Realt
   const rate = cc ? 0 : d.land!.effective;
   const draft = makeDraft({ settings, sender, docType: cc ? 'BILL_OF_SUPPLY' : 'TAX_INVOICE' });
   const line = (name: string, amount: number, description: string): InvoiceItem => ({ id: generateId(), name, description, type: 'service', hsn: '9954', unit: 'NOS', quantity: 1, rate: amount, tax_rate: rate, discount_percent: 0, amount });
-  const items = [line(`${stage.label} — ${num(stage.pct)}% of agreement value`, d.amount, `Unit ${d.unit}${d.tower ? `, ${d.tower}` : ''} · ${project.name} · booking ${b.number} · demand ${number}`)];
+  const items = [line(`${stage.label}: ${num(stage.pct)}% of agreement value`, d.amount, `Unit ${d.unit}${d.tower ? `, ${d.tower}` : ''} · ${project.name} · booking ${b.number} · demand ${number}`)];
   if (d.interest) items.push(line('Interest on delayed payment', d.interest.amount, `${d.interest.days} days at ${d.interest.rate}% a year (Sec 15(2)(d): part of the value)`));
   const home = senderStateCode(sender);
   const rec: InvoiceRecord = {
@@ -100,7 +100,7 @@ export function demandInvoice(d: CnDemandSnapshot & { amount: number }, b: Realt
     client: client ? { ...client } : { ...draft.client, name: b.client_name }, items, place_of_supply: project.state_code,
     gst_mode: cc ? 'NONE' : deriveGstMode({ senderStateCode: home, placeOfSupply: project.state_code, senderHasGstin: !!sender?.companyGstin?.trim(), taxEnabled: true }),
     ...(cc ? { exempt_kind: 'NON_GST' as const } : {}), ...(project.cost_centre_id ? { cost_centre_id: project.cost_centre_id } : {}),
-    notes: cc ? 'Sale of building after the completion certificate — not a supply (Schedule III para 5(b)); no GST. Verify with your CA.' : 'Construction service at the concessional rate without input tax credit; value of land deemed one-third. Verify with your CA.',
+    notes: cc ? 'Sale of building after the completion certificate: not a supply (Schedule III para 5(b)); no GST. Verify with your CA.' : 'Construction service at the concessional rate without input tax credit; value of land deemed one-third. Verify with your CA.',
     boq_terms: { cn: { v: 1, demand: { ...d, number } } },
   };
   delete (rec.boq_terms!.cn!.demand as { amount?: number }).amount;
@@ -184,5 +184,5 @@ export function demandAgeing(invoices: readonly InvoiceRecord[], asOf: string) {
 /** WhatsApp text of a demand. */
 export const demandText = (i: InvoiceRecord, money: (n: number) => string) => {
   const d = i.boq_terms?.cn?.demand;
-  return `Demand ${d?.number ?? ''} (${i.invoice_number}) for unit ${d?.unit ?? ''}: ${d?.stage_label ?? ''} ${d?.pct ?? ''}% — ${money(num(i.total))} due by ${i.due_date}.${d?.account ? ` Pay only to ${d.account.name}${d.account.no ? ` ${d.account.no}` : ''}.` : ''}`;
+  return `Demand ${d?.number ?? ''} (${i.invoice_number}) for unit ${d?.unit ?? ''}: ${d?.stage_label ?? ''} ${d?.pct ?? ''}%, ${money(num(i.total))} due by ${i.due_date}.${d?.account ? ` Pay only to ${d.account.name}${d.account.no ? ` ${d.account.no}` : ''}.` : ''}`;
 };

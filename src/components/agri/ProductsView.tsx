@@ -26,7 +26,7 @@ export default function ProductsView({ onDone }: { onDone: Done }) {
           <thead><tr><th>{bT('product')}</th><th className={surface.numeric}>{bT('milkPerUnit')}</th><th className={surface.numeric}>{bT('gstToday')}</th><th /></tr></thead>
           <tbody>{DAIRY_STARTERS.map((s) => (
             <tr key={s.key}>
-              <td>{s.name}{s.by ? ` + ${s.by.name}` : ''}</td><td className={surface.numeric}>{s.milkL} L</td><td className={surface.numeric}>{starterRate(s, todayInput())?.rate ?? '—'}%</td>
+              <td>{s.name}{s.by ? ` + ${s.by.name}` : ''}</td><td className={surface.numeric}>{s.milkL} L</td><td className={surface.numeric}>{starterRate(s, todayInput())?.rate ?? '-'}%</td>
               <td><button type="button" className={sm} onClick={() => run(() => { addStarter(s.key, milk, todayInput()); return bT('starterAdded', { name: s.name }); })}>{bT('addStarter')}</button></td>
             </tr>
           ))}</tbody>

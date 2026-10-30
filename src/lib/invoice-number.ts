@@ -160,7 +160,7 @@ export class DuplicateNumberError extends Error {
     const who = clash.client?.name ? ` for ${clash.client.name}` : '';
     super(
       `Number ${number.trim()} is already used by ${what.toLowerCase()} ${clash.invoice_number}${who}. ` +
-        'Every document needs its own serial number (GST Rule 46) — pick another or leave it blank to number automatically.',
+        'Every document needs its own serial number (GST Rule 46): pick another or leave it blank to number automatically.',
     );
     this.name = 'DuplicateNumberError';
     this.number = number;

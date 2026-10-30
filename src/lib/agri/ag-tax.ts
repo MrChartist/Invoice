@@ -25,22 +25,22 @@ export const classRate = (cls: AgClass | undefined, date?: string): AgClassRate 
 export function classRateNotice(line: { name?: string; tax_rate?: number; ag_class?: AgClass }, date?: string): string {
   const c = classRate(line.ag_class, date);
   if (!c || num(line.tax_rate) === c.rate) return '';
-  return `${line.name || 'A line'}: rate ${num(line.tax_rate)}% differs from the class (${c.rate}% on this date, HSN ${c.hsn}) — your typed rate is kept; verify with your CA (${caOfClass(line.ag_class!)}).`;
+  return `${line.name || 'A line'}: rate ${num(line.tax_rate)}% differs from the class (${c.rate}% on this date, HSN ${c.hsn}), your typed rate is kept; verify with your CA (${caOfClass(line.ag_class!)}).`;
 }
 
 /** Classes that are agricultural produce sold loose (the bill-of-supply declaration). */
 const LOOSE = new Set<AgClass>(['cereal_loose', 'pulses_loose', 'flour_loose', 'paddy', 'veg_fruit_fresh', 'potato', 'milk_fresh', 'curd_loose', 'broken_rice']);
 export const isLooseProduce = (cls: AgClass | undefined): boolean => !!cls && LOOSE.has(cls);
 
-export const AGRI_PURCHASE_DECLARATION = 'Purchased from an agriculturist — agricultural produce; exempt; reverse charge not applicable.';
-export const LOOSE_PRODUCE_DECLARATION = 'Agricultural produce — not pre-packaged and labelled.';
+export const AGRI_PURCHASE_DECLARATION = 'Purchased from an agriculturist: agricultural produce; exempt; reverse charge not applicable.';
+export const LOOSE_PRODUCE_DECLARATION = 'Agricultural produce: not pre-packaged and labelled.';
 
 /** The declaration of a farmer voucher: the RCM line(s) of notified goods, else the agriculturist line. */
 export function voucherDeclaration(vendor: { gstin?: string; principal_kind?: string; rcm_maker?: boolean } | undefined, lines: readonly { hsn?: string; name?: string }[], date: string): string {
   const kinds = supplierKinds(vendor);
   if (!kinds.includes('agriculturist')) return '';
   const rcm = rcmGoodsMatches(lines, kinds, date);
-  return rcm.length ? `${rcm.map((r) => r.goods).join(', ')} from an agriculturist: GST payable by us on reverse charge (${rcm[0].notification}) — verify with your CA.` : AGRI_PURCHASE_DECLARATION;
+  return rcm.length ? `${rcm.map((r) => r.goods).join(', ')} from an agriculturist: GST payable by us on reverse charge (${rcm[0].notification}), verify with your CA.` : AGRI_PURCHASE_DECLARATION;
 }
 
 /**
@@ -51,5 +51,5 @@ export function prompt194q(date: string, fyPurchases: number, turnoverByFy?: Rea
   const b = buyer194q(date, turnoverByFy);
   const limit = tdsThreshold('194Q', date)?.aggregate ?? 0;
   if (b.status !== 'applies' || !(limit > 0) || !(num(fyPurchases) > limit)) return '';
-  return `194Q: purchases from this farmer are ₹${round2(fyPurchases).toLocaleString('en-IN')} in FY ${getIndianFY(date).label}, above ₹${limit.toLocaleString('en-IN')} — deduct TDS on the excess (agricultural produce is "goods"; AG13). Verify with your CA.`;
+  return `194Q: purchases from this farmer are ₹${round2(fyPurchases).toLocaleString('en-IN')} in FY ${getIndianFY(date).label}, above ₹${limit.toLocaleString('en-IN')}, deduct TDS on the excess (agricultural produce is "goods"; AG13). Verify with your CA.`;
 }

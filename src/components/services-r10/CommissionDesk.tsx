@@ -84,10 +84,10 @@ function StaffView({ staff, plans, run }: { staff: ServiceStaff[]; plans: Commis
         <Field k="phone"><input className={controls.input} type="tel" value={f.phone ?? ''} onChange={(e) => set({ phone: e.target.value })} /></Field>
         <Field k="role"><select className={controls.select} value={f.role} onChange={(e) => set({ role: e.target.value as StaffRole })}>{ROLES.map((r) => <option key={r} value={r}>{svT(`role.${r}`)}</option>)}</select></Field>
         <Field k="employment"><select className={controls.select} value={f.employment} onChange={(e) => set({ employment: e.target.value as ServiceStaff['employment'] })}><option value="employee">{svT('emp.employee')}</option><option value="freelance">{svT('emp.freelance')}</option></select></Field>
-        {f.employment === 'employee' && !!employees.length && <Field k="employee"><select className={controls.select} value={f.employee_id ?? ''} onChange={(e) => set({ employee_id: e.target.value || undefined })}><option value="">—</option>{employees.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></Field>}
-        {f.employment === 'freelance' && <Field k="vendor"><select className={controls.select} value={f.vendor_id ?? ''} onChange={(e) => set({ vendor_id: e.target.value || undefined })}><option value="">—</option>{vendors.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></Field>}
+        {f.employment === 'employee' && !!employees.length && <Field k="employee"><select className={controls.select} value={f.employee_id ?? ''} onChange={(e) => set({ employee_id: e.target.value || undefined })}><option value="">-</option>{employees.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></Field>}
+        {f.employment === 'freelance' && <Field k="vendor"><select className={controls.select} value={f.vendor_id ?? ''} onChange={(e) => set({ vendor_id: e.target.value || undefined })}><option value="">-</option>{vendors.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></Field>}
         {f.employment === 'freelance' && <Field k="tds"><select className={controls.select} value={f.tds_section ?? ''} onChange={(e) => set({ tds_section: e.target.value || undefined })}><option value="">{f.role === 'doctor' ? '194J' : '194H'}</option>{['194H', '194J', '194C'].map((x) => <option key={x}>{x}</option>)}</select></Field>}
-        <Field k="plan"><select className={controls.select} value={f.plan_id ?? ''} onChange={(e) => set({ plan_id: e.target.value || undefined })} data-staff-plan><option value="">—</option>{plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+        <Field k="plan"><select className={controls.select} value={f.plan_id ?? ''} onChange={(e) => set({ plan_id: e.target.value || undefined })} data-staff-plan><option value="">-</option>{plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
         <Field k="breakFrom"><input className={controls.input} type="time" value={brk.from} onChange={(e) => set({ hours: { ...f.hours, breaks: e.target.value ? [{ from: e.target.value, to: brk.to || e.target.value }] : [] } })} /></Field>
         {isPackOn(localDb.settings.get(), 'practice') && <Suspense fallback={null}><StaffPsRow value={f.ps} onChange={(ps) => set({ ps })} /></Suspense>}
         <Field k="breakTo"><input className={controls.input} type="time" value={brk.to} onChange={(e) => set({ hours: { ...f.hours, breaks: brk.from ? [{ from: brk.from, to: e.target.value }] : [] } })} /></Field>
@@ -105,7 +105,7 @@ function StaffView({ staff, plans, run }: { staff: ServiceStaff[]; plans: Commis
           <tbody>
             {staff.map((s) => (
               <tr key={s.id}>
-                <td>{s.name}{s.active === false ? ' ·' : ''}</td><td>{svT(`role.${s.role}`)}</td><td>{svT(`emp.${s.employment}`)}</td><td>{plans.find((p) => p.id === s.plan_id)?.name ?? '—'}</td>
+                <td>{s.name}{s.active === false ? ' ·' : ''}</td><td>{svT(`role.${s.role}`)}</td><td>{svT(`emp.${s.employment}`)}</td><td>{plans.find((p) => p.id === s.plan_id)?.name ?? '-'}</td>
                 <td>
                   <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => setF(s)}>{svT('edit')}</button>
                   <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => run(() => deleteStaff(s.id), svT('deleted'))}>{svT('del')}</button>

@@ -56,13 +56,13 @@ export const LETTER_SECTIONS: Readonly<Record<Group, readonly [string, string][]
 export function letterLines(e: Engagement, sac: string, gst: number): InvoiceItem[] {
   const line = (name: string, rate: number, unit = 'NOS', quantity = 1): InvoiceItem => ({ id: generateId(), type: 'Service', name, hsn: sac, unit, quantity, rate: round2(rate), tax_rate: gst, discount_percent: 0, amount: round2(rate * quantity) });
   switch (e.model) {
-    case 'fixed': return [line(`Professional fees — ${e.title} (fixed fee)`, num(e.fee))];
+    case 'fixed': return [line(`Professional fees: ${e.title} (fixed fee)`, num(e.fee))];
     case 'milestone': return (e.milestones ?? []).map((m, i, all) => line(`${m.label} (stage ${i + 1} of ${all.length})`, milestoneAmount(e, m)));
-    case 'capped': return [line(`Professional fees — ${e.title}: time at agreed rates, capped at`, num(e.cap))];
-    case 'blended': return [line(`Professional fees — ${e.title}: per hour (blended rate)`, num(e.blended_rate), 'HRS')];
-    case 'retainer': return [line(`Retainer — ${e.title} (per month)`, num(e.fee))];
-    case 'success': return [line(`Success fee — ${e.success?.event ?? e.title}`, num(e.success?.amount))];
-    default: return [line(`Professional fees — ${e.title}: time at agreed hourly rates`, num(e.fee))];
+    case 'capped': return [line(`Professional fees, ${e.title}: time at agreed rates, capped at`, num(e.cap))];
+    case 'blended': return [line(`Professional fees, ${e.title}: per hour (blended rate)`, num(e.blended_rate), 'HRS')];
+    case 'retainer': return [line(`Retainer: ${e.title} (per month)`, num(e.fee))];
+    case 'success': return [line(`Success fee: ${e.success?.event ?? e.title}`, num(e.success?.amount))];
+    default: return [line(`Professional fees, ${e.title}: time at agreed hourly rates`, num(e.fee))];
   }
 }
 

@@ -236,7 +236,7 @@ function Ageing({ positions, today, ctx, ids }: { positions: Positions; today: s
             <thead><tr><th>{mfgT('item')}</th><th>{mfgT('batch')}</th><th>{mfgT('oldest')}</th><th>{mfgT('expiry')}</th><th className={styles.num}>{mfgT('quantity')}</th><th className={styles.num}>{mfgT('ageDays')}</th></tr></thead>
             <tbody>
               {batches.map((b) => (
-                <tr key={`${b.itemName}|${b.batch}`}><td>{b.itemName}</td><td>{b.batch}</td><td>{b.firstIn ? formatDate(b.firstIn) : '—'}</td><td>{b.expiry ? formatDate(b.expiry) : '—'}</td><td className={styles.num}>{qtyText(b.qty)} {b.unit}</td><td className={styles.num}>{b.age < 0 ? '—' : b.age}</td></tr>
+                <tr key={`${b.itemName}|${b.batch}`}><td>{b.itemName}</td><td>{b.batch}</td><td>{b.firstIn ? formatDate(b.firstIn) : '-'}</td><td>{b.expiry ? formatDate(b.expiry) : '-'}</td><td className={styles.num}>{qtyText(b.qty)} {b.unit}</td><td className={styles.num}>{b.age < 0 ? '-' : b.age}</td></tr>
               ))}
             </tbody>
           </table>

@@ -49,8 +49,8 @@ export default function DeliveriesTab({ onDone }: { onDone: (msg: string, error?
   const status = (s: DeliveryStatus) => rtaT(`st.${s}`);
   const printRun = (riderId: string) => {
     const list = rows.filter((r) => r.delivery.rider_id === riderId && (r.delivery.status === 'packed' || r.delivery.status === 'out'));
-    const html = `<!doctype html><meta charset="utf-8"><title>${esc(rtaT('runSheet'))}</title><style>${PRINT_FONT_FACE}body{font:14px ${PRINT_FONT}}td,th{border:1px solid #999;padding:4px}table{border-collapse:collapse;width:100%}</style><h2>${esc(rtaT('runSheet'))} — ${esc(riderName(riderId))} · ${day}</h2><table><tr><th>#</th><th>${esc(rtaT('address'))}</th><th>${esc(rtaT('phone'))}</th><th>${esc(rtaT('slot'))}</th><th>${esc(rtaT('toCollect'))}</th></tr>${list
-      .map((r) => `<tr><td>${esc(r.invoice.invoice_number)}</td><td>${esc(r.delivery.address)}</td><td>${esc(r.delivery.phone ?? '')}</td><td>${esc(r.delivery.slot ?? '')}</td><td>${r.delivery.cod ? esc(formatCurrency(r.toCollect)) : '—'}</td></tr>`)
+    const html = `<!doctype html><meta charset="utf-8"><title>${esc(rtaT('runSheet'))}</title><style>${PRINT_FONT_FACE}body{font:14px ${PRINT_FONT}}td,th{border:1px solid #999;padding:4px}table{border-collapse:collapse;width:100%}</style><h2>${esc(rtaT('runSheet'))}: ${esc(riderName(riderId))} · ${day}</h2><table><tr><th>#</th><th>${esc(rtaT('address'))}</th><th>${esc(rtaT('phone'))}</th><th>${esc(rtaT('slot'))}</th><th>${esc(rtaT('toCollect'))}</th></tr>${list
+      .map((r) => `<tr><td>${esc(r.invoice.invoice_number)}</td><td>${esc(r.delivery.address)}</td><td>${esc(r.delivery.phone ?? '')}</td><td>${esc(r.delivery.slot ?? '')}</td><td>${r.delivery.cod ? esc(formatCurrency(r.toCollect)) : '-'}</td></tr>`)
       .join('')}</table>`;
     const w = window.open('', '_blank');
     if (!w) return;
@@ -74,7 +74,7 @@ export default function DeliveriesTab({ onDone }: { onDone: (msg: string, error?
         <div className={controls.row} style={{ gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <label className={controls.field}><span className={controls.label}>{rtaT('rider')}</span>
             <select className={controls.select} value={riderFilter} onChange={(e) => setRiderFilter(e.target.value)}>
-              <option value="">—</option>
+              <option value="">-</option>
               {riders.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           </label>
@@ -125,7 +125,7 @@ export default function DeliveriesTab({ onDone }: { onDone: (msg: string, error?
           <div className={controls.row} style={{ gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <label className={controls.field}><span className={controls.label}>{rtaT('settleRider')}</span>
               <select className={controls.select} value={settle.rider} onChange={(e) => setSettle({ rider: e.target.value, counted: riderOpenReceipts(payments, settlements, e.target.value, day).reduce((s, p) => s + p.amount, 0), account: '' })} data-settle-rider>
-                <option value="">—</option>
+                <option value="">-</option>
                 {riders.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
             </label>

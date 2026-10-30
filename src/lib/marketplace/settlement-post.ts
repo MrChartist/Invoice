@@ -122,7 +122,7 @@ export function postSettlement(settlementId: string, opts: PostOptions = {}): Se
   const s = getSettlement(settlementId);
   if (s.posted) throw new SettlementError('This settlement is already posted.');
   const channel = channelById(s.channel_id);
-  if (!channel?.clearing_bank_id) throw new SettlementError('The channel has no clearing account — open the channel and save it once.');
+  if (!channel?.clearing_bank_id) throw new SettlementError('The channel has no clearing account: open the channel and save it once.');
   const clearing = channel.clearing_bank_id;
   const clearingLedger = bankLedgerId(clearing);
   const bank = opts.bankAccountId || DEFAULT_BANK_ID;
@@ -206,7 +206,7 @@ export function postSettlement(settlementId: string, opts: PostOptions = {}): Se
     const cr = lines.reduce((a, l) => a + l.cr, 0);
     if (dr !== cr) lines.push({ account_id: clearingLedger, dr: dr < cr ? cr - dr : 0, cr: dr > cr ? dr - cr : 0 });
     const journal = lines.length >= 2
-      ? saveVoucher({ type: 'JOURNAL', date: s.deposit_date, narration: `${channel.name} settlement ${s.settlement_id}: fees, TCS / TDS, refunds and adjustments (working paper — verify with your CA)`, lines, voucher_class: SETTLEMENT_CLASS })
+      ? saveVoucher({ type: 'JOURNAL', date: s.deposit_date, narration: `${channel.name} settlement ${s.settlement_id}: fees, TCS / TDS, refunds and adjustments (working paper, verify with your CA)`, lines, voucher_class: SETTLEMENT_CLASS })
       : undefined;
 
     // 3. Payout contra.
@@ -278,7 +278,7 @@ export function recordFeeInvoice(settlementId: string, input: FeeInvoiceInput): 
       date: input.date,
       place_of_supply: home,
       category: MARKETPLACE_FEES_ACCOUNT,
-      lines: [{ id: 'fee', name: `${channel.name} fees — settlement ${s.settlement_id}`, hsn: input.hsn || '9985', unit: 'NOS', quantity: 1, rate: fees, tax_rate: fees > 0 ? round2((gst / fees) * 100) : 0 }],
+      lines: [{ id: 'fee', name: `${channel.name} fees: settlement ${s.settlement_id}`, hsn: input.hsn || '9985', unit: 'NOS', quantity: 1, rate: fees, tax_rate: fees > 0 ? round2((gst / fees) * 100) : 0 }],
       taxable: fees,
       cgst: g.cgst,
       sgst: g.sgst,

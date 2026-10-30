@@ -354,7 +354,7 @@ function postBounceCharges(c: Cheque, date: string, charges: number, to: 'expens
   const v = saveVoucher({
     type: 'PAYMENT',
     date,
-    narration: `Bank charges on bounced cheque ${c.number} (${c.party_name})${to === 'party' ? ' — recoverable from the party' : ''}`,
+    narration: `Bank charges on bounced cheque ${c.number} (${c.party_name})${to === 'party' ? ': recoverable from the party' : ''}`,
     lines: [debit, { account_id: bank, dr: 0, cr: paise }],
   });
   return v.id;

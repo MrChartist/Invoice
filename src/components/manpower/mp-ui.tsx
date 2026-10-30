@@ -17,7 +17,7 @@ export function RegimeChip({ client, sacs, date, entity }: { client?: Pick<Clien
   const r = mpRegime({ date, entityType: entity, client }, sacs);
   return (
     <span className={controls.hint} data-mp-regime={r.regime}>
-      {mpT(`reg.${r.regime}`, { r: r.rate })} ({r.ca.join(', ')}){r.split ? ` — ${mpT('split')}` : ''}
+      {mpT(`reg.${r.regime}`, { r: r.rate })} ({r.ca.join(', ')}){r.split ? `: ${mpT('split')}` : ''}
       {regimeNotes(r.regime, localDb.settings.activeProfile()?.companyGstin).length > 0 && <PendingNote area="rcm_self" day={date} />}
     </span>
   );

@@ -818,7 +818,7 @@ export function tdsReconCsv(rec: TdsRecon): string {
   }
   for (const l of rec.onlyBooks) {
     rows.push(['Only in books', fyLabel(l.fy), `Q${l.quarter}`, l.partyName, l.tan, l.section, '', l.number,
-      '', '', l.tds, -l.tds, l.settled ? 'Paid — ask the customer to file / correct their TDS return' : 'Invoice not fully paid yet']);
+      '', '', l.tds, -l.tds, l.settled ? 'Paid: ask the customer to file / correct their TDS return' : 'Invoice not fully paid yet']);
   }
   rows.push([]);
   rows.push(['Working paper, not validated against TRACES. Verify with your CA.']);

@@ -24,7 +24,7 @@ export default function SchemesView({ ctx }: { ctx: MfgContext }) {
       <div style={row}>
         <Fld l={fdT('item')}>
           <select className={controls.select} value={item} onChange={(e) => setItem(e.target.value)} data-mfd="scheme-item">
-            <option value="">—</option>
+            <option value="">-</option>
             {ctx.items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
           </select>
         </Fld>

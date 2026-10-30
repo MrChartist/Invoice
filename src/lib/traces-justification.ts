@@ -29,7 +29,7 @@ export const MAX_JUSTIFICATION_LINES = 20_000;
 export const MAX_FINDINGS = 5_000;
 export const MAX_CELL = 200;
 
-export const JUSTIFICATION_NOTE = 'Working paper — findings read from a TRACES justification report (layout not verified). The TRACES demand is what counts: correct the statement or pay through TRACES and verify with your CA.';
+export const JUSTIFICATION_NOTE = 'Working paper: findings read from a TRACES justification report (layout not verified). The TRACES demand is what counts: correct the statement or pay through TRACES and verify with your CA.';
 
 export type JustificationKind = 'SHORT_DEDUCTION' | 'SHORT_PAYMENT' | 'LATE_DEDUCTION' | 'LATE_PAYMENT' | 'LATE_FILING' | 'PAN_ERROR' | 'OTHER';
 

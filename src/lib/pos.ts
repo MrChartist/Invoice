@@ -84,7 +84,7 @@ export function tenderSummary(total: number, tenders: readonly Tender[]): Tender
   const nonCash = round2(by('UPI') + by('Card') + by('Cheque') + by('Wallet') + by('Gift voucher'));
   const tendered = round2(cash + nonCash);
   const errors: string[] = [];
-  if (nonCash > t + 0.004) errors.push('UPI, card, cheque, wallet and gift vouchers together are more than the bill — only cash can be given back as change.');
+  if (nonCash > t + 0.004) errors.push('UPI, card, cheque, wallet and gift vouchers together are more than the bill: only cash can be given back as change.');
   const change = nonCash > t ? 0 : round2(Math.max(tendered - t, 0));
   const due = round2(Math.max(t - tendered, 0));
   const payments: TenderSummary['payments'] = [];
@@ -265,9 +265,9 @@ export function posIssues(rec: InvoiceRecord, summary: TenderSummary, allowCredi
   const errors: string[] = [];
   if (!rec.sender?.companyName?.trim()) errors.push('Add your business profile in Settings first.');
   if (rec.items.length === 0) errors.push('Add at least one item.');
-  if (!(rec.total > 0)) errors.push('The bill total is zero — check the rates.');
+  if (!(rec.total > 0)) errors.push('The bill total is zero: check the rates.');
   errors.push(...summary.errors);
-  if (!allowCredit && summary.due > 0.004) errors.push(`${formatCurrency(summary.due, rec.currency)} is still unpaid — take the rest, or pick a saved customer to leave it on account.`);
+  if (!allowCredit && summary.due > 0.004) errors.push(`${formatCurrency(summary.due, rec.currency)} is still unpaid: take the rest, or pick a saved customer to leave it on account.`);
   return errors;
 }
 
@@ -521,7 +521,7 @@ export function openTableOrders(day?: string): { id: string; label: string }[] {
 export function openOrdersBlocker(day?: string): string {
   const open = openTableOrders(day);
   if (!open.length) return '';
-  return `${open.length} restaurant order${open.length === 1 ? ' is' : 's are'} still open (${open.slice(0, 6).map((o) => o.label).join(', ')}${open.length > 6 ? ', …' : ''}) — settle or void ${open.length === 1 ? 'it' : 'them'} on the Tables screen (/tables) first.`;
+  return `${open.length} restaurant order${open.length === 1 ? ' is' : 's are'} still open (${open.slice(0, 6).map((o) => o.label).join(', ')}${open.length > 6 ? ', …' : ''}): settle or void ${open.length === 1 ? 'it' : 'them'} on the Tables screen (/tables) first.`;
 }
 
 export const dayCloseDb = {

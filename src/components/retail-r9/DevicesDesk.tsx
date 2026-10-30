@@ -107,7 +107,7 @@ function ImeiView({ run, day }: { run: Run; day: string }) {
   return (
     <>
       <input className={controls.input} value={q} onChange={(e) => setQ(e.target.value)} placeholder="IMEI 1 / IMEI 2" aria-label="IMEI" style={{ maxWidth: 320 }} data-dev-lookup />
-      {r && <p data-dev-hit>{r.item.name} · <span className={surface.mono}>{r.serial}{two ? ` / ${two}` : ''}</span> · {r.inStock ? rtdT('inStock') : rtdT('sold', { ref: r.sale?.refNumber ?? '', until: r.warrantyUntil || '—' })}</p>}
+      {r && <p data-dev-hit>{r.item.name} · <span className={surface.mono}>{r.serial}{two ? ` / ${two}` : ''}</span> · {r.inStock ? rtdT('inStock') : rtdT('sold', { ref: r.sale?.refNumber ?? '', until: r.warrantyUntil || '-' })}</p>}
       <h3 className={surface.cardHeadIcon}>{rtdT('checkTitle')}</h3>
       <p className={surface.sectionNote}>{rtdT('checkNote')}</p>
       <FormRow keys={['imei', 'result', 'ref']} init={{ result: 'clear' }} run={run} onSave={(f) => (logImeiCheck({ date: day, imei: f.imei ?? '', result: f.result === 'blocked' ? 'blocked' : 'clear', portal_ref: f.ref }), ok(f.imei))} />

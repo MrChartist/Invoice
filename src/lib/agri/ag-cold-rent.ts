@@ -28,7 +28,7 @@ import { AG_TABLES } from './ag-shared';
 import { lotBalance, q3 } from './ag-cold-lots';
 
 export const PLANS_TABLE = AG_TABLES.coldRentPlans;
-export const EXEMPT_NOTE = 'Exempt — storage of agricultural produce (N 12/2017 entry 54(e); verify AG8).';
+export const EXEMPT_NOTE = 'Exempt: storage of agricultural produce (N 12/2017 entry 54(e); verify AG8).';
 const SEASONAL = new Set<RentBasis | undefined>(['bag_season', 'qtl_season', 'flat']);
 const BASIS_TEXT: Readonly<Record<RentBasis, string>> = { bag_season: 'per bag per season', bag_month: 'per bag per month', qtl_season: 'per quintal per season', qtl_month: 'per quintal per month', flat: 'lump sum' };
 
@@ -181,7 +181,7 @@ export function buildRentBill(lot: ColdLot, plan: ColdRentPlan, occ: ReturnType<
   const rec: InvoiceRecord = {
     ...draft, issue_date: occ.date, due_date: occ.date > draft.due_date ? occ.date : draft.due_date, status: 'Draft', client: { ...ctx.client }, items, place_of_supply: pos,
     ...(anyTax ? { gst_mode: deriveGstMode({ senderStateCode: home, placeOfSupply: pos, senderHasGstin: !!ctx.sender?.companyGstin?.trim(), taxEnabled: true }) } : {}),
-    notes: [plan.class === 'storage_agri' ? EXEMPT_NOTE : 'Storage of goods other than agricultural produce — taxable (verify AG8).', plan.space ? 'Renting space may be a separate taxable supply (Gujarat AAR) — verify AG8.' : '', plan.notified?.order_ref ? `Rent as notified: ${plan.notified.order_ref}.` : ''].filter(Boolean).join(' '),
+    notes: [plan.class === 'storage_agri' ? EXEMPT_NOTE : 'Storage of goods other than agricultural produce: taxable (verify AG8).', plan.space ? 'Renting space may be a separate taxable supply (Gujarat AAR): verify AG8.' : '', plan.notified?.order_ref ? `Rent as notified: ${plan.notified.order_ref}.` : ''].filter(Boolean).join(' '),
     ag: agSnapshot('rent', { rent, lines: { [items[0].id]: { lot: lot.number, bags: occ.bags || undefined, rate_bag: plan.basis === 'bag_season' || plan.basis === 'bag_month' ? rate : undefined, season: lot.season } } }),
   };
   const t = calculateInvoice(calcInputFromRecord(rec, { amount_paid: 0 }));

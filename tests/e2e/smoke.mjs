@@ -1128,7 +1128,7 @@ try {
     check(/\b10 NOS\b/.test(await row('E2E Shaft').innerText()), 'stock summary: 10 processed shafts received');
 
     await page.goto(srv.origin + '/manufacturing?tab=jobwork&jw=itc04');
-    await page.getByText('Table 4 — goods sent to job workers').waitFor();
+    await page.getByText('Table 4: goods sent to job workers').waitFor();
     check((await page.getByRole('row').filter({ hasText: /JWC\/FY\d\d-\d\d\/0001/ }).count()) >= 1, 'ITC-04 Table 4 lists the challan');
     check(await page.getByText(/verify with your CA/i).first().isVisible(), 'ITC-04 carries the verify-with-your-CA wording');
 
@@ -1299,7 +1299,7 @@ try {
     await page.locator('[data-gv-face]').fill('500');
     await page.locator('[data-gv-face]').blur();
     await page.locator('[data-gv-sell-save]').click();
-    await page.getByText(/1 voucher\(s\) sold — receipt RV\/FY\d\d-\d\d\/\d+/).waitFor();
+    await page.getByText(/1 voucher\(s\) sold: receipt RV\/FY\d\d-\d\d\/\d+/).waitFor();
     const [gv] = await readJson(page, 'gift_vouchers', [], (v) => v.length > 0);
     const rv = (await readJson(page, 'vouchers', [], (v) => v.some((x) => x.voucher_class === 'Gift voucher sale'))).find((x) => x.voucher_class === 'Gift voucher sale');
     check(/^GV\/FY\d\d-\d\d\/0001$/.test(gv?.number ?? '') && /^\d{11}-[A-Z2-9]{4}$/.test(gv?.code ?? '') && rv?.lines?.[0]?.dr === 50000, `voucher sold as a liability (${gv?.number} ${gv?.code})`);
@@ -1519,7 +1519,7 @@ try {
     const cash = await dlg.locator('#ret-Cash').inputValue();
     check(cash === '118', `refund defaults to cash 118 (${cash})`);
     await dlg.getByRole('button', { name: 'Save return' }).click();
-    await page.getByText(/CRN\/FY\d\d-\d\d\/\d{4} saved — refund/).first().waitFor();
+    await page.getByText(/CRN\/FY\d\d-\d\d\/\d{4} saved: refund/).first().waitFor();
     const cn = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.doc_type === 'CREDIT_NOTE' && !beforeIds.has(i.id)))).find((i) => i.doc_type === 'CREDIT_NOTE' && !beforeIds.has(i.id));
     check(cn?.goods_returned === true && cn.total === 118, `credit note with goods returned (${cn?.invoice_number}, ${cn?.total})`);
     const rets = await readJson(page, 'pos_returns', [], (v) => v.length > 0);
@@ -2860,7 +2860,7 @@ try {
     await page.goto(srv.origin + '/settings?tab=defaults');
     await page.getByLabel('Business type').selectOption('kirana');
     await page.getByRole('button', { name: 'Save settings' }).click();
-    const more = nav.getByRole('link', { name: /more features — Show/ });
+    const more = nav.getByRole('link', { name: /more features: Show/ });
     await more.waitFor();
     await more.click();
     await page.waitForURL(/\/settings\?tab=features/);
@@ -4417,7 +4417,7 @@ try {
     const stText = await page.locator('[data-agd-statement]').innerText({ timeout: 15000 });
     check(/1 lots · in 240 · out 60 · balance 180 bags/.test(stText) && /rent billed ₹10,800/.test(stText), `the depositor statement shows the lot after the pass (${stText})`);
     const [pop] = await Promise.all([page.waitForEvent('popup', { timeout: 15000 }), page.locator('[data-agd-b="print-statement"]').click()]);
-    check(/Depositor statement — E2E Ram Singh[\s\S]*in 240 · out 60 · balance 180 bags/.test(await pop.content()), 'the depositor statement prints with the lot');
+    check(/Depositor statement: E2E Ram Singh[\s\S]*in 240 · out 60 · balance 180 bags/.test(await pop.content()), 'the depositor statement prints with the lot');
     await pop.close();
     // D4: the licence due in 30 days.
     await page.goto(srv.origin + '/inventory?tab=inputs&view=licences');
@@ -5563,7 +5563,7 @@ try {
     await page.reload();
     await page.locator('[data-mp-sites]').waitFor({ timeout: 15000 });
     const chip1 = page.locator(`[data-mp-site="${s1.mp.code}"] [data-mp-regime]`);
-    check(await chip1.getAttribute('data-mp-regime') === 'rcm' && /Reverse charge — client pays GST/.test(await chip1.innerText()), 'after reload the site shows "Reverse charge — client pays GST"');
+    check(await chip1.getAttribute('data-mp-regime') === 'rcm' && /Reverse charge: client pays GST/.test(await chip1.innerText()), 'after reload the site shows "Reverse charge — client pays GST"');
     const f2 = await newSite('E2E Green Park RWA', 'e2e-mp-c2', [['Guard', 2, 750]]);
     await f2.locator('[data-mp-save-site]').click();
     const s2 = (await readJson(page, 'cost_centres', [], (v) => v.some((c) => c.name === 'E2E Green Park RWA' && c.mp), 15000)).find((c) => c.name === 'E2E Green Park RWA');
@@ -6277,7 +6277,7 @@ try {
     await readJson(page, 'purchases', [], (v) => (v ?? []).some((x) => x.id === 'e2e-lg-disb'), 15000);
     await page.reload();
     await page.getByRole('button', { name: /^Notifications/ }).click({ timeout: 15000 });
-    await page.getByRole('dialog', { name: 'Notifications' }).getByText(/JOB\/FY26-27\/0901 — disbursements unrecovered/).first().waitFor({ timeout: 15000 });
+    await page.getByRole('dialog', { name: 'Notifications' }).getByText(/JOB\/FY26-27\/0901: disbursements unrecovered/).first().waitFor({ timeout: 15000 });
     check(true, 'the bell lists the job\'s unrecovered disbursements');
     await page.keyboard.press('Escape');
     await page.keyboard.press('Control+k');

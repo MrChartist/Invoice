@@ -131,7 +131,7 @@ export function ActivityPanel() {
       )}
       <div className={surface.cardBody}>
         <p className={surface.sectionNote}>
-          Every change to documents, payments, clients and settings is recorded on this device — like Tally&apos;s edit log.
+          Every change to documents, payments, clients and settings is recorded on this device: like Tally&apos;s edit log.
           Contact and bank details are noted as &ldquo;changed&rdquo;, never copied.
         </p>
         <p className={surface.sectionNote} role="note">{migT('cannotDisable')}</p>

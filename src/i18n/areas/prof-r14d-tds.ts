@@ -18,7 +18,7 @@ export const ptT = defineArea(
     email: 'Email',
     bill: 'Bill',
     notYet: 'TDS not expected yet: ₹{sofar} of ₹{limit} this year ({section}).',
-    onBase: 'TDS expected u/s {section} at {rate}% on the fee base ₹{base} (GST and pure-agent recoveries out): ₹{amount} — verify with your CA.',
+    onBase: 'TDS expected u/s {section} at {rate}% on the fee base ₹{base} (GST and pure-agent recoveries out): ₹{amount}, verify with your CA.',
   } as const,
   {
     chase: 'माँगने वाले प्रमाणपत्र (फ़ॉर्म 131 / 16A)',
@@ -33,6 +33,6 @@ export const ptT = defineArea(
     email: 'ईमेल',
     bill: 'बिल',
     notYet: 'अभी TDS अपेक्षित नहीं: इस वर्ष ₹{limit} में से ₹{sofar} ({section})।',
-    onBase: 'धारा {section} के तहत फ़ीस आधार ₹{base} पर {rate}% की दर से अपेक्षित TDS (GST और शुद्ध एजेंट प्रतिपूर्ति बाहर): ₹{amount} — अपने CA से जाँच लें।',
+    onBase: 'धारा {section} के तहत फ़ीस आधार ₹{base} पर {rate}% की दर से अपेक्षित TDS (GST और शुद्ध एजेंट प्रतिपूर्ति बाहर): ₹{amount}, अपने CA से जाँच लें।',
   },
 );

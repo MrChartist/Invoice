@@ -487,7 +487,7 @@ export function DesignPanel({
               >
                 {DATE_FORMATS.map((f) => (
                   <option key={f} value={f}>
-                    {f} — {formatDatePref('2026-04-05', f)}
+                    {f} : {formatDatePref('2026-04-05', f)}
                   </option>
                 ))}
               </select>

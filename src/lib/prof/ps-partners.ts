@@ -57,7 +57,7 @@ export function validatePartner(p: Omit<Partner, 'id' | 'capital_account_id' | '
     if (!(n(t.share_pct) >= 0 && n(t.share_pct) <= 100)) e.push('Share must be between 0 and 100 %.');
     const cap = psRuleAt(PARTNER_INTEREST_CAP_RULES, t.from).value;
     if (n(t.interest_pct) < 0) e.push('Interest on capital cannot be negative.');
-    else if (n(t.interest_pct) > cap) e.push(`Interest on capital above ${cap} % is not allowed as a deduction (Sec 40(b)) — the excess is disallowed; keep the deed rate and see the run, or enter ${cap} %.`);
+    else if (n(t.interest_pct) > cap) e.push(`Interest on capital above ${cap} % is not allowed as a deduction (Sec 40(b)): the excess is disallowed; keep the deed rate and see the run, or enter ${cap} %.`);
     if (t.remuneration.mode === 'pct_book_profit' && !(n(t.remuneration.pct) > 0)) e.push('Enter the % of book profit.');
   }
   const draft = { ...p, id: p.id ?? '_new', capital_account_id: '', current_account_id: '' } as Partner;
@@ -91,8 +91,8 @@ export function savePartner(input: Omit<Partner, 'id' | 'capital_account_id' | '
     name,
     ...(input.pan ? { pan: input.pan.toUpperCase() } : {}),
     terms: [...input.terms].map((t) => ({ ...t, share_pct: round2(n(t.share_pct)), interest_pct: round2(n(t.interest_pct)) })).sort((a, b) => a.from.localeCompare(b.from)),
-    capital_account_id: prev?.capital_account_id || ensureLedger(`Capital — ${name}`, 'CAPITAL', 1020),
-    current_account_id: prev?.current_account_id || ensureLedger(`Current — ${name}`, 'CAPITAL', 1040),
+    capital_account_id: prev?.capital_account_id || ensureLedger(`Capital: ${name}`, 'CAPITAL', 1020),
+    current_account_id: prev?.current_account_id || ensureLedger(`Current: ${name}`, 'CAPITAL', 1040),
     created_at: prev?.created_at ?? new Date().toISOString(),
   };
   setTable(T, prev ? all.map((p) => (p.id === row.id ? row : p)) : [...all, row]);
@@ -145,7 +145,7 @@ export function postDrawings(partnerId: string, amount: number, date: string, fr
   return saveVoucher({
     type: 'PAYMENT',
     date,
-    narration: narration.trim() || `Drawings — ${p.name}`,
+    narration: narration.trim() || `Drawings: ${p.name}`,
     lines: [{ account_id: p.current_account_id, dr: paise, cr: 0 }, { account_id: fromAccountId, dr: 0, cr: paise }],
     voucher_class: PS_D_CLASSES.drawings,
   });

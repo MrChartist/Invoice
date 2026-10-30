@@ -52,7 +52,7 @@ export function postBrokerage(b: SalesAgent, period: { from: string; to: string 
     const v = saveVoucher({
       type: 'JOURNAL',
       date,
-      narration: `Brokerage payable to ${b.name} for ${period.from} to ${period.to} (${st.lines.length} document(s))${tds ? `, TDS u/s 194H ₹${t.amount.toFixed(2)}` : ''} — verify with your CA`,
+      narration: `Brokerage payable to ${b.name} for ${period.from} to ${period.to} (${st.lines.length} document(s))${tds ? `, TDS u/s 194H ₹${t.amount.toFixed(2)}` : ''}: verify with your CA`,
       lines: [
         { account_id: ensureLedger(), dr: total, cr: 0 },
         { account_id: A.creditors, dr: 0, cr: total - tds, party: b.name },

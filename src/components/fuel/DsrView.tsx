@@ -30,7 +30,7 @@ export default function DsrView() {
     [fbT('collections'), ['', '₹'], r.modes.map(([m, v]) => [mode(m), v])],
     [fbT('people'), [fuT('shift'), fuT('attendant'), fbT('expected'), fbT('collected'), fbT('diff')], r.people],
   ];
-  const head = `${fbT('title')} — ${d.day}`;
+  const head = `${fbT('title')}: ${d.day}`;
   const print = () => {
     const tbl = parts.map(([t, h, rows]) => `<h3>${escHtml(t)}</h3><table><tr>${h.map((x) => `<th>${escHtml(x)}</th>`).join('')}</tr>${rows.map((row) => `<tr>${row.map((c) => `<td>${escHtml(c)}</td>`).join('')}</tr>`).join('')}</table>`).join('');
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escHtml(head)}</title><style>@page{size:A4 landscape;margin:10mm}body{font:12px sans-serif}table{border-collapse:collapse;width:100%}td,th{border:1px solid gray;padding:3px 5px;text-align:left}</style></head><body><h2>${escHtml(head)}</h2>${tbl}<p>${escHtml(fbT('credit', { v: r.credit }))}</p><p>${escHtml(fuT('wp'))}</p></body></html>`;

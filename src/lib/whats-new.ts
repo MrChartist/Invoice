@@ -26,7 +26,7 @@ export const WHATS_NEW: readonly WhatsNewEntry[] = [
   {
     version: '3.1.0',
     date: '2026-10-26',
-    label: 'Round 6 — help and first steps',
+    label: 'Round 6: help and first steps',
     items: [
       { title: 'Help knows your screen', hi: 'मदद अब आपकी स्क्रीन जानती है', text: 'Help (?) or F1 opens "On this screen": what the tab is for, when to use it and where to go next.', href: '/gst-reports?tab=b2cl' },
       { title: 'Tap a GST or TDS term', hi: 'GST या TDS शब्द पर टैप करें', text: 'Codes such as B2CL, 4(B)(1) and 26AS explain themselves. Each GST, TDS and payroll tab has a one-line "About this tab".', href: '/gst-reports?tab=gstr3b' },
@@ -38,7 +38,7 @@ export const WHATS_NEW: readonly WhatsNewEntry[] = [
   {
     version: '3.0.3',
     date: '2026-10-26',
-    label: 'Round 5 — industry packs',
+    label: 'Round 5: industry packs',
     items: [
       { title: 'Marketplace seller pack', hi: 'मार्केटप्लेस विक्रेता पैक', text: 'Channels, order import, settlements, GST TCS and returns.', href: '/receivables?tab=marketplace' },
       { title: 'Transport and works contracts', hi: 'ट्रांसपोर्ट और वर्क्स कॉन्ट्रैक्ट', text: 'LR / bilty, trips and vehicles; BOQ, RA bills and retention.', href: '/distribution?tab=transport' },
@@ -56,7 +56,7 @@ export const WHATS_NEW: readonly WhatsNewEntry[] = [
   {
     version: '3.0.1',
     date: '2026-10-26',
-    label: 'Round 4 — production, stores, trade desk',
+    label: 'Round 4: production, stores, trade desk',
     items: [
       { title: 'Production orders, QC and recalls', hi: 'प्रोडक्शन ऑर्डर, QC और रिकॉल', href: '/manufacturing?tab=orders' },
       { title: 'Gift vouchers, store prices and transfer requests', hi: 'गिफ़्ट वाउचर, स्टोर कीमतें और ट्रांसफ़र अनुरोध', href: '/pos' },

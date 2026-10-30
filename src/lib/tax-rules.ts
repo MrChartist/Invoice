@@ -171,7 +171,7 @@ export const GST_SLABS = [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 12, 18, 28, 40] as cons
  */
 export const GST_SLAB_RULES: readonly Versioned<readonly number[]>[] = [
   { from: '2017-07-01', value: [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 12, 18, 28], source: 'Notifications 1/2017-CT(R), 11/2017-CT(R) and later amendments' },
-  { from: '2025-09-22', value: [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 18, 28, 40], source: 'GST rate rationalisation from 22 Sep 2025 (28% only for tobacco / pan masala) — verify' },
+  { from: '2025-09-22', value: [0, 0.1, 0.25, 1, 1.5, 3, 5, 6, 18, 28, 40], source: 'GST rate rationalisation from 22 Sep 2025 (28% only for tobacco / pan masala): verify' },
 ];
 
 export const slabsAt = (date?: string): readonly number[] => ruleAt(GST_SLAB_RULES, date);
@@ -389,7 +389,7 @@ export function compositionDueDays(periodStart?: string) {
 export const ECO_TCS_RATE_RULES: readonly Versioned<number>[] = [
   { from: '2017-07-01', value: 0, source: 'Sec 52 not in force yet' },
   { from: '2018-10-01', value: 1, source: 'Sec 52; Notification 52/2018-CT' },
-  { from: '2024-07-10', value: 0.5, source: 'Notification 15/2024-CT (0.25% + 0.25% / 0.5% IGST) — verify' },
+  { from: '2024-07-10', value: 0.5, source: 'Notification 15/2024-CT (0.25% + 0.25% / 0.5% IGST): verify' },
 ];
 
 export function ecoTcsRate(date?: string): number {
@@ -445,9 +445,9 @@ export type DepreciationBlock =
   | 'ENERGY_SAVING';
 
 export const DEPRECIATION_BLOCK_LABELS: Record<DepreciationBlock, string> = {
-  BUILDING_RESIDENTIAL: 'Building — mainly residential',
-  BUILDING_OTHER: 'Building — office, factory, shop',
-  BUILDING_TEMPORARY: 'Building — temporary structure',
+  BUILDING_RESIDENTIAL: 'Building: mainly residential',
+  BUILDING_OTHER: 'Building: office, factory, shop',
+  BUILDING_TEMPORARY: 'Building: temporary structure',
   FURNITURE: 'Furniture & fittings',
   PLANT_MACHINERY: 'Plant & machinery (general)',
   MOTOR_CAR: 'Motor car (not for hire)',
@@ -512,16 +512,16 @@ export interface GstSetOffOrder {
 }
 
 export const GST_SETOFF_RULES: readonly Versioned<GstSetOffOrder>[] = [
-  { from: '2017-07-01', value: { igstFirst: false, igstRemainder: 'cgst_then_sgst' }, source: 'Sec 49(5) CGST Act as enacted — verify' },
+  { from: '2017-07-01', value: { igstFirst: false, igstRemainder: 'cgst_then_sgst' }, source: 'Sec 49(5) CGST Act as enacted: verify' },
   {
     from: '2019-02-01',
     value: { igstFirst: true, igstRemainder: 'cgst_then_sgst' },
-    source: 'Sec 49(5) and Sec 49A, CGST (Amendment) Act 2018 in force 1 Feb 2019 (Notification 2/2019-CT) — verify',
+    source: 'Sec 49(5) and Sec 49A, CGST (Amendment) Act 2018 in force 1 Feb 2019 (Notification 2/2019-CT): verify',
   },
   {
     from: '2019-03-29',
     value: { igstFirst: true, igstRemainder: 'any' },
-    source: 'Rule 88A CGST Rules, Notification 16/2019-CT dated 29 Mar 2019; Circular 98/17/2019-GST — verify',
+    source: 'Rule 88A CGST Rules, Notification 16/2019-CT dated 29 Mar 2019; Circular 98/17/2019-GST: verify',
   },
 ];
 
@@ -537,7 +537,7 @@ export function gstSetOffOrder(periodStart?: string): GstSetOffOrder {
  */
 export const RULE_86B_RULES: readonly Versioned<{ monthlyTaxable: number; cashPct: number } | null>[] = [
   { from: '2017-07-01', value: null },
-  { from: '2021-01-01', value: { monthlyTaxable: 5e6, cashPct: 1 }, source: 'Rule 86B, Notification 94/2020-CT — verify' },
+  { from: '2021-01-01', value: { monthlyTaxable: 5e6, cashPct: 1 }, source: 'Rule 86B, Notification 94/2020-CT: verify' },
 ];
 
 export function rule86b(periodStart?: string): { monthlyTaxable: number; cashPct: number } | null {
@@ -550,7 +550,7 @@ export function rule86b(periodStart?: string): { monthlyTaxable: number; cashPct
  */
 export const ITC04_RULES: readonly Versioned<{ limit: number; above: 'Q' | 'H'; upTo: 'Q' | 'A'; dueDay: number }>[] = [
   { from: '2017-07-01', value: { limit: 0, above: 'Q', upTo: 'Q', dueDay: 25 }, source: 'Rule 45(3): quarterly' },
-  { from: '2021-04-01', value: { limit: 5e7, above: 'H', upTo: 'A', dueDay: 25 }, source: 'Rule 45(3) amended by Notification 35/2021-CT (FY 2021-22 on) — verify' },
+  { from: '2021-04-01', value: { limit: 5e7, above: 'H', upTo: 'A', dueDay: 25 }, source: 'Rule 45(3) amended by Notification 35/2021-CT (FY 2021-22 on): verify' },
 ];
 
 // ── TDS sections inserted by later Finance Acts (7O, 7.97) ───────────────────
@@ -569,23 +569,23 @@ export const TDS_EXTRA_SECTION_RULES: readonly { section: string; versions: read
     section: '194O',
     versions: [
       { from: '2017-07-01', value: null },
-      { from: '2020-10-01', value: { section: '194O', label: '194-O E-commerce operator 0.75%', rate: 0.75 }, source: 'Finance Act 2020 (Sec 194-O) with the 25% cut to 31 Mar 2021 — verify' },
-      { from: '2021-04-01', value: { section: '194O', label: '194-O E-commerce operator 1%', rate: 1 }, source: 'Sec 194-O — verify' },
-      { from: '2024-10-01', value: { section: '194O', label: '194-O E-commerce operator 0.1%', rate: 0.1 }, source: 'Finance (No. 2) Act 2024 — verify' },
+      { from: '2020-10-01', value: { section: '194O', label: '194-O E-commerce operator 0.75%', rate: 0.75 }, source: 'Finance Act 2020 (Sec 194-O) with the 25% cut to 31 Mar 2021: verify' },
+      { from: '2021-04-01', value: { section: '194O', label: '194-O E-commerce operator 1%', rate: 1 }, source: 'Sec 194-O: verify' },
+      { from: '2024-10-01', value: { section: '194O', label: '194-O E-commerce operator 0.1%', rate: 0.1 }, source: 'Finance (No. 2) Act 2024: verify' },
     ],
   },
   {
     section: '194R',
     versions: [
       { from: '2017-07-01', value: null },
-      { from: '2022-07-01', value: { section: '194R', label: '194R Business perquisite / benefit 10%', rate: 10 }, source: 'Finance Act 2022 (Sec 194R) — verify' },
+      { from: '2022-07-01', value: { section: '194R', label: '194R Business perquisite / benefit 10%', rate: 10 }, source: 'Finance Act 2022 (Sec 194R): verify' },
     ],
   },
   {
     section: '194S',
     versions: [
       { from: '2017-07-01', value: null },
-      { from: '2022-07-01', value: { section: '194S', label: '194S Virtual digital asset 1%', rate: 1 }, source: 'Finance Act 2022 (Sec 194S) — verify' },
+      { from: '2022-07-01', value: { section: '194S', label: '194S Virtual digital asset 1%', rate: 1 }, source: 'Finance Act 2022 (Sec 194S): verify' },
     ],
   },
 ];
@@ -595,5 +595,5 @@ export const TDS_EXTRA_SECTION_RULES: readonly { section: string; versions: read
 // Oct 2025 tax period). Verify with your CA; the 2B view lets the user switch the check off.
 export const IMS_REMARK_RULES: readonly Versioned<{ pending: boolean; reject: boolean }>[] = [
   { from: '2017-07-01', value: { pending: false, reject: false } },
-  { from: '2025-10-01', value: { pending: true, reject: true }, source: 'GSTN IMS advisory (Oct 2025) as understood — verify' },
+  { from: '2025-10-01', value: { pending: true, reject: true }, source: 'GSTN IMS advisory (Oct 2025) as understood: verify' },
 ];

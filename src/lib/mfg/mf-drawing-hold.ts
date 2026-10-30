@@ -20,7 +20,7 @@ export function holdBlock(itemId: string, drawings: readonly Drawing[]): string 
   for (const d of drawings) {
     if (d.item_id !== itemId) continue;
     const cur = currentRev(d);
-    if (cur?.status === 'hold' && key(d.release_override?.rev) !== key(cur.rev)) return `Drawing ${d.number} rev ${cur.rev} is on hold — release it in the drawing register (or the owner overrides it) first.`;
+    if (cur?.status === 'hold' && key(d.release_override?.rev) !== key(cur.rev)) return `Drawing ${d.number} rev ${cur.rev} is on hold: release it in the drawing register (or the owner overrides it) first.`;
   }
   return '';
 }

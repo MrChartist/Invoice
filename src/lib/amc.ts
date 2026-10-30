@@ -148,7 +148,7 @@ export function amcReminders(contracts: readonly AmcContract[], today: string): 
         kind: 'renewal',
         date: c.end,
         overdue: s.state === 'expired',
-        text: s.state === 'expired' ? `${c.title} for ${c.client_name} expired on ${c.end} — renew it` : `${c.title} for ${c.client_name} ends on ${c.end} — renewal due`,
+        text: s.state === 'expired' ? `${c.title} for ${c.client_name} expired on ${c.end}: renew it` : `${c.title} for ${c.client_name} ends on ${c.end}: renewal due`,
       });
     }
   }

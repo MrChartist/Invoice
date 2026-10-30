@@ -46,7 +46,7 @@ const n = (v: string) => (v.trim() === '' ? undefined : Number(v) || 0);
 const list = (v: string) => v.split(',').map((x) => x.trim()).filter(Boolean);
 const o = (keys: readonly string[], p: string) => keys.map((k) => [k, mcT(`${p}${k}` as McKey)] as const);
 const wd = (i: number) => new Intl.DateTimeFormat(dateLocale(), { weekday: 'short' }).format(new Date(Date.UTC(2024, 0, 1 + i)));
-const staffOpts = () => [['', '—'] as const, ...loadStaff().map((s) => [s.id, s.name] as const)];
+const staffOpts = () => [['', '-'] as const, ...loadStaff().map((s) => [s.id, s.name] as const)];
 
 export default function MembersDesk({ notify }: { notify: Notify }) {
   useT();
@@ -103,7 +103,7 @@ function Plans({ notify, tick, refresh }: P) {
         <T l={mcT('name')} v={f.name} on={(name) => set({ name })} d="mp-name" />
         <S l={mcT('kind')} v={f.kind} o={o(KINDS, 'k.')} on={(k) => set({ kind: k as MemberPlanKind })} d="mp-kind" />
         {NUMS.filter(([, , show]) => [...show].some((c) => fl.includes(c))).map(([k, l]) => <T key={k} l={mcT(l)} t="number" v={f.x[k]} on={(val) => set({ x: { ...f.x, [k]: val } })} d={`mp-${k}`} />)}
-        <S l={mcT('cls')} v={f.cls} o={[['', '—'], ...SV_CLASSES.map((c) => [c, svT(`cl.${c}`)] as const)]} on={(cls) => set({ cls })} d="mp-cls" />
+        <S l={mcT('cls')} v={f.cls} o={[['', '-'], ...SV_CLASSES.map((c) => [c, svT(`cl.${c}`)] as const)]} on={(cls) => set({ cls })} d="mp-cls" />
         {fl.includes('s') && <><T l={mcT('covers')} v={f.covers} on={(covers) => set({ covers })} d="mp-covers" /><S l={mcT('trainer')} v={f.trainer} o={staffOpts()} on={(trainer) => set({ trainer })} /><C l={mcT('onCheckin')} v={f.onCheckin} on={(onCheckin) => set({ onCheckin })} /></>}
         {fl !== 'w' && <S l={mcT('refund')} v={f.refund} o={o(['none', 'pro_rata'], 'r.')} on={(refund) => set({ refund })} />}
         <B p l={mcT('save')} on={save} d="mp-save" />
@@ -166,7 +166,7 @@ function Members({ notify, tick, refresh }: P) {
         <B p l={mcT('sell')} on={sell} d="mem-sell" dis={!plan} />
       </div>
       <Tbl d="mem-list" h={[mcT('number'), mcT('member'), mcT('plan'), mcT('start'), mcT('end'), mcT('status'), mcT('used'), '']} rows={all.slice(0, 300).map((m) => [
-        m.number, m.client_name, m.plan.name, m.start, m.end || '—', <span key="s" data-mem-status={m.number}>{mcT(`s.${statusOf(m, d, used(m), invoices)}`)}</span>,
+        m.number, m.client_name, m.plan.name, m.start, m.end || '-', <span key="s" data-mem-status={m.number}>{mcT(`s.${statusOf(m, d, used(m), invoices)}`)}</span>,
         m.plan.sessions ? `${used(m)} / ${m.plan.sessions}` : m.plan.kind === 'wallet' ? mcT('bonusLeft', { amount: rs(bonusLeft(m)) }) : '',
         <span key="a">{m.invoice_ids[0] && <Link to={`/invoice/${m.invoice_ids[0]}`}>{mcT('bill')}</Link>} <B sm l={mcT('act')} on={() => setSel(m)} d="mem-act-row" /></span>,
       ])} />
@@ -177,7 +177,7 @@ function Members({ notify, tick, refresh }: P) {
           <T l={mcT('from')} t="date" v={a.from} on={(from) => setA({ ...a, from })} d="mem-from" />
           {a.act === 'freeze' && <T l={mcT('to')} t="date" v={a.to} on={(to) => setA({ ...a, to })} d="mem-to" />}
           {(a.act === 'freeze' || a.act === 'cancel') && <T l={mcT('reason')} v={a.reason} on={(reason) => setA({ ...a, reason })} />}
-          {a.act === 'upgrade' && <S l={mcT('plan')} v={a.plan} o={[['', '—'], ...plans.map((p) => [p.id, p.name] as const)]} on={(v) => setA({ ...a, plan: v })} />}
+          {a.act === 'upgrade' && <S l={mcT('plan')} v={a.plan} o={[['', '-'], ...plans.map((p) => [p.id, p.name] as const)]} on={(v) => setA({ ...a, plan: v })} />}
           {a.act === 'transfer' && <Who v={a.client} on={(client) => setA({ ...a, client })} />}
           {(a.act === 'cancel' || a.act === 'topup') && <T l={a.act === 'cancel' ? mcT('refundAmt') : mcT('amount')} t="number" v={a.amount} on={(amount) => setA({ ...a, amount })} />}
           <B p l={mcT('go')} on={act} d="mem-go" />
@@ -204,7 +204,7 @@ function Deferral({ notify, tick, refresh }: P) {
       <C l={mcT('deferOn')} v={!!s.defer_package_income} on={(v) => attempt(notify, () => { saveServiceSettings({ defer_package_income: v, ...(v && !s.defer_package_from ? { defer_package_from: d } : {}) }); refresh(); }, mcT('saved'))} />
       {r && (
         <>
-          <p className={styles.note}>{mcT('deferHint', { date: s.defer_package_from ?? '—' })}</p>
+          <p className={styles.note}>{mcT('deferHint', { date: s.defer_package_from ?? '-' })}</p>
           <div className={styles.toolbar}>
             <T l={mcT('month')} t="month" v={month} on={setMonth} d="sv-defer-month" />
             <span>{mcT('deferRow', { sold: rs(r.deferred), rec: rs(r.recognised), red: rs(r.redeemed), lost: rs(r.forfeited), closed: rs(r.closed), net: rs(r.net) })}</span>
@@ -229,7 +229,7 @@ function Checkin({ notify, tick, refresh }: P) {
   const hits = findMembers(q, all).slice(0, 8);
   const line = (m: Membership) => {
     const st = statusOf(m, d, sessionsUsed(m, invoices, days), invoices);
-    return gateFor(st, gate) === 'block' ? mcT('blocked') : st === 'active' ? mcT('till', { date: m.end || '—' }) : st === 'frozen' ? mcT('frozenNow') : st === 'expired' ? mcT('exp', { n: Math.max(0, daysBetween(m.end || d, d)) }) : mcT(`s.${st}`);
+    return gateFor(st, gate) === 'block' ? mcT('blocked') : st === 'active' ? mcT('till', { date: m.end || '-' }) : st === 'frozen' ? mcT('frozenNow') : st === 'expired' ? mcT('exp', { n: Math.max(0, daysBetween(m.end || d, d)) }) : mcT(`s.${st}`);
   };
   const go = (m: Membership) => attempt(notify, () => {
     const now = new Date();
@@ -257,7 +257,7 @@ function Checkin({ notify, tick, refresh }: P) {
       ))}
       <h4>{mcT('today', { n: todays.length })}</h4>
       <Tbl h={[mcT('time'), mcT('member'), '']} rows={todays.map((e, i) => [e.time, e.name, <B key="u" g sm l={mcT('undo')} on={() => attempt(notify, () => { undoCheckin(d, i); refresh(); })} />])} />
-      <p className={styles.note}>{mcT('peak')}: {peak.map(([h, c]) => `${h}:00 (${c})`).join(', ') || '—'}</p>
+      <p className={styles.note}>{mcT('peak')}: {peak.map(([h, c]) => `${h}:00 (${c})`).join(', ') || '-'}</p>
       <h4>{mcT('notSeen')}</h4>
       <Tbl h={[mcT('member'), mcT('plan'), '']} rows={notSeen(all, days, d).slice(0, 100).map(({ m, last }) => [m.client_name, `${m.plan.name}${last ? ` · ${last}` : ''}`, <a key="w" target="_blank" rel="noreferrer" href={whatsappLink(m.phone, mcT('waRenew', { name: m.client_name, plan: m.plan.name, number: m.number, date: m.end }))}>{mcT('remind')}</a>])} />
     </div>
@@ -307,15 +307,15 @@ function Classes({ notify, tick, refresh }: P) {
       {classes.map((c) => (
         <div key={c.id} className={styles.line}>
           <strong>{c.name}</strong>
-          <span className={styles.note}>{c.start} · {mcT('members')} {(c.members ?? []).map(name).join(', ') || '—'}{c.capacity ? ` (${c.members?.length ?? 0}/${c.capacity})` : ''}{c.waitlist?.length ? ` · ${mcT('waitlist')}: ${c.waitlist.map(name).join(', ')}` : ''}</span>
+          <span className={styles.note}>{c.start} · {mcT('members')} {(c.members ?? []).map(name).join(', ') || '-'}{c.capacity ? ` (${c.members?.length ?? 0}/${c.capacity})` : ''}{c.waitlist?.length ? ` · ${mcT('waitlist')}: ${c.waitlist.map(name).join(', ')}` : ''}</span>
           <input className={controls.input} list="mc-clients" value={pick[c.id] ?? ''} onChange={(e) => setPick({ ...pick, [c.id]: e.target.value })} aria-label={mcT('member')} />
           <B sm l={mcT('enrol')} on={() => attempt(notify, () => { const cl = clientByName(pick[c.id] ?? ''); if (!cl) throw new Error(mcT('member')); notify(mcT(enrolMember(c.id, cl.id!) === 'member' ? 'members' : 'waitlist')); refresh(); })} />
           {(c.members ?? []).slice(-1).map((id) => <B key={id} g sm l={`− ${name(id)}`} on={() => attempt(notify, () => { dropMember(c.id, id); refresh(); })} />)}
           <B g sm l={mcT('del')} on={() => attempt(notify, () => { deleteClass(c.id); refresh(); })} />
           {/* PENDING #21: book one meeting (an appointment with class_id), capped by the capacity of that day. */}
           <B sm l={mcT('book')} d="sv-book" on={() => attempt(notify, () => { const cl = clientByName(pick[c.id] ?? ''); bookOccurrence(c.id, day, cl ? { id: cl.id, name: cl.name, phone: cl.phone } : { name: (pick[c.id] ?? '').trim() }); refresh(); }, mcT('saved'))} />
-          <span className={styles.note} data-sv-bookings={c.name}>{mcT('booked', { date: day, names: bookingsOf(appts, c.id, day).map((a) => a.client_name).join(', ') || '—' })}{Number.isFinite(placesLeft(c, appts, day)) ? ` · ${mcT('placesLeft', { n: placesLeft(c, appts, day) })}` : ''}</span>
-          {bookingsOf(appts, c.id, day).slice(-1).map((a) => <B key={a.id} g sm l={`${mcT('cancelBooking')} — ${a.client_name}`} on={() => attempt(notify, () => { cancelBooking(a.id); refresh(); })} />)}
+          <span className={styles.note} data-sv-bookings={c.name}>{mcT('booked', { date: day, names: bookingsOf(appts, c.id, day).map((a) => a.client_name).join(', ') || '-' })}{Number.isFinite(placesLeft(c, appts, day)) ? ` · ${mcT('placesLeft', { n: placesLeft(c, appts, day) })}` : ''}</span>
+          {bookingsOf(appts, c.id, day).slice(-1).map((a) => <B key={a.id} g sm l={`${mcT('cancelBooking')}: ${a.client_name}`} on={() => attempt(notify, () => { cancelBooking(a.id); refresh(); })} />)}
         </div>
       ))}
       <ClientList />
@@ -326,7 +326,7 @@ function Classes({ notify, tick, refresh }: P) {
 function Recipes() {
   const [month, setMonth] = useState(today().slice(0, 7));
   const staff = loadStaff();
-  const r = useMemo(() => recipeReport(getTable<InvoiceRecord>('invoices'), getTable<StockItem>('stock_items'), getTable<Bom>('boms'), month, (id) => staff.find((s) => s.id === id)?.name ?? '—'), [month]); // eslint-disable-line react-hooks/exhaustive-deps
+  const r = useMemo(() => recipeReport(getTable<InvoiceRecord>('invoices'), getTable<StockItem>('stock_items'), getTable<Bom>('boms'), month, (id) => staff.find((s) => s.id === id)?.name ?? '-'), [month]); // eslint-disable-line react-hooks/exhaustive-deps
   const h = (k: McKey) => [mcT(k), mcT('qty'), mcT('cost'), mcT('revenue')];
   const rows = (x: typeof r.product) => x.map((y) => [y.key, y.qty, rs(y.cost), y.revenue ? rs(y.revenue) : '']);
   return (

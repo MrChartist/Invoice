@@ -98,7 +98,7 @@ export default function FxTab({ data, period, onChanged, notify }: { data: Books
                       <td><Link to={`/invoice/${r.invoiceId}`}>{r.invoiceNumber}</Link></td>
                       <td>{r.party}</td>
                       <td className={styles.numeric}>{r.currency} {formatMoney(r.foreign)}</td>
-                      <td className={styles.numeric}>{r.bookRate ?? '—'}</td>
+                      <td className={styles.numeric}>{r.bookRate ?? '-'}</td>
                       <td>
                         <span className={styles.group}>
                           <input
@@ -119,7 +119,7 @@ export default function FxTab({ data, period, onChanged, notify }: { data: Books
                           )}
                         </span>
                       </td>
-                      <td className={styles.numeric}>{r.fx ? signed(r.fx.gain) : <span className={styles.muted}>{r.bookRate === null ? planT('noInvoiceRate') : '—'}</span>}</td>
+                      <td className={styles.numeric}>{r.fx ? signed(r.fx.gain) : <span className={styles.muted}>{r.bookRate === null ? planT('noInvoiceRate') : '-'}</span>}</td>
                     </tr>
                   );
                 })}
@@ -184,7 +184,7 @@ export default function FxTab({ data, period, onChanged, notify }: { data: Books
                       <td className={styles.numeric}>{r.currency} {formatMoney(r.openForeign)}</td>
                       <td className={styles.numeric}>{r.bookRate}</td>
                       <td className={styles.numeric}>{formatMoney(r.bookInr)}</td>
-                      <td className={styles.numeric}>{r.closingInr === null ? '—' : formatMoney(r.closingInr)}</td>
+                      <td className={styles.numeric}>{r.closingInr === null ? '-' : formatMoney(r.closingInr)}</td>
                       <td className={styles.numeric}>{r.unrealised === null ? <span className={styles.muted}>{planT('enterRate')}</span> : signed(r.unrealised)}</td>
                     </tr>
                   ))}

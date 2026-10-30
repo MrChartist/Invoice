@@ -21,7 +21,7 @@ import { billKind } from './bill-to';
 
 export const SAC_COMMISSION = '998552';
 export const COMMISSION_GST = 18;
-export const LOW_BAND_NOTE = 'ITC not available: every room-night this year is in the 5% (no ITC) band — verify with your CA.';
+export const LOW_BAND_NOTE = 'ITC not available: every room-night this year is in the 5% (no ITC) band, verify with your CA.';
 
 /** True when the FY's hotel invoices so far are all low-band (D12). */
 export function fullyLowBand(invoices: readonly Pick<InvoiceRecord, 'hotel_band' | 'issue_date' | 'status'>[], day: string): boolean {
@@ -66,7 +66,7 @@ export function commissionBill(c: CommissionBillInput): Omit<PurchaseRecord, 'id
     taxable, igst: inter ? gst : 0, cgst: inter ? 0 : half, sgst: inter ? 0 : round2(gst - half),
     itc_eligible: !c.lowBand && gst > 0, total: round2(taxable + gst), amount_paid: 0,
     ...(rate ? { tds_section: '194H', tds_rate: rate, tds_base: taxable, tds_amount: round2((taxable * rate) / 100), tds_on: 'BILL' as const } : {}),
-    notes: [c.lowBand && gst > 0 ? LOW_BAND_NOTE : '', 'Working paper — verify with your CA.'].filter(Boolean).join(' '),
+    notes: [c.lowBand && gst > 0 ? LOW_BAND_NOTE : '', 'Working paper: verify with your CA.'].filter(Boolean).join(' '),
   };
 }
 

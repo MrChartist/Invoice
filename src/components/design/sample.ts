@@ -87,7 +87,7 @@ export function buildSampleInvoice(extra: Partial<InvoiceRecord> = {}): InvoiceR
 export function buildLongInvoice(count: number): InvoiceRecord {
   const items: InvoiceItem[] = Array.from({ length: count }, (_, i) => ({
     id: `l${i}`,
-    name: `Line item ${i + 1} — consulting & analysis`,
+    name: `Line item ${i + 1}: consulting & analysis`,
     description: i % 4 === 0 ? 'Includes detailed write-up and follow-up call' : undefined,
     type: 'Service',
     hsn: i % 3 === 0 ? '998399' : '998311',

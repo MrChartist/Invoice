@@ -92,12 +92,12 @@ function RegisterView({ rows, today, notify, changed }: { rows: RealisationRow[]
               <tr key={r.invoiceId} data-realisation-row={r.number}>
                 <td>{r.number}<div className={styles.muted}>{formatDate(r.invoiceDate)}</div></td>
                 <td>{r.party}</td>
-                <td>{r.sbMissing ? <span className={styles.warn} title={trT('sbMissing')}>{r.sbNo || '—'} ⚠</span> : <>{r.sbNo}<div className={styles.muted}>{formatDate(r.sbDate)}</div></>}</td>
+                <td>{r.sbMissing ? <span className={styles.warn} title={trT('sbMissing')}>{r.sbNo || '-'} ⚠</span> : <>{r.sbNo}<div className={styles.muted}>{formatDate(r.sbDate)}</div></>}</td>
                 <td className={styles.num}>{money(r.fcy, r.currency)}</td>
                 <td className={styles.num}>{money(r.realisedFcy, r.currency)}</td>
                 <td className={styles.num}>{money(r.outstandingFcy, r.currency)}</td>
                 <td>{formatDate(r.dueDate)}<div className={styles.muted}>{r.months} m</div></td>
-                <td className={`${styles.num} ${r.status === 'overdue' ? styles.bad : ''}`}>{r.outstandingFcy > 0.005 ? r.daysLeft : '—'}</td>
+                <td className={`${styles.num} ${r.status === 'overdue' ? styles.bad : ''}`}>{r.outstandingFcy > 0.005 ? r.daysLeft : '-'}</td>
                 <td><span className={`${styles.status} ${styles[`st_${r.status}`] ?? ''}`}>{trT(`st_${r.status}`)}</span>{r.writeOffReason && <div className={styles.muted}>{r.writeOffReason}</div>}</td>
                 <td>{r.irms.map((x) => <div key={x.id + x.irm_no}>{x.irm_no}{x.ebrc_no ? ` · ${x.ebrc_no}` : ''}</div>)}</td>
                 <td>
@@ -125,7 +125,7 @@ function RegisterView({ rows, today, notify, changed }: { rows: RealisationRow[]
           <label className={`${controls.field} ${styles.grow}`}>
             <span className={controls.label}>{trT('forBankParty')}</span>
             <select className={controls.select} value={party} onChange={(e) => setParty(e.target.value)}>
-              <option value="">—</option>
+              <option value="">-</option>
               {parties.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
           </label>
@@ -225,7 +225,7 @@ function ImportsView({ notify, changed, version }: { notify: Notify; changed: ()
           <tbody>
             {rows.map((r) => (
               <tr key={r.billId}>
-                <td>{r.boeNo || '—'}<div className={styles.muted}>{formatDate(r.boeDate)} · {r.billNo}</div></td>
+                <td>{r.boeNo || '-'}<div className={styles.muted}>{formatDate(r.boeDate)} · {r.billNo}</div></td>
                 <td>{r.port}</td>
                 <td>{r.supplier}</td>
                 <td className={styles.num}>{money(r.av)}</td>

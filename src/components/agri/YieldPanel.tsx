@@ -51,8 +51,8 @@ export default function YieldPanel({ order, items, canEdit, onSaved }: { order: 
             [T('by'), q(y.by), y.byPct],
             ...(y.scrap ? [[T('scrap'), q(y.scrap), y.input ? Math.round((y.scrap * 10000) / y.input) / 100 : 0]] : []),
             [T('loss'), q(y.loss), y.lossPct],
-            [`— ${T('moistureLoss')}`, q(y.moistureLoss), ''],
-            [`— ${T('unexplained')}`, q(y.unexplained), ''],
+            [`- ${T('moistureLoss')}`, q(y.moistureLoss), ''],
+            [`- ${T('unexplained')}`, q(y.unexplained), ''],
           ]} />
           <p className={controls.hint}>{T('byCredit')}: {fmtMoney(y.deductions)} · {T('unitCost')}: {fmtMoney(y.unitCost)}</p>
         </>

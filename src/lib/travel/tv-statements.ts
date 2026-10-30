@@ -133,7 +133,7 @@ export function removeStatement(id: string): void {
   const all = loadStatements();
   const s = all.find((x) => x.id === id);
   if (!s) return;
-  if (s.bill_id && purchasesDb.get(s.bill_id)) throw new Error('Its bill is made — delete the bill first.');
+  if (s.bill_id && purchasesDb.get(s.bill_id)) throw new Error('Its bill is made: delete the bill first.');
   assertUnlocked({ issue_date: s.period_end }, 'delete');
   write(all.filter((x) => x.id !== id));
 }

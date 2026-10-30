@@ -34,7 +34,7 @@ export default function FeesTab({ notify }: { notify: Notify }) {
   const runs = useMemo(() => loadFeeRuns().filter((r) => !r.undone).reverse(), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const setBill = (x: Partial<typeof b>) => { setB({ ...b, ...x }); setPre(null); };
   const pick = plans.length > 1 && <S l={iT('plan')} v={plan?.id} o={plans.map((p) => [p.id, p.name] as const)} on={(v) => { setPlanId(v); setPre(null); }} />;
-  const nameOf = (id: string, i: number) => { const p = plans.find((x) => x.id === id); return `${p?.name} — ${p?.instalments[i]?.label}`; };
+  const nameOf = (id: string, i: number) => { const p = plans.find((x) => x.id === id); return `${p?.name}: ${p?.instalments[i]?.label}`; };
 
   return (
     <Shell pack="fees" views={VIEWS} view={view} go={go} label={(v) => iT(`fees.${v}`)} note={iT('feesNote')} d="fees-tab">

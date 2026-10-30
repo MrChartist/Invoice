@@ -53,7 +53,7 @@ export function cancelPlan(targets: readonly TravelBooking[], all: readonly Trav
   for (const b of targets) {
     if (!isBilled(b, live)) continue;
     const { invoice_id, line_id } = b.line_ref!;
-    if (all.some((o) => !ids.has(o.id) && o.status !== 'cancelled' && o.line_ref?.line_id === line_id && o.line_ref.invoice_id === invoice_id)) throw new Error('This booking is billed inside the package line — cancel the whole trip.');
+    if (all.some((o) => !ids.has(o.id) && o.status !== 'cancelled' && o.line_ref?.line_id === line_id && o.line_ref.invoice_id === invoice_id)) throw new Error('This booking is billed inside the package line: cancel the whole trip.');
     by.set(invoice_id, (by.get(invoice_id) ?? new Set()).add(line_id));
   }
   let billed = 0;
@@ -99,7 +99,7 @@ export function cancelBookings(bookingIds: readonly string[], i: CancelInput): {
       const sender = localDb.settings.activeProfile() ?? null;
       const base = makeDraft({ settings: localDb.settings.get(), sender, docType: 'INVOICE', templateId: localDb.template.get() });
       const hsn = regime === 'agent' ? ruleAt(AIR_SAC_RULES, i.date)[targets.every((b) => b.component === 'air') ? 'air' : 'other'] : regimeRule(regime, i.date).sac;
-      const item: InvoiceItem = { id: generateId(), name: `Cancellation fee — ${[...new Set(targets.map((b) => b.ref || b.component))].join(', ')}`, type: 'Service', hsn, unit: 'NOS', quantity: 1, rate: n(i.fee), amount: n(i.fee), tax_rate: plan.rate, discount_percent: 0, ...(regime === 'exempt_outside' ? { sv: { exempt: 'EXEMPT' as const } } : {}) };
+      const item: InvoiceItem = { id: generateId(), name: `Cancellation fee: ${[...new Set(targets.map((b) => b.ref || b.component))].join(', ')}`, type: 'Service', hsn, unit: 'NOS', quantity: 1, rate: n(i.fee), amount: n(i.fee), tax_rate: plan.rate, discount_percent: 0, ...(regime === 'exempt_outside' ? { sv: { exempt: 'EXEMPT' as const } } : {}) };
       const client = plan.credits[0]?.invoice.client ?? ((trip?.client_id && localDb.clients.getById(trip.client_id)) || { ...blankClient(), name: trip?.name ?? '' });
       const snap = trip ? tvSnapshot(trip, regime, i.date) : { regime };
       delete snap.decl;
@@ -110,7 +110,7 @@ export function cancelBookings(bookingIds: readonly string[], i: CancelInput): {
     targets.forEach((b, k) => { if (b.bill_id && ri[k] > 0) due.set(b.bill_id, round2((due.get(b.bill_id) ?? 0) + ri[k])); });
     for (const [billId, amt] of due) {
       if (!purchasesDb.get(billId)) continue;
-      purchaseReturnsDb.create({ kind: 'DEBIT_NOTE', date: i.date, purchaseId: billId, reason: '07', goodsReturned: false, lines: [{ id: generateId(), name: 'Cancellation — refund due', quantity: 1, rate: amt, tax_rate: 0 }], notes: 'Booking cancelled. Verify with your CA.' });
+      purchaseReturnsDb.create({ kind: 'DEBIT_NOTE', date: i.date, purchaseId: billId, reason: '07', goodsReturned: false, lines: [{ id: generateId(), name: 'Cancellation: refund due', quantity: 1, rate: amt, tax_rate: 0 }], notes: 'Booking cancelled. Verify with your CA.' });
     }
     const now = new Date().toISOString();
     const at = new Map(targets.map((b, k) => [b.id, k]));

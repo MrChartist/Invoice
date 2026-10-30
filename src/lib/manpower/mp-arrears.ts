@@ -38,7 +38,7 @@ export interface ArrearNote { of: InvoiceRecord; lines: ArrearLine[]; amount: nu
 export function postArrear(site: Site, post: MpPost, m: Pick<SiteMuster, 'month' | 'rows'>, delta: number, s: ManpowerSettings, ref: string): ArrearLine | null {
   const duties = m.rows.filter((r) => r.post_id === post.id).reduce((t, r) => t + (Number(r.duties) || 0), 0);
   if (!(delta > 0) || !duties) return null;
-  const head = `Arrears ${m.month} — ${post.name}`;
+  const head = `Arrears ${m.month}: ${post.name}`;
   if (post.basis === 'duty') return { name: `${head}: ${duties} duties × ₹${delta} (${ref})`, hsn: post.sac, quantity: duties, rate: delta, amount: round2(duties * delta), site, post, month: m.month, duties, delta };
   const days = s.billing_days === 26 || s.billing_days === 30 ? s.billing_days : daysIn(m.month);
   const rate = post.basis === 'hour' ? post.rate + delta / post.shift_hours : post.basis === 'month' ? post.rate + delta * days : post.rate + delta;
@@ -68,7 +68,7 @@ export function mpArrears(i: { rev: WageRevision; revs: readonly WageRevision[];
       for (const site of sites) {
         const mine = lines.filter((l) => l.site === site);
         const amt = round2((round2(mine.reduce((t, l) => t + l.amount, 0)) * pct) / 100);
-        if (amt > 0) lines.push({ ...mine[0], name: `Service charge ${pct} % on arrears${sites.length > 1 ? ` — ${site.mp.code}` : ''}`, quantity: 1, rate: amt, amount: amt, duties: 0, delta: 0 });
+        if (amt > 0) lines.push({ ...mine[0], name: `Service charge ${pct} % on arrears${sites.length > 1 ? `: ${site.mp.code}` : ''}`, quantity: 1, rate: amt, amount: amt, duties: 0, delta: 0 });
       }
     }
     if (!lines.length) continue;

@@ -98,7 +98,7 @@ export function suggestLine(f: PackFacts, opts: { counterLoose?: boolean; asFeed
 
 export type EwayHint = { kind: 'prompt'; taxable: number } | { kind: 'exempt_note'; text: string } | { kind: 'none' };
 
-export const EXEMPT_EWAY_NOTE = 'e-Way bill may not be needed for exempt goods — verify with your CA (AG12).';
+export const EXEMPT_EWAY_NOTE = 'e-Way bill may not be needed for exempt goods: verify with your CA (AG12).';
 
 /**
  * e-Way bill hint by line mix: exempt-only goods → the "may not be needed" note; taxable goods worth more than the

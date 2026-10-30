@@ -215,7 +215,7 @@ export function ExtrasTab({ month, version, refresh, notify }: TabProps) {
                     <td>{name.get(p.employee_id) ?? ''}</td>
                     <td>{pT(PERQ_KEY[p.kind])}{p.description ? <span className={styles.sub}>{p.description}</span> : null}{p.basis ? <span className={styles.sub}>{p.basis}</span> : null}</td>
                     <td>{monthLabel(p.from_month)}</td>
-                    <td>{p.to_month ? monthLabel(p.to_month) : '—'}</td>
+                    <td>{p.to_month ? monthLabel(p.to_month) : '-'}</td>
                     <td className={styles.num}>{inr(p.monthly_value)}</td>
                     <td className={styles.num}><button type="button" className={controls.btnDanger} aria-label={pT('ext.delete', { name: pT(PERQ_KEY[p.kind]) })} onClick={() => runAction(() => deletePerquisite(p.id), refresh, notify, pT('ext.deleted'))}><Trash2 size={15} /></button></td>
                   </tr>

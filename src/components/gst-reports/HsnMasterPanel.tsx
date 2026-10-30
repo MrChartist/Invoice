@@ -101,9 +101,9 @@ export function HsnMasterPanel({ notify }: HsnMasterPanelProps) {
                   <tr key={r.id}>
                     <td className={surface.mono}>{r.code}</td>
                     <td style={{ textAlign: 'left', whiteSpace: 'normal' }}>{r.description}</td>
-                    <td>{r.uqc ?? '—'}</td>
+                    <td>{r.uqc ?? '-'}</td>
                     <td>{r.kind === 'services' ? soT('hsnServices') : soT('hsnGoods')}</td>
-                    <td>{cur ? `${cur.rate}%${cur.cess_rate ? ` + ${cur.cess_rate}%` : ''}` : '—'}</td>
+                    <td>{cur ? `${cur.rate}%${cur.cess_rate ? ` + ${cur.cess_rate}%` : ''}` : '-'}</td>
                     <td style={{ textAlign: 'left' }}>
                       <ul className={styles.history}>
                         {r.rates.map((x) => <li key={x.from}>{formatDate(x.from)}: {x.rate}%{x.cess_rate ? ` + ${x.cess_rate}%` : ''}</li>)}

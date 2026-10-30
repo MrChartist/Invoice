@@ -49,7 +49,7 @@ test('saveRaBill writes the snapshot: header from the contract table, line refs 
   const row = cn.abstract!.find((x) => x.id === 'l1')!;
   assert.equal(line.cum_amount, row.cum_amount);
   assert.equal(worksLineText(r2.invoice.items[0], cn), 'Item 2.1 · MB 113/2');
-  assert.equal(raDocTitle(r2.invoice, 'Tax Invoice'), 'Tax Invoice — Running Account Bill No. 2');
+  assert.equal(raDocTitle(r2.invoice, 'Tax Invoice'), 'Tax Invoice: Running Account Bill No. 2');
   assert.equal(r1.invoice.boq_terms!.cn!.header!.ra_label, '1st RA bill (running)');
 });
 

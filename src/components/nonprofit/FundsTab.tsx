@@ -34,7 +34,7 @@ export default function FundsTab({ period, notify }: { period: Period; notify: N
   const fund = funds.find((f) => f.id === id) ?? funds[0];
   const [f, setF] = useState<{ name: string } & FundInfo>({ name: '', nature: 'restricted' });
   const [tr, setTr] = useState({ from: '', to: '', amount: 0, date: today() });
-  const pick = [['', '—'] as const, ...funds.map((x) => [x.id, x.name] as const)];
+  const pick = [['', '-'] as const, ...funds.map((x) => [x.id, x.name] as const)];
   const run = (fn: () => void) => attempt(notify, () => { fn(); refresh(); }, iT('saved'));
   return (
     <Shell pack="nonprofit" views={VIEWS} view={view} go={go} label={(v) => iT(`funds.${v}`)} note={iT('fundsNote')} d="funds-tab">

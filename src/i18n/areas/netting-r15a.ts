@@ -17,7 +17,7 @@ export const netT = defineArea(
     reversed: 'Netting reversed.',
     note: 'No cash moves; GST / TDS untouched (verify with your CA).',
     link: 'Also customer',
-    linkNone: '—',
+    linkNone: '-',
   } as const,
   {
     title: 'आपसी समायोजन (नेटिंग)',
@@ -34,6 +34,6 @@ export const netT = defineArea(
     reversed: 'नेटिंग उलटी गई।',
     note: 'नकद नहीं; GST / TDS पर असर नहीं (CA से जाँचें)।',
     link: 'ग्राहक भी',
-    linkNone: '—',
+    linkNone: '-',
   },
 );

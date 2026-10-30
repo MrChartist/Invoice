@@ -84,10 +84,10 @@ export function presumptive(input: PresumptiveInput): PresumptivePaper {
   const deemed = round2((gross * r.deemedPct) / 100);
   const adv = psRuleAt(PRESUMPTIVE_ADVANCE_TAX_RULES, start);
   const notes: string[] = [];
-  if (input.firmForm === 'llp') notes.push('Not available to an LLP — verify with your CA.');
-  if (input.firmForm === 'company') notes.push('Not available to a company — verify with your CA.');
-  if (input.firmForm === 'partnership') notes.push('A firm on 44ADA / Sec 58 cannot deduct partners’ remuneration and interest — verify with your CA (PS22, PS24).');
-  if (!rule.verified || !adv.verified) notes.push('Some values here are not yet confirmed — verify with your CA.');
+  if (input.firmForm === 'llp') notes.push('Not available to an LLP: verify with your CA.');
+  if (input.firmForm === 'company') notes.push('Not available to a company: verify with your CA.');
+  if (input.firmForm === 'partnership') notes.push('A firm on 44ADA / Sec 58 cannot deduct partners’ remuneration and interest: verify with your CA (PS22, PS24).');
+  if (!rule.verified || !adv.verified) notes.push('Some values here are not yet confirmed: verify with your CA.');
   return {
     fy: input.fy, section: r.section, accrual: gross, cashBasis: round2(all), recoveriesOut: round2(recoveries), cashReceipts: round2(cash), cashPct,
     limit, raised, withinLimit: gross <= limit, deemedPct: r.deemedPct, deemed,

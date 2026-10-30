@@ -72,7 +72,7 @@ export interface MediaBillPrefs {
 }
 
 type Line = Omit<InvoiceItem, 'id' | 'amount' | 'type'> & { charge_head_id?: string };
-const label = (r: MediaRow) => `${r.media.publication || r.vendor} — ${r.media.medium}${r.media.ro ? ` (RO ${r.media.ro})` : ''}`;
+const label = (r: MediaRow) => `${r.media.publication || r.vendor}: ${r.media.medium}${r.media.ro ? ` (RO ${r.media.ro})` : ''}`;
 
 /** Invoice lines for media rows (principal: cost at the chosen rate + fee; agent: pure-agent recovery + fee). */
 export function mediaLines(rows: readonly MediaRow[], prefs: MediaBillPrefs): Line[] {
@@ -80,12 +80,12 @@ export function mediaLines(rows: readonly MediaRow[], prefs: MediaBillPrefs): Li
   const fee = Math.max(num(prefs.fee_pct), 0);
   for (const r of rows) {
     if (r.media.mode === 'agent') {
-      out.push({ name: `Media at actual — ${label(r)}`, description: PURE_AGENT_CHARGE, charge_head_id: 'rule33', unit: 'NOS', quantity: 1, rate: r.total, tax_rate: 0, discount_percent: 0, bill_refs: [r.id] });
+      out.push({ name: `Media at actual: ${label(r)}`, description: PURE_AGENT_CHARGE, charge_head_id: 'rule33', unit: 'NOS', quantity: 1, rate: r.total, tax_rate: 0, discount_percent: 0, bill_refs: [r.id] });
     } else {
       const own = prefs.media_rate !== undefined;
-      out.push({ name: `Media — ${label(r)}`, hsn: own ? prefs.media_hsn ?? prefs.sac : prefs.sac, unit: 'NOS', quantity: 1, rate: r.cost, tax_rate: own ? num(prefs.media_rate) : num(prefs.gst_rate), discount_percent: 0, bill_refs: [r.id] });
+      out.push({ name: `Media: ${label(r)}`, hsn: own ? prefs.media_hsn ?? prefs.sac : prefs.sac, unit: 'NOS', quantity: 1, rate: r.cost, tax_rate: own ? num(prefs.media_rate) : num(prefs.gst_rate), discount_percent: 0, bill_refs: [r.id] });
     }
-    if (fee > 0) out.push({ name: `Agency service fee ${fee}% — ${label(r)}`, hsn: prefs.sac, unit: 'NOS', quantity: 1, rate: round2((r.cost * fee) / 100), tax_rate: num(prefs.gst_rate), discount_percent: 0 });
+    if (fee > 0) out.push({ name: `Agency service fee ${fee}%: ${label(r)}`, hsn: prefs.sac, unit: 'NOS', quantity: 1, rate: round2((r.cost * fee) / 100), tax_rate: num(prefs.gst_rate), discount_percent: 0 });
   }
   return out;
 }
@@ -100,7 +100,7 @@ export function byMedium(rows: readonly MediaRow[]): { medium: Medium; rows: Med
 
 /** Commission a publisher pays us: billed as our service to the publisher (an ordinary invoice line). */
 export function commissionLine(publication: string, grossSpace: number, pct: number, prefs: Pick<MediaBillPrefs, 'sac' | 'gst_rate'>): Line {
-  return { name: `Media commission ${num(pct)}% — ${publication}`, hsn: prefs.sac, unit: 'NOS', quantity: 1, rate: round2((num(grossSpace) * num(pct)) / 100), tax_rate: num(prefs.gst_rate), discount_percent: 0 };
+  return { name: `Media commission ${num(pct)}%: ${publication}`, hsn: prefs.sac, unit: 'NOS', quantity: 1, rate: round2((num(grossSpace) * num(pct)) / 100), tax_rate: num(prefs.gst_rate), discount_percent: 0 };
 }
 
 /** TDS a client deducts on an advertising agency's bill (194C, Circular 715) and whether the 6 % levy still applies. */

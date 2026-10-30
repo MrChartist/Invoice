@@ -27,7 +27,7 @@ export default function Tds194jView({ ctx }: { ctx: PsDeskCtx }) {
         const d = clientTdsDefault(c, kind);
         return [c.name, (
           <select key="s" className={controls.select} value={d?.section ?? ''} onChange={(e) => ctx.run(() => patchClientPs(c.id!, { tds: e.target.value ? { section: e.target.value as ClientTdsDefault['section'] } : undefined }))} data-ps="j-section">
-            <option value="">—</option>{SECTIONS.map((s) => <option key={s} value={s}>{s === 'none' ? fdT('noTds') : s}</option>)}
+            <option value="">-</option>{SECTIONS.map((s) => <option key={s} value={s}>{s === 'none' ? fdT('noTds') : s}</option>)}
           </select>
         )];
       })} />

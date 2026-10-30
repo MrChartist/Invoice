@@ -11,7 +11,7 @@ import type { LgJob, LogisticsSettings } from '../../types/logistics-r19';
 import { round2 } from '../invoice-calc';
 
 /** Printed as the voucher's description of supply (LG12). */
-export const DEPOSIT_TEXT = "Deposit towards customs duty and charges payable on the client's behalf — not consideration for our supply";
+export const DEPOSIT_TEXT = "Deposit towards customs duty and charges payable on the client's behalf: not consideration for our supply";
 
 export interface DepositReceipt { amount: number; date: string; method: string; reference?: string; bankAccountId?: string }
 
@@ -20,7 +20,7 @@ export function depositInput(job: Pick<LgJob, 'id' | 'number'>, client: AdvanceI
   return {
     date: x.date, client, place_of_supply: pos, supply: 'services', tax_rate: 0, amount: round2(Number(x.amount) || 0), method: x.method || 'Bank transfer',
     ...(x.reference?.trim() ? { reference: x.reference.trim() } : {}), ...(x.bankAccountId ? { bankAccountId: x.bankAccountId } : {}),
-    description: `${DEPOSIT_TEXT} — job ${job.number}`, booking: { pass_through: true }, lg: { job_id: job.id },
+    description: `${DEPOSIT_TEXT}: job ${job.number}`, booking: { pass_through: true }, lg: { job_id: job.id },
   };
 }
 

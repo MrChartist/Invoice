@@ -31,7 +31,7 @@ export function ChallanQtyTable({ invoice }: { invoice: InvoiceRecord }) {
               <div className={styles.itemName}>{i.name}</div>
               {i.description && <div className={styles.itemDesc}>{i.description}</div>}
             </td>
-            {showHsn && <td className={cn(styles.center, styles.num)}>{i.hsn || '—'}</td>}
+            {showHsn && <td className={cn(styles.center, styles.num)}>{i.hsn || '-'}</td>}
             <td className={cn(styles.right, styles.num)}>
               {formatQuantity(i.quantity)}
               {i.unit ? ` ${i.unit}` : ''}

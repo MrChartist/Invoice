@@ -122,7 +122,7 @@ export async function shareBackupNow(opts: { passphrase?: string; allowPlain?: b
     if (last !== 'unsupported') break; // cancelled / blocked / failed: do not offer a second sheet
   }
   const message =
-    last === 'cancelled' ? 'Share cancelled — nothing was saved.'
+    last === 'cancelled' ? 'Share cancelled: nothing was saved.'
       : last === 'blocked' ? 'Tap Share again to open the share sheet.'
         : last === 'unsupported' ? 'This browser cannot share files. Use Download backup instead.'
           : 'The backup could not be shared.';

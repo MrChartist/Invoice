@@ -41,10 +41,10 @@ export function TripSheet({ trip, pnl, notify, refresh, tick, onBack }: PanelPro
     <div className={styles.stack}>
       <div className={styles.toolbar}>
         <button type="button" className={B.gs} onClick={onBack}><ChevronLeft size={14} aria-hidden="true" /> {twT('back')}</button>
-        <strong>{trip.number} · {vehicle?.reg_no ?? '—'}{trip.driver ? ` · ${trip.driver}` : ''} · {twT(`ts.${trip.status}`)}</strong>
+        <strong>{trip.number} · {vehicle?.reg_no ?? '-'}{trip.driver ? ` · ${trip.driver}` : ''} · {twT(`ts.${trip.status}`)}</strong>
       </div>
       {pnl && <p className={styles.note}>{twT('freight')} {fmtMoney(pnl.freight)} − {twT('expenses')} {fmtMoney(pnl.expenses)} − {twT('hire')} {fmtMoney(pnl.hire)} = <strong className={pnl.margin < 0 ? styles.bad : styles.good}>{fmtMoney(pnl.margin)}</strong>{pnl.kmpl !== null ? ` · ${pnl.km} km / ${pnl.litres} l = ${pnl.kmpl} ${twT('kmpl')}` : ''}</p>}
-      <p className={styles.note}>{twT('lrsCarried')}: {lrs.map((l) => l.number).join(', ') || '—'}</p>
+      <p className={styles.note}>{twT('lrsCarried')}: {lrs.map((l) => l.number).join(', ') || '-'}</p>
       <section className={styles.box}>
         <h4>{twT('expenses')}</h4>
         <ul className={styles.note}>{expenses.map((e) => <li key={e.id}>{e.date} · {e.category} · {fmtMoney(e.amount)}</li>)}</ul>
@@ -71,7 +71,7 @@ export function TripSheet({ trip, pnl, notify, refresh, tick, onBack }: PanelPro
           <h4>{twT('hire')}</h4>
           {hire ? <p className={styles.note}>{hire.vendor_name} · {fmtMoney(hire.total)} · {hire.tds_reason === 'T' ? twT('tds194c6Nil') : hire.tds_amount ? `TDS ${sectionText(hire.tds_section, hire.date)} ${fmtMoney(hire.tds_amount)}` : twT('noTds')}</p> : (
             <div className={styles.lineRow}>
-              <F l={twT('owner')}><select className={controls.select} value={f.vendor} onChange={set('vendor')}><option value="">—</option>{vendorsDb.all().map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></F>
+              <F l={twT('owner')}><select className={controls.select} value={f.vendor} onChange={set('vendor')}><option value="">-</option>{vendorsDb.all().map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></F>
               {field('hire', twT('amount'))}{field('billNo', twT('billNo'), 'text')}
               <button type="button" className={B.o} onClick={() => run(() => recordLorryHire(trip.id, { date: f.day, vendorId: f.vendor, amount: Number(f.hire), billNumber: f.billNo }), twT('hireSaved'))}>{twT('add')}</button>
             </div>

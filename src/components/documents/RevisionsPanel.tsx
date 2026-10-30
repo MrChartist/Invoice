@@ -52,7 +52,7 @@ export function RevisionsPanel({ quote, refreshKey }: { quote: InvoiceRecord; re
             <ul className={styles.list}>
               {changed.map((l, i) => (
                 <li key={`${l.name}-${i}`} className={cn(l.kind === 'added' && styles.diffAdded, l.kind === 'removed' && styles.diffRemoved, l.kind === 'changed' && styles.diffChanged)}>
-                  {l.kind === 'added' ? s2T('q.added') : l.kind === 'removed' ? s2T('q.removed') : s2T('q.changed')}: {l.name || '—'}
+                  {l.kind === 'added' ? s2T('q.added') : l.kind === 'removed' ? s2T('q.removed') : s2T('q.changed')}: {l.name || '-'}
                   {l.kind === 'changed' && l.before && l.after && (
                     <span className={styles.muted}>
                       {' '}({l.fields.map((f) => `${f.replace('_percent', ' %').replace('_', ' ')} ${String(l.before![f as keyof typeof l.before])} → ${String(l.after![f as keyof typeof l.after])}`).join('; ')})

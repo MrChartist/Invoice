@@ -27,7 +27,7 @@ export default function DrawingsView({ ctx, done }: { ctx: MfgContext; done: Don
   const [docId, setDocId] = useState('');
   const [lines, setLines] = useState<Record<string, MfLineSnap>>({});
   const doc: InvoiceRecord | undefined = d.drafts.find((x) => x.id === docId);
-  const itemName = (id?: string) => ctx.items.find((i) => i.id === id)?.name ?? '—';
+  const itemName = (id?: string) => ctx.items.find((i) => i.id === id)?.name ?? '-';
   const heat = (l: InvoiceRecord['items'][number]) => {
     const it = buildItemIndex(ctx.items).find(l.name, l.hsn);
     return it && l.batch_no ? heatsForBatch(it.id, l.batch_no, { mfg: getTable('manufacturing_vouchers'), transfers: getTable('stock_transfers'), purchases: getTable('purchases') }).join(', ') : '';
@@ -58,7 +58,7 @@ export default function DrawingsView({ ctx, done }: { ctx: MfgContext; done: Don
         const cur = currentRev(x);
         return [
           <span key="n"><strong>{x.number}</strong> {x.title}</span>, itemName(x.item_id),
-          <span key="c" data-mfb-rev-status={cur?.status}>{cur ? `${cur.rev} · ${S(`st.${cur.status}`)}` : '—'}{x.release_override ? ` · ${S('overridden')}` : ''}</span>,
+          <span key="c" data-mfb-rev-status={cur?.status}>{cur ? `${cur.rev} · ${S(`st.${cur.status}`)}` : '-'}{x.release_override ? ` · ${S('overridden')}` : ''}</span>,
           x.revisions.map((r) => r.rev).join(' → '),
           <span key="r" style={row}>
             <input className={controls.input} style={{ maxWidth: 60 }} aria-label={S('newRev')} value={revs[x.id] ?? ''} onChange={(e) => setRevs({ ...revs, [x.id]: e.target.value })} data-mfb="new-rev" />
@@ -78,7 +78,7 @@ export default function DrawingsView({ ctx, done }: { ctx: MfgContext; done: Don
         const setC = (i: number, p: Partial<DrawingChar>) => setEdit({ ...edit, chars: edit.chars.map((c, j) => (j === i ? { ...c, ...p } : c)) });
         return dw && (
           <div data-mfb-chars>
-            <h4>{S('chars')} — {dw.number}</h4>
+            <h4>{S('chars')} : {dw.number}</h4>
             {edit.chars.map((c, i) => (
               <div key={i} style={row}>
                 <Txt l={S('charName')} v={c.name} set={(x) => setC(i, { name: x })} x={160} d="char-name" />

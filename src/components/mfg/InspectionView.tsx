@@ -62,7 +62,7 @@ export default function InspectionView({ ctx, done }: { ctx: MfgContext; done: D
       <Table d="reports" empty={S('none')} head={[S('number'), S('date'), S('drawingNo'), S('result'), S('attach'), '']} rows={d.reports.map((r) => {
         const w = d.drawings.find((x) => x.id === r.drawing_id);
         return [
-          r.number, r.date, `${w?.number ?? '—'} rev ${r.rev}`, <span key="r" data-mfb-result={r.result}>{S(`r.${r.result}`)}</span>,
+          r.number, r.date, `${w?.number ?? '-'} rev ${r.rev}`, <span key="r" data-mfb-result={r.result}>{S(`r.${r.result}`)}</span>,
           <span key="a" style={row}>
             <select className={controls.select} style={{ maxWidth: 200 }} aria-label={S('attach')} value={att[r.id] ?? ''} onChange={(e) => setAtt({ ...att, [r.id]: e.target.value })}>{opt(d.drafts, (i) => i.id, (i) => `${i.invoice_number || i.doc_type} · ${i.client?.name ?? ''}`).map(([k, s]) => <option key={k} value={k}>{s}</option>)}</select>
             <button type="button" className={B.gs} disabled={!w || !att[r.id]} onClick={() => run(() => { attachToInvoice(r.id, att[r.id], w!); return S('attached'); })}>{S('attach')}</button>

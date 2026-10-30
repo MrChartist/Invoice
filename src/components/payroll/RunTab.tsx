@@ -80,7 +80,7 @@ export function RunTab({ month, version, refresh, notify }: Props) {
 
   const cell = (r: PayrollRun, l: PayslipLine, row: number, col: Col, list: PayslipLine['earnings']) => {
     const amount = list.find((x) => x.pay_head_id === col.id)?.amount ?? 0;
-    if (!draft) return <td key={col.id} className={styles.num}>{amount ? inr(amount) : '—'}</td>;
+    if (!draft) return <td key={col.id} className={styles.num}>{amount ? inr(amount) : '-'}</td>;
     const overridden = l.overrides?.[col.id] !== undefined;
     return (
       <td key={col.id} className={styles.num}>

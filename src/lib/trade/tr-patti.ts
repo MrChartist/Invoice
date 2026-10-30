@@ -159,7 +159,7 @@ export function unsettledLots(arrivals: readonly Arrival[], sales: readonly Agen
 /** Plain-text patti (print / WhatsApp). */
 export function pattiText(p: SalePatti, company = '', money: (n: number) => string = (n) => `₹${n.toFixed(2)}`): string {
   return [
-    `${company ? `${company} — ` : ''}Bikri patti ${p.number} (${p.date})`,
+    `${company ? `${company}: ` : ''}Bikri patti ${p.number} (${p.date})`,
     `Principal: ${p.principal_name}`,
     ...p.sales.map((s) => `${s.invoice_number} ${s.date}: ${s.qty} → ${money(s.amount)}`),
     `Gross sales: ${money(p.gross)}`,
@@ -212,7 +212,7 @@ export function postPatti(id: string): SalePatti {
     const v = saveVoucher({
       type: 'JOURNAL',
       date: p.date,
-      narration: `Bikri patti ${p.number} to ${p.principal_name}: gross sales ₹${p.gross.toFixed(2)} less deductions ₹${p.total_deductions.toFixed(2)} (agency sales transferred to the principal) — verify with your CA`,
+      narration: `Bikri patti ${p.number} to ${p.principal_name}: gross sales ₹${p.gross.toFixed(2)} less deductions ₹${p.total_deductions.toFixed(2)} (agency sales transferred to the principal), verify with your CA`,
       lines: pattiJournal(p).map((l) => ({
         account_id: ids[l.account] ?? l.account,
         dr: Math.round(l.dr * 100),

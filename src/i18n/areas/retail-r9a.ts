@@ -7,7 +7,7 @@ import { defineArea } from '../area';
 export const rtaT = defineArea(
   {
     'tab.deliveries': 'Deliveries',
-    workingPaper: 'Working paper — verify with your CA.',
+    workingPaper: 'Working paper: verify with your CA.',
     // RT-A2 retail checks (Settings → Items)
     checksTitle: 'Retail checks',
     checksSub: 'Counter checks for every shop. Each is off until you turn it on (your shop profile may have turned some on).',
@@ -92,12 +92,12 @@ export const rtaT = defineArea(
     sbCallMsg: 'Good news: {item} is back in stock at {shop}.',
     sbOrdered: 'On PO',
     sbSupplier: 'Last supplier',
-    sbNone: '—',
+    sbNone: '-',
     sbFromSearch: 'Not found? Add "{q}" to the short book',
   } as const,
   {
     'tab.deliveries': 'डिलीवरी',
-    workingPaper: 'कार्य-पत्र — अपने CA से जाँच लें।',
+    workingPaper: 'कार्य-पत्र: अपने CA से जाँच लें।',
     checksTitle: 'रिटेल जाँच',
     checksSub: 'हर दुकान के लिए काउंटर जाँच। चालू करने तक हर जाँच बंद रहती है (दुकान प्रोफ़ाइल ने कुछ चालू की हो सकती हैं)।',
     mrpGuard: 'MRP से ऊपर बिक्री',
@@ -177,7 +177,7 @@ export const rtaT = defineArea(
     sbCallMsg: 'ख़ुशख़बरी: {item} {shop} पर फिर से स्टॉक में है।',
     sbOrdered: 'PO पर',
     sbSupplier: 'पिछला सप्लायर',
-    sbNone: '—',
+    sbNone: '-',
     sbFromSearch: 'नहीं मिला? "{q}" शॉर्ट बुक में जोड़ें',
   },
 );

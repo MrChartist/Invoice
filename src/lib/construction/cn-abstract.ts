@@ -60,7 +60,7 @@ export function deviationWarnings(boq: Pick<InvoiceRecord, 'items'>, lines: read
 }
 
 export const deviationWarningText = (w: DeviationWarning): string =>
-  `"${w.name}": cumulative ${w.cumulative} is beyond the deviation limit ${w.limit} (BOQ + ${w.pct}%) — the excess is billed as a deviation item; keep the approval on record.`;
+  `"${w.name}": cumulative ${w.cumulative} is beyond the deviation limit ${w.limit} (BOQ + ${w.pct}%), the excess is billed as a deviation item; keep the approval on record.`;
 
 /**
  * Split the deviation part out of each excess ("Extra item") line of a stage bill: the quantity beyond the limit
@@ -84,7 +84,7 @@ export function splitDeviation(items: readonly InvoiceItem[], boq: Pick<InvoiceR
     }
     const rest = roundQty(num(it.quantity) - devQty);
     if (rest > EPS) out.push({ ...it, quantity: rest, amount: round2(rest * num(it.rate)) });
-    out.push({ ...it, id: `${it.id.slice(0, -2)}-d`, name: `Deviation — ${src?.name ?? it.name}`, description: 'Quantity beyond the deviation limit — rate per clause of agreement', quantity: devQty, amount: round2(devQty * num(it.rate)) });
+    out.push({ ...it, id: `${it.id.slice(0, -2)}-d`, name: `Deviation: ${src?.name ?? it.name}`, description: 'Quantity beyond the deviation limit: rate per clause of agreement', quantity: devQty, amount: round2(devQty * num(it.rate)) });
   }
   return out;
 }

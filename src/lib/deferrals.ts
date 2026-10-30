@@ -327,7 +327,7 @@ function voucherFor(d: Stored, e: PlannedEntry) {
   return {
     type: 'JOURNAL' as const,
     date: e.date,
-    narration: `${d.kind === 'revenue' ? 'Income received in advance' : 'Prepaid expense'} ${what} — ${d.source.number ?? ''} ${d.source.name ?? ''}`.trim(),
+    narration: `${d.kind === 'revenue' ? 'Income received in advance' : 'Prepaid expense'} ${what}: ${d.source.number ?? ''} ${d.source.name ?? ''}`.trim(),
     voucher_class: DEFERRAL_CLASS,
     lines: [
       { account_id: drAcc, dr: e.amount, cr: 0 },

@@ -58,7 +58,7 @@ export function ApprovalsPanel({ notify }: { notify?: (m: string, tone?: 'succes
                 <div>
                   <Link to={`/invoice/${d.id}`}><strong>{DOCUMENT_LABELS[d.doc_type]} {d.invoice_number}</strong></Link>
                   <span className={controls.hint}>
-                    {approvalsT('line', { party: d.client?.name || '—', amount: formatCurrency(d.total, d.currency), by: d.approval?.requested_by || '—', date: formatDate(d.issue_date) })}
+                    {approvalsT('line', { party: d.client?.name || '-', amount: formatCurrency(d.total, d.currency), by: d.approval?.requested_by || '-', date: formatDate(d.issue_date) })}
                   </span>
                 </div>
                 {mayApprove && (
@@ -126,7 +126,7 @@ export function ApprovalBanner({ approval }: { approval?: { state: string; note?
   if (!approval || approval.state === 'approved') return null;
   return (
     <p className={own.banner} role="status">
-      {approval.state === 'pending' ? approvalsT('bannerPending', { by: approval.requested_by || '—' }) : approvalsT('bannerRejected', { note: approval.note || '—' })}
+      {approval.state === 'pending' ? approvalsT('bannerPending', { by: approval.requested_by || '-' }) : approvalsT('bannerRejected', { note: approval.note || '-' })}
     </p>
   );
 }

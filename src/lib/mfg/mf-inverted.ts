@@ -20,7 +20,7 @@ import { saveRefund, type GstRefundClaim } from '../gst-cash-refunds';
 /** Pre-fill a DRAFT refund claim (category `INVERTED_DUTY`) in the existing register; split CGST / SGST — edit the heads there. */
 export function prefillInvertedClaim(x: { from: string; to: string; refund: number; gstin?: string; notes?: string }): GstRefundClaim {
   const half = round2(num(x.refund) / 2);
-  return saveRefund({ category: 'INVERTED_DUTY', period_from: x.from, period_to: x.to, relevant_date: x.to, ...(x.gstin ? { gstin: x.gstin } : {}), claimed: { igst: 0, cgst: half, sgst: round2(num(x.refund) - half), cess: 0 }, notes: `${x.notes ?? 'Rule 89(5) working paper'} — split by head as your credit ledger allows. Verify with your CA (MF26).` });
+  return saveRefund({ category: 'INVERTED_DUTY', period_from: x.from, period_to: x.to, relevant_date: x.to, ...(x.gstin ? { gstin: x.gstin } : {}), claimed: { igst: 0, cgst: half, sgst: round2(num(x.refund) - half), cess: 0 }, notes: `${x.notes ?? 'Rule 89(5) working paper'}: split by head as your credit ledger allows. Verify with your CA (MF26).` });
 }
 
 export interface IdLine {
@@ -98,14 +98,14 @@ export function rule895(outs: readonly IdLine[], ins: readonly IdLine[], inverte
   const netItc = round2(i.filter((l) => !l.capital && (rule.inputServices || !l.service)).reduce((s, l) => s + l.tax, 0));
   const itcAvailed = round2(i.filter((l) => !l.capital).reduce((s, l) => s + l.tax, 0));
   const notes: string[] = [];
-  if (!(att > 0)) return { invertedTurnover, att, netItc, itcAvailed, taxPayable, refund: 0, first: 0, second: 0, notes: ['Adjusted total turnover is nil — no refund can be worked out.'] };
+  if (!(att > 0)) return { invertedTurnover, att, netItc, itcAvailed, taxPayable, refund: 0, first: 0, second: 0, notes: ['Adjusted total turnover is nil: no refund can be worked out.'] };
   const first = round2((invertedTurnover * netItc) / att);
   const second = round2(rule.ratioOnTax && itcAvailed > 0 ? (taxPayable * netItc) / itcAvailed : taxPayable);
   const refund = round2(Math.max(first - second, 0));
   if (!refund) notes.push('No refund: the tax payable on the inverted supply covers its share of input credit.');
   const higher = i.filter((l) => !l.service && !l.capital && invertedRates.some((r) => l.rate > r)).length;
-  if (!higher) notes.push('No input is taxed above the chosen output rates — the structure may not be inverted.');
-  notes.push(`Net ITC is inputs only (input services and capital goods out). ${rule.ratioOnTax ? 'Tax payable scaled by net ITC ÷ ITC availed (N 14/2022-CT).' : 'Tax payable deducted in full (before 5 Jul 2022).'} Working paper — verify with your CA (${rule.ca}).`);
+  if (!higher) notes.push('No input is taxed above the chosen output rates: the structure may not be inverted.');
+  notes.push(`Net ITC is inputs only (input services and capital goods out). ${rule.ratioOnTax ? 'Tax payable scaled by net ITC ÷ ITC availed (N 14/2022-CT).' : 'Tax payable deducted in full (before 5 Jul 2022).'} Working paper: verify with your CA (${rule.ca}).`);
   return { invertedTurnover, att, netItc, itcAvailed, taxPayable, refund, first, second, notes };
 }
 

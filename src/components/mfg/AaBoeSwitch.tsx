@@ -30,7 +30,7 @@ export default function AaBoeSwitch({ bill, duty }: { bill?: PurchaseRecord; dut
     <div data-mfd-boe>
       <label className={controls.field}><span className={controls.label}>{sdT('underAa')}</span>
         <select className={controls.select} value={id} onChange={(e) => setId(e.target.value)} data-mfd="boe-aa">
-          <option value="">—</option>
+          <option value="">-</option>
           {open.map((a) => <option key={a.id} value={a.id}>{a.kind === 'aa' ? 'AA' : 'EPCG'} {a.number}</option>)}
         </select>
       </label>

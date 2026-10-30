@@ -588,14 +588,14 @@ export function OrderPanel(p: OrderPanelProps) {
           {moveOpen === 'move' ? (
             freeTables.length ? (
               <select className={controls.select} value={target} onChange={(e) => setTarget(e.target.value)} aria-label={rT('pickTable')}>
-                <option value="">—</option>
+                <option value="">-</option>
                 {freeTables.map((t) => <option key={t.id} value={t.id}>{rT('tableN', { name: t.name })}</option>)}
               </select>
             ) : <p>{rT('noFree')}</p>
           ) : others.length ? (
             <>
               <select className={controls.select} value={target} onChange={(e) => setTarget(e.target.value)} aria-label={rT('pickOrder')}>
-                <option value="">—</option>
+                <option value="">-</option>
                 {others.map((o) => <option key={o.id} value={o.id}>{p.whereOf(o)}</option>)}
               </select>
               {moveOpen === 'transfer' && (

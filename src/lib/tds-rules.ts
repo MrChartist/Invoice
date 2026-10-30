@@ -25,12 +25,12 @@ export const DEDUCTEE_TYPES: readonly DeducteeType[] = ['COMPANY', 'INDIVIDUAL',
 export interface TdsPayableSection { code: string; family: string; section: string; label: string; rpu: string }
 
 export const TDS_PAYABLE_SECTIONS: readonly TdsPayableSection[] = [
-  { code: '194C-1', family: '194C', section: '194C', label: '194C Contractor — individual / HUF', rpu: '94C' },
-  { code: '194C-2', family: '194C', section: '194C', label: '194C Contractor — others', rpu: '94C' },
+  { code: '194C-1', family: '194C', section: '194C', label: '194C Contractor: individual / HUF', rpu: '94C' },
+  { code: '194C-2', family: '194C', section: '194C', label: '194C Contractor: others', rpu: '94C' },
   { code: '194J', family: '194J', section: '194J', label: '194J Professional fees', rpu: '4JB' },
   { code: '194J-T', family: '194J-T', section: '194J', label: '194J Technical services', rpu: '4JA' },
-  { code: '194I-A', family: '194I', section: '194I', label: '194I Rent — plant / machinery', rpu: '4IA' },
-  { code: '194I-B', family: '194I', section: '194I', label: '194I Rent — land / building / furniture', rpu: '4IB' },
+  { code: '194I-A', family: '194I', section: '194I', label: '194I Rent: plant / machinery', rpu: '4IA' },
+  { code: '194I-B', family: '194I', section: '194I', label: '194I Rent: land / building / furniture', rpu: '4IB' },
   { code: '194H', family: '194H', section: '194H', label: '194H Commission / brokerage', rpu: '94H' },
   { code: '194Q', family: '194Q', section: '194Q', label: '194Q Purchase of goods', rpu: '94Q' },
   { code: '194A', family: '194A', section: '194A', label: '194A Interest (other than on securities)', rpu: '94A' },
@@ -40,10 +40,10 @@ export const TDS_PAYABLE_SECTIONS: readonly TdsPayableSection[] = [
   { code: '194S', family: '194S', section: '194S', label: '194S Virtual digital asset', rpu: '94S' },
   // 7R (7.120): Sec 195 — payments to non-residents, reported in Form 27Q (not 26Q). Act rate by nature from
   // `NR_ACT_RATE_RULES` below; RPU section code '195' UNVERIFIED.
-  { code: '195-R', family: '195', section: '195', label: '195 Non-resident — royalty', rpu: '195' },
-  { code: '195-F', family: '195', section: '195', label: '195 Non-resident — fees for technical services', rpu: '195' },
-  { code: '195-I', family: '195', section: '195', label: '195 Non-resident — interest', rpu: '195' },
-  { code: '195-O', family: '195', section: '195', label: '195 Non-resident — other sums', rpu: '195' },
+  { code: '195-R', family: '195', section: '195', label: '195 Non-resident: royalty', rpu: '195' },
+  { code: '195-F', family: '195', section: '195', label: '195 Non-resident: fees for technical services', rpu: '195' },
+  { code: '195-I', family: '195', section: '195', label: '195 Non-resident: interest', rpu: '195' },
+  { code: '195-O', family: '195', section: '195', label: '195 Non-resident: other sums', rpu: '195' },
   // R14 (PS-D2): Sec 194T — salary, remuneration, commission, bonus or interest to a partner of a firm / LLP, from
   // 1 Apr 2025 (rate `TDS_194T_RULES`, threshold below). RPU / Form 140 code NOT confirmed (PS19) — verify with your CA.
   { code: '194T', family: '194T', section: '194T', label: '194T Payments to partners', rpu: '94T' },
@@ -130,10 +130,10 @@ export function tdsThreshold(family: string, date?: string): TdsThreshold | unde
  * participants only and is left to the CA. Append new versions; never edit an old one.
  */
 export const TDS_EXTRA_THRESHOLD_RULES: Readonly<Record<string, readonly Versioned<TdsThreshold | null>[]>> = {
-  '194R': [{ from: '2022-07-01', value: { aggregate: 20000 }, source: 'Sec 194R — verify' }],
-  '194S': [{ from: '2022-07-01', value: { aggregate: 10000 }, source: 'Sec 194S (other than a specified person) — verify' }],
+  '194R': [{ from: '2022-07-01', value: { aggregate: 20000 }, source: 'Sec 194R: verify' }],
+  '194S': [{ from: '2022-07-01', value: { aggregate: 10000 }, source: 'Sec 194S (other than a specified person): verify' }],
   // R14 (PS-D2): 194T — ₹20,000 per FY per partner across salary, remuneration, commission, bonus and interest.
-  '194T': [{ from: '2025-04-01', value: { aggregate: 20000 }, source: 'Finance (No. 2) Act 2024 (Sec 194T) — taxmann, L&S, tdsman' }],
+  '194T': [{ from: '2025-04-01', value: { aggregate: 20000 }, source: 'Finance (No. 2) Act 2024 (Sec 194T): taxmann, L&S, tdsman' }],
 };
 
 /** Sec 206AA: payee without a valid PAN — at least 20% (5% for 194Q from 1 Jul 2021). */
@@ -206,7 +206,7 @@ export const TCS_27EQ_CODES: readonly { match: RegExp; code: string; label: stri
   // R15-D1 (TV7): TCS on an overseas tour programme package (labels of `travel/tv-tcs.ts` `tourTcsLabel`: "206C(1G)
   // overseas tour package 5 %", "Sec 394(1) Sl. 8 — overseas tour package 2 %"). The collection code is not confirmed:
   // left blank — verify with your CA. Placed before the LRS row, whose /1G/ would otherwise take the old-Act label.
-  { match: /overseas tour/i, code: '', label: '206C(1G) overseas tour programme package (code to confirm — verify with your CA)' },
+  { match: /overseas tour/i, code: '', label: '206C(1G) overseas tour programme package (code to confirm: verify with your CA)' },
   { match: /1G/i, code: '6CQ', label: '206C(1G) remittance under LRS' },
   // R8-C (TR-C2): 206C(1) specified goods and 206C(1F) — labels of `tradingTcsPresets` (trade/tr-statutory.ts). The
   // luxury-goods code is not confirmed: left blank (TR15) — verify with your CA.
@@ -218,7 +218,7 @@ export const TCS_27EQ_CODES: readonly { match: RegExp; code: string; label: stri
   { match: /206C\(1\) tendu/i, code: '6CI', label: '206C(1) tendu leaves' },
   { match: /206C\(1\) coal/i, code: '6CJ', label: '206C(1) coal / lignite / iron ore' },
   { match: /206C\(1F\) motor vehicle/i, code: '6CL', label: '206C(1F) motor vehicle' },
-  { match: /206C\(1F\) notified luxury/i, code: '', label: '206C(1F) notified luxury goods (code to confirm — verify with your CA)' },
+  { match: /206C\(1F\) notified luxury/i, code: '', label: '206C(1F) notified luxury goods (code to confirm: verify with your CA)' },
 ];
 
 /**
@@ -300,10 +300,10 @@ export function nrNatureOf(code: string | undefined): NrNature {
 export interface NrActRates { ROYALTY: number; FTS: number; INTEREST: number; OTHER: number; OTHER_COMPANY: number; cessPct: number }
 
 export const NR_ACT_RATE_RULES: readonly Versioned<NrActRates>[] = [
-  { from: '2017-07-01', value: { ROYALTY: 10, FTS: 10, INTEREST: 20, OTHER: 30, OTHER_COMPANY: 40, cessPct: 3 }, source: 'Sec 115A / First Schedule Part II — verify' },
-  { from: '2018-04-01', value: { ROYALTY: 10, FTS: 10, INTEREST: 20, OTHER: 30, OTHER_COMPANY: 40, cessPct: 4 }, source: 'Finance Act 2018 (health & education cess 4%) — verify' },
-  { from: '2023-04-01', value: { ROYALTY: 20, FTS: 20, INTEREST: 20, OTHER: 30, OTHER_COMPANY: 40, cessPct: 4 }, source: 'Finance Act 2023 (Sec 115A royalty / FTS 20%) — verify' },
-  { from: '2024-04-01', value: { ROYALTY: 20, FTS: 20, INTEREST: 20, OTHER: 30, OTHER_COMPANY: 35, cessPct: 4 }, source: 'Finance (No. 2) Act 2024 (foreign company 35%) — verify' },
+  { from: '2017-07-01', value: { ROYALTY: 10, FTS: 10, INTEREST: 20, OTHER: 30, OTHER_COMPANY: 40, cessPct: 3 }, source: 'Sec 115A / First Schedule Part II: verify' },
+  { from: '2018-04-01', value: { ROYALTY: 10, FTS: 10, INTEREST: 20, OTHER: 30, OTHER_COMPANY: 40, cessPct: 4 }, source: 'Finance Act 2018 (health & education cess 4%): verify' },
+  { from: '2023-04-01', value: { ROYALTY: 20, FTS: 20, INTEREST: 20, OTHER: 30, OTHER_COMPANY: 40, cessPct: 4 }, source: 'Finance Act 2023 (Sec 115A royalty / FTS 20%): verify' },
+  { from: '2024-04-01', value: { ROYALTY: 20, FTS: 20, INTEREST: 20, OTHER: 30, OTHER_COMPANY: 35, cessPct: 4 }, source: 'Finance (No. 2) Act 2024 (foreign company 35%): verify' },
 ];
 
 /**
@@ -318,8 +318,8 @@ export interface NrSurcharge { other: readonly (readonly [number, number])[]; fi
 
 const NR_SC_FIRM_CO = { firm: [[1e7, 12]], company: [[1e8, 5], [1e7, 2]] } as const;
 export const NR_SURCHARGE_RULES: readonly Versioned<NrSurcharge>[] = [
-  { from: '2017-07-01', value: { other: [[1e7, 15], [5e6, 10]], ...NR_SC_FIRM_CO }, source: 'Finance Act 2017 First Schedule Part II as summarised — verify', verified: false },
-  { from: '2019-04-01', value: { other: [[5e7, 37], [2e7, 25], [1e7, 15], [5e6, 10]], ...NR_SC_FIRM_CO }, source: 'Finance (No. 2) Act 2019 First Schedule Part II as summarised — verify', verified: false },
+  { from: '2017-07-01', value: { other: [[1e7, 15], [5e6, 10]], ...NR_SC_FIRM_CO }, source: 'Finance Act 2017 First Schedule Part II as summarised: verify', verified: false },
+  { from: '2019-04-01', value: { other: [[5e7, 37], [2e7, 25], [1e7, 15], [5e6, 10]], ...NR_SC_FIRM_CO }, source: 'Finance (No. 2) Act 2019 First Schedule Part II as summarised: verify', verified: false },
 ];
 
 /**
@@ -328,7 +328,7 @@ export const NR_SURCHARGE_RULES: readonly Versioned<NrSurcharge>[] = [
  * from 1 Apr 2016, as understood — not read in the gazette text: verify). Append-only.
  */
 export const FORM15CA_RULES: readonly Versioned<{ partALimit: number }>[] = [
-  { from: '2016-04-01', value: { partALimit: 500000 }, source: 'Rule 37BB (Notification 93/2015) as summarised — verify', verified: false },
+  { from: '2016-04-01', value: { partALimit: 500000 }, source: 'Rule 37BB (Notification 93/2015) as summarised: verify', verified: false },
 ];
 
 /** Surcharge % on a non-resident's TDS for an aggregate of `aggregate` ₹ in the FY (0 below the first slab). */
@@ -352,7 +352,7 @@ export function nrActRate(nature: NrNature, date?: string, deductee?: DeducteeTy
  */
 export const TDS_194O_RULES: readonly Versioned<{ individualExemption: number; noPanRate: number } | null>[] = [
   { from: '2017-07-01', value: null },
-  { from: '2020-10-01', value: { individualExemption: 500000, noPanRate: 5 }, source: 'Sec 194-O(2) and Sec 206AA for 194-O (Finance Act 2020) — verify' },
+  { from: '2020-10-01', value: { individualExemption: 500000, noPanRate: 5 }, source: 'Sec 194-O(2) and Sec 206AA for 194-O (Finance Act 2020): verify' },
 ];
 
 /**
@@ -362,7 +362,7 @@ export const TDS_194O_RULES: readonly Versioned<{ individualExemption: number; n
  * (labels via `ita2025.ts`). Verify with your CA. Append-only.
  */
 export const TDS_194C6_RULES: readonly Versioned<{ maxVehicles: number; reason: string } | null>[] = [
-  { from: '2015-06-01', value: { maxVehicles: 10, reason: 'T' }, source: 'Sec 194C(6) as amended by Finance Act 2015 (≤ 10 goods carriages, PAN + declaration) — verify' },
+  { from: '2015-06-01', value: { maxVehicles: 10, reason: 'T' }, source: 'Sec 194C(6) as amended by Finance Act 2015 (≤ 10 goods carriages, PAN + declaration): verify' },
 ];
 
 /**
@@ -373,7 +373,7 @@ export const TDS_194C6_RULES: readonly Versioned<{ maxVehicles: number; reason: 
  */
 export const TDS_194T_RULES: readonly Versioned<number | null>[] = [
   { from: '2017-07-01', value: null },
-  { from: '2025-04-01', value: 10, source: 'Sec 194T (Finance (No. 2) Act 2024) — taxmann, Lakshmikumaran & Sridharan, tdsman' },
+  { from: '2025-04-01', value: 10, source: 'Sec 194T (Finance (No. 2) Act 2024): taxmann, Lakshmikumaran & Sridharan, tdsman' },
 ];
 
 /**
@@ -386,7 +386,7 @@ export const MANPOWER_WORK_RULES: readonly (Versioned<string | null> & { verifie
   { from: '2017-07-01', value: null },
   {
     from: '2026-04-01',
-    value: 'Sec 393(1) Table Sl. 6(i) — contractor / supply of manpower (Sec 402(47) from 1 Apr 2026)',
+    value: 'Sec 393(1) Table Sl. 6(i): contractor / supply of manpower (Sec 402(47) from 1 Apr 2026)',
     source: 'Finance Bill 2026 cl. 78; Memorandum ("Application of TDS on supply of manpower")',
     verified: false,
   },

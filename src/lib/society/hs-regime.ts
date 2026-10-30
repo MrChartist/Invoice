@@ -20,9 +20,9 @@ export const isCounted = (r: Pick<HsHeadRow, 'kind'>) => r.kind !== 'statutory' 
 const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`;
 const DECL: Partial<Record<HsRegime, (l: string) => string>> = {
   unregistered: () => 'The society is not registered under GST.',
-  exempt77c: (l) => `Exempt — contribution by a member for the common use of members up to ${l} a month (N 12/2017-CT(R) Sl. 77(c)). Statutory dues collected for the authority are outside GST. Verify with your CA.`,
+  exempt77c: (l) => `Exempt: contribution by a member for the common use of members up to ${l} a month (N 12/2017-CT(R) Sl. 77(c)). Statutory dues collected for the authority are outside GST. Verify with your CA.`,
   taxable_whole: (l) => `Monthly contribution exceeds ${l}: GST on the whole amount (Circular 109/28/2019-GST). Verify with your CA.`,
-  taxable_excess: (l) => `GST on the amount above ${l} a month (Madras High Court, 2021 — under appeal). Verify with your CA.`,
+  taxable_excess: (l) => `GST on the amount above ${l} a month (Madras High Court, 2021: under appeal). Verify with your CA.`,
 };
 
 export interface RegimeIn {

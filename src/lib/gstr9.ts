@@ -224,7 +224,7 @@ export interface Gstr9Report {
 export const GSTR9_OPTIONAL_LIMIT = 2_00_00_000;
 
 export const GSTR9_DISCLAIMER =
-  'Working paper prepared offline from your invoices and purchase bills — not a filed return and not validated against the GST portal. Verify with your CA before filing.';
+  'Working paper prepared offline from your invoices and purchase bills: not a filed return and not validated against the GST portal. Verify with your CA before filing.';
 
 /* ───────────────────────── Helpers ───────────────────────── */
 

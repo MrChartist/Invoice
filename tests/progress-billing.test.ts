@@ -44,7 +44,7 @@ test('30 / 40 / 30: proportional scaling keeps HSN, rate and the tax split; the 
   assert.equal(s1.taxable_value, 360000);
   assert.ok(s1.cgst_amount > 0 && s1.sgst_amount > 0 && s1.igst_amount === 0, 'intra-state stays CGST + SGST');
   assert.equal(s1.cgst_amount, s1.sgst_amount);
-  assert.match(s1.notes, /^Stage 1 — 30% of QTN\/FY26-27\/0012/);
+  assert.match(s1.notes, /^Stage 1: 30% of QTN\/FY26-27\/0012/);
   assert.deepEqual(s1.progress_of, { source_id: 'q1', basis: 'percent', value: 30, stage: 1 });
   assert.equal(s1.acceptance, undefined);
   assert.equal(s1.quote_status, undefined);

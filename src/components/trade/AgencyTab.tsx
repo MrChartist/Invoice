@@ -154,7 +154,7 @@ function Arrivals({ data, run }: { data: Data; run: Run }) {
                 <td>{r.status === 'cancelled' ? trT('cancelled') : trT('open')}</td>
                 <td>
                   {r.status !== 'cancelled' && (
-                    <button type="button" className={controls.btnGhost} onClick={() => { const why = window.prompt(trT('cancelReason')); if (why) run(() => `${cancelArrival(r.id, why, data.invoices).number} — ${trT('cancelled')}`); }}>
+                    <button type="button" className={controls.btnGhost} onClick={() => { const why = window.prompt(trT('cancelReason')); if (why) run(() => `${cancelArrival(r.id, why, data.invoices).number}: ${trT('cancelled')}`); }}>
                       {trT('cancel')}
                     </button>
                   )}
@@ -237,9 +237,9 @@ function Pattis({ data, run }: { data: Data; run: Run }) {
                 <td>{trT(p.status === 'posted' ? 'posted' : p.status === 'cancelled' ? 'cancelled' : 'draft')}</td>
                 <td>
                   <button type="button" className={controls.btnGhost} onClick={() => setShown(p.id === shown ? '' : p.id)} data-patti-view>{trT('view')}</button>
-                  {p.status === 'draft' && <button type="button" className={controls.btnGhost} onClick={() => run(() => `${postPatti(p.id).number} — ${trT('posted')}`)} data-patti-post>{trT('post')}</button>}
+                  {p.status === 'draft' && <button type="button" className={controls.btnGhost} onClick={() => run(() => `${postPatti(p.id).number}: ${trT('posted')}`)} data-patti-post>{trT('post')}</button>}
                   {p.status !== 'cancelled' && (
-                    <button type="button" className={controls.btnGhost} onClick={() => { const why = window.prompt(trT('cancelReason')); if (why) run(() => `${cancelPatti(p.id, why).number} — ${trT('cancelled')}`); }}>{trT('cancel')}</button>
+                    <button type="button" className={controls.btnGhost} onClick={() => { const why = window.prompt(trT('cancelReason')); if (why) run(() => `${cancelPatti(p.id, why).number}: ${trT('cancelled')}`); }}>{trT('cancel')}</button>
                   )}
                 </td>
               </tr>
@@ -286,7 +286,7 @@ function Indents({ data, run }: { data: Data; run: Run }) {
           <F label={trT('buyer')}><input className={controls.input} value={x.buyer_name} onChange={(e) => set({ buyer_name: e.target.value })} /></F>
           <F label={trT('pickClient')}>
             <select className={controls.select} value={x.principal_id} onChange={(e) => set({ principal_id: e.target.value })}>
-              <option value="">—</option>
+              <option value="">-</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </F>

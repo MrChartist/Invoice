@@ -197,7 +197,7 @@ export function buildEway(record: InvoiceRecord, options: EwayOptions = {}): Ewa
   // R21-A3: non-GST lines (MS / HSD / natural gas, liquor — Rule 138(14)) need no e-Way bill: out of the list and the value.
   const nonGst = new Set((record.items ?? []).filter((x) => x.sv?.exempt === 'NON_GST' || (record.doc_type === 'BILL_OF_SUPPLY' && record.exempt_kind === 'NON_GST')).map((x) => x.id));
   const nonGstTotal = round2(calc.lines.filter((l) => nonGst.has(l.id)).reduce((t, l) => t + l.total, 0));
-  if (nonGst.size && nonGst.size === calc.lines.length) assumptions.push(issue('warning', 'EWAY_NOT_NEEDED', 'Items', 'e-Way bill not needed — Rule 138(14): non-GST goods only (verify with your CA).'));
+  if (nonGst.size && nonGst.size === calc.lines.length) assumptions.push(issue('warning', 'EWAY_NOT_NEEDED', 'Items', 'e-Way bill not needed, Rule 138(14): non-GST goods only (verify with your CA).'));
   const supplied = calc.lines.filter((l) => !agentIds.has(l.id) && !nonGst.has(l.id));
   const goods = supplied.filter((l) => !isServiceHsn(l.hsn));
   const skippedServiceLines = supplied.length - goods.length;

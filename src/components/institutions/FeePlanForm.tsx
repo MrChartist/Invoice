@@ -50,7 +50,7 @@ export function FeePlanForm({ plan, notify, onSaved }: { plan?: FeePlan; notify:
       ))}
       <div className={styles.line}>{[1, 2, 3, 4, 12].map((n) => <B key={n} sm l={iT('nEqual', { n })} on={() => set({ instalments: equalShares(n).map((share, i) => ({ label: p.instalments[i]?.label || `${i + 1}`, due_date: p.instalments[i]?.due_date ?? '', share })) })} />)}</div>
       <div className={styles.toolbar}>
-        <S l={iT('fine')} v={fine?.kind ?? ''} o={[['', '—'], ...opts(['flat', 'per_day'] as const, 'fine.')]} on={(v) => set({ fine: v ? { amount: 0, grace_days: 0, ...fine, kind: v as 'flat' } : undefined })} />
+        <S l={iT('fine')} v={fine?.kind ?? ''} o={[['', '-'], ...opts(['flat', 'per_day'] as const, 'fine.')]} on={(v) => set({ fine: v ? { amount: 0, grace_days: 0, ...fine, kind: v as 'flat' } : undefined })} />
         {fine && (<>
           <T l={iT('amount')} v={fine.amount || ''} on={(v) => set({ fine: { ...fine, amount: num(v) } })} />
           <T l={iT('graceDays')} v={fine.grace_days || ''} on={(v) => set({ fine: { ...fine, grace_days: num(v) } })} />

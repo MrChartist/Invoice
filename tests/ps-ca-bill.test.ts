@@ -22,7 +22,7 @@ beforeEach(() => {
 });
 
 const ev3b: CaEvent = { key: caKey(clientMH.id!, 'gstr3b', '2026-10'), client_id: clientMH.id!, kind: 'gstr3b', period: '2026-10', date: '2026-11-18', label: 'GSTR3B 2026-10' };
-const evCert: CaEvent = { key: 'udin:u1', client_id: clientMH.id!, kind: 'certificate', period: '2026-11-12', date: '2026-11-12', label: 'Turnover certificate — UDIN 26123456ABCDEF1234', udin: '26123456ABCDEF1234' };
+const evCert: CaEvent = { key: 'udin:u1', client_id: clientMH.id!, kind: 'certificate', period: '2026-11-12', date: '2026-11-12', label: 'Turnover certificate (UDIN 26123456ABCDEF1234)', udin: '26123456ABCDEF1234' };
 
 test('fee schedule: catalogue items flagged by event; the client\'s agreed fee wins; TDS default kept beside it', () => {
   setFeeEvent('i3b', 'gstr3b');
@@ -35,8 +35,8 @@ test('fee schedule: catalogue items flagged by event; the client\'s agreed fee w
   assert.deepEqual((c as unknown as { ps: { tds: unknown } }).ps.tds, { section: '194J' });
   const lines = draftLines([ev3b, evCert], c, localDb.items.getAll(), false);
   assert.deepEqual(lines.map((l) => [l.name, l.rate, l.tax_rate, l.bill_refs, l.description]), [
-    ['GSTR-3B filing — GSTR3B 2026-10', 2000, 18, [ev3b.key], ''],
-    ['Certification — Turnover certificate — UDIN 26123456ABCDEF1234', 5000, 18, ['udin:u1'], 'UDIN 26123456ABCDEF1234'],
+    ['GSTR-3B filing: GSTR3B 2026-10', 2000, 18, [ev3b.key], ''],
+    ['Certification: Turnover certificate (UDIN 26123456ABCDEF1234)', 5000, 18, ['udin:u1'], 'UDIN 26123456ABCDEF1234'],
   ]);
   const covered = draftLines([ev3b, typedEvent(clientMH.id!, 'retainer', '2026-11', 'Retainer 2026-11')], c, localDb.items.getAll(), true);
   assert.equal(covered[0].rate, 0);

@@ -29,7 +29,7 @@ export function LeaseForm({ lease, props, notify, onSaved }: { lease?: Lease; pr
     <div className={styles.stack} data-lease-form>
       <div className={styles.toolbar}>
         <S l={iT('property')} v={l.property_id} o={props.map((p) => [p.id, p.name] as const)} on={(property_id) => set({ property_id, unit_ids: [] })} />
-        <S l={iT('tenant')} v={l.tenant_id} o={[['', '—'], ...clients.map((c) => [c.id!, c.name] as const)]} on={(tenant_id) => set({ tenant_id })} d="lease-tenant" />
+        <S l={iT('tenant')} v={l.tenant_id} o={[['', '-'], ...clients.map((c) => [c.id!, c.name] as const)]} on={(tenant_id) => set({ tenant_id })} d="lease-tenant" />
         <T l={iT('start')} t="date" v={l.start} on={(start) => set({ start })} />
         <T l={iT('end')} t="date" v={l.end} on={(end) => set({ end })} d="lease-end" />
         <T l={iT('lockIn')} t="date" v={l.lock_in_end} on={(v) => set({ lock_in_end: v || undefined })} />
@@ -57,9 +57,9 @@ export function LeaseForm({ lease, props, notify, onSaved }: { lease?: Lease; pr
         <C l={iT('compTenant')} v={l.comp} on={(comp) => set({ comp })} />
         <C l={iT('exemptBos')} v={l.bos} on={(bos) => set({ bos })} />
       </div>
-      <p data-lease-class><strong>{iT(`cls.${g.cls}`)}</strong>{g.rate ? ` · SAC ${g.sac} · ${g.rate}%` : ''}{g.note ? ` — ${iT(`note.${g.note}`)}` : ''}</p>
+      <p data-lease-class><strong>{iT(`cls.${g.cls}`)}</strong>{g.rate ? ` · SAC ${g.sac} · ${g.rate}%` : ''}{g.note ? `: ${iT(`note.${g.note}`)}` : ''}</p>
       <div className={styles.toolbar}>
-        <S l="TDS" v={l.tds?.section ?? ''} o={[['', '—'], ...(['194I-B', '194I-A'] as const).map((s) => [s, `${sectionText(s, ctx.date, ita25Words())} · ${iT(`tds.${s}`)} · ${sectionRate(s, ctx.date)}%`] as const)]} on={(v) => set({ tds: v ? { section: v as '194I-B' } : undefined })} />
+        <S l="TDS" v={l.tds?.section ?? ''} o={[['', '-'], ...(['194I-B', '194I-A'] as const).map((s) => [s, `${sectionText(s, ctx.date, ita25Words())} · ${iT(`tds.${s}`)} · ${sectionRate(s, ctx.date)}%`] as const)]} on={(v) => set({ tds: v ? { section: v as '194I-B' } : undefined })} />
         <T l={iT('lateFee')} v={l.late_fee_pct} on={(v) => set({ late_fee_pct: num(v) || undefined })} />
       </div>
       <div><B p l={iT('save')} d="lease-save" on={() => attempt(notify, () => {

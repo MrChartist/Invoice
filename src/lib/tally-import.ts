@@ -644,7 +644,7 @@ export function planTallyImport(parsed: TallyParsed, existing: ExistingBooks, op
       if (/profit\s*&\s*loss/i.test(rec.name)) primary = 'RESERVES';
     } else primary = primaryOfTally(rec.parent);
     if (!primary) {
-      issues.push(`Group “${rec.parent || '(none)'}” not found; placed under Other current assets — check it.`);
+      issues.push(`Group “${rec.parent || '(none)'}” not found; placed under Other current assets: check it.`);
       primary = 'OTHER_CA';
     }
     const override = opts.mapTo && Object.hasOwn(opts.mapTo, lower(rec.name)) ? opts.mapTo[lower(rec.name)] : undefined;
@@ -667,7 +667,7 @@ export function planTallyImport(parsed: TallyParsed, existing: ExistingBooks, op
         target = { kind: 'account', existing: false, group: primary, ...(under ? { underGroup: under } : {}), code: nextCode() };
       }
     }
-    if (rec.gstin && !isValidGstin(rec.gstin)) issues.push(`GSTIN ${rec.gstin} fails the GSTIN check; the party is saved without it — correct it in the party master.`);
+    if (rec.gstin && !isValidGstin(rec.gstin)) issues.push(`GSTIN ${rec.gstin} fails the GSTIN check; the party is saved without it: correct it in the party master.`);
     ledgers.push({ rec, primary, target, issues });
   }
 
@@ -761,7 +761,7 @@ export function planTallyImport(parsed: TallyParsed, existing: ExistingBooks, op
         } else lines.push({ ledger: ln.ledger, dr: side === 'dr' ? amt : 0, cr: side === 'cr' ? amt : 0 });
       }
       let type: ManualVoucherType = rec.base === 'Contra' ? 'CONTRA' : rec.base === 'Payment' ? 'PAYMENT' : rec.base === 'Receipt' ? 'RECEIPT' : 'JOURNAL';
-      const narration = [`Tally ${rec.vtype}${rec.number ? ` #${rec.number}` : ''}`, rec.reference && `Ref ${rec.reference}`, rec.narration].filter(Boolean).join(' — ');
+      const narration = [`Tally ${rec.vtype}${rec.number ? ` #${rec.number}` : ''}`, rec.reference && `Ref ${rec.reference}`, rec.narration].filter(Boolean).join(', ');
       const pv: PlannedVoucher = {
         rec, tag, lines, type, status: 'ok',
         narration: `${narration} ${tag}`.slice(0, 1000),

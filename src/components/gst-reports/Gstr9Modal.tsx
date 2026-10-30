@@ -53,7 +53,7 @@ function download(name: string, mime: string, text: string) {
 }
 
 const fyText = (y: number) => `FY ${String(y).slice(2)}-${String(y + 1).slice(2)}`;
-const money = (n: number | null) => (n === null ? '—' : formatMoney(n));
+const money = (n: number | null) => (n === null ? '-' : formatMoney(n));
 
 /** The stored turnover that belongs to `fy`: this FY so far, or last FY's figure. */
 function storedFor(fy: number, stored: { gt: number; curGt: number }): number {
@@ -114,7 +114,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 const Diff = ({ v }: { v: number | null }) =>
-  v === null ? <>—</> : <span className={Math.abs(v) >= 1 ? styles.diff : undefined}>{formatMoney(v)}</span>;
+  v === null ? <>-</> : <span className={Math.abs(v) >= 1 ? styles.diff : undefined}>{formatMoney(v)}</span>;
 
 /** GSTR-9 annual working paper (roadmap 5.2): lazy-loaded from the GST reports page. */
 export default function Gstr9Modal(props: Gstr9ModalProps) {
@@ -233,13 +233,13 @@ function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerNa
           <Field label={gvT('itc8a')}>
             <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={itc2b.igst} placeholder="0" onChange={(e) => setItc2b({ ...itc2b, igst: num(e.target.value) })} />
           </Field>
-          <Field label="8A — CGST">
+          <Field label="8A: CGST">
             <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={itc2b.cgst} placeholder="0" onChange={(e) => setItc2b({ ...itc2b, cgst: num(e.target.value) })} />
           </Field>
-          <Field label="8A — SGST">
+          <Field label="8A: SGST">
             <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={itc2b.sgst} placeholder="0" onChange={(e) => setItc2b({ ...itc2b, sgst: num(e.target.value) })} />
           </Field>
-          <Field label="8A — Cess">
+          <Field label="8A: Cess">
             <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={itc2b.cess} placeholder="0" onChange={(e) => setItc2b({ ...itc2b, cess: num(e.target.value) })} />
           </Field>
         </div>

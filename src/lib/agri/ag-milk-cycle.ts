@@ -93,7 +93,7 @@ export function cycleSummary(c: Pick<FarmerCycle, 'lines' | 'centre_id'>, vendor
   const m = new Map<string, CycleSummaryRow & { fq: number; q: number }>();
   for (const l of c.lines) {
     const v = vendors.find((x) => x.id === l.farmer_id);
-    const key = by === 'farmer' ? l.name ?? v?.name ?? l.farmer_id : (by === 'village' ? v?.ag?.village : v?.ag?.route) || '—';
+    const key = by === 'farmer' ? l.name ?? v?.name ?? l.farmer_id : (by === 'village' ? v?.ag?.village : v?.ag?.route) || '-';
     const r = m.get(key) ?? { key, litres: 0, kgFat: 0, amount: 0, avgFat: 0, fq: 0, q: 0 };
     r.litres = q3(r.litres + l.qty);
     r.kgFat = q3(r.kgFat + num(l.kg_fat));

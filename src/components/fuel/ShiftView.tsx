@@ -65,7 +65,7 @@ function Card({ s, nozzles, act }: { s: FuelShift; nozzles: FuelNozzle[]; act: (
         </table>
       </div>
       {err && <p className={controls.error}>{err}</p>}
-      {plan && <p className={controls.hint} data-fu-counter>{fbT('counter')}: {plan.lines.map((l) => `${l.litres} L · ₹${l.amount}`).join('; ') || '—'}{Object.values(plan.excess).some(Boolean) && ` · ${fbT('excess', { v: Object.values(plan.excess).reduce((a, x) => a + (x ?? 0), 0) })}`}</p>}
+      {plan && <p className={controls.hint} data-fu-counter>{fbT('counter')}: {plan.lines.map((l) => `${l.litres} L · ₹${l.amount}`).join('; ') || '-'}{Object.values(plan.excess).some(Boolean) && ` · ${fbT('excess', { v: Object.values(plan.excess).reduce((a, x) => a + (x ?? 0), 0) })}`}</p>}
       <Row>
         {live && <button type="button" className={controls.btnOutline} onClick={() => save()} data-fu-shift-save>{fbT('save')}</button>}
         {s.status === 'open' && <><In d={d} set={set} k="at" label={fbT('closeAt')} w="5rem" /><button type="button" className={controls.btnPrimary} onClick={() => save(true)} data-fu-shift-close>{fbT('close')}</button><button type="button" className={controls.btnGhost} onClick={() => act(() => removeShift(s.id))}>{fuT('del')}</button></>}

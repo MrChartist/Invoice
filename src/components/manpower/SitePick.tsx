@@ -15,7 +15,7 @@ export default function SitePick({ value, onChange }: { value: Tag; onChange: (v
   return (
     <label className={controls.field}><span className={controls.label}>{mpT('site')}</span>
       <select className={controls.select} value={value?.site_id ?? ''} onChange={(e) => onChange(e.target.value ? { site_id: e.target.value } : undefined)} data-mp-bill-site-pick>
-        <option value="">—</option>
+        <option value="">-</option>
         {sites.map((s) => <option key={s.id} value={s.id}>{siteLabel(s)}</option>)}
       </select>
     </label>

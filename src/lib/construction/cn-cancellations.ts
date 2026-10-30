@@ -101,7 +101,7 @@ export function cancelBooking(id: string, date: string, reason: string, method =
     const journal = p.forfeiture > 0
       ? saveVoucher({
         type: 'JOURNAL', date, ...(fromAdv > 0 ? {} : { variant: 'OPTIONAL' as const }), voucher_class: 'Booking forfeiture',
-        narration: `Forfeiture on cancellation of booking ${b.number} (${b.client_name}) — no GST by default${advTax > 0 ? '; GST paid on the advance kept stays paid' : ''}; verify with your CA (CN22).`,
+        narration: `Forfeiture on cancellation of booking ${b.number} (${b.client_name}): no GST by default${advTax > 0 ? '; GST paid on the advance kept stays paid' : ''}; verify with your CA (CN22).`,
         lines: [
           ...(fromAdv > 0 ? [{ account_id: A.custAdvances, dr: pc(fromAdv), cr: 0, party: b.client_name }] : []),
           ...(fLeft > 0.004 ? [{ account_id: A.debtors, dr: pc(fLeft), cr: 0, party: b.client_name }] : []),

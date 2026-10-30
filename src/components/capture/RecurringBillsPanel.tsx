@@ -117,7 +117,7 @@ export default function RecurringBillsPanel({ businessState, onChanged }: { busi
               </label>
               <label className={controls.field}><span className={controls.label}>{capT('supplier')}</span>
                 <select className={controls.select} value={f.vendorId} onChange={(e) => set({ vendorId: e.target.value })}>
-                  <option value="">—</option>
+                  <option value="">-</option>
                   {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
                 </select>
               </label>

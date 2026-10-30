@@ -318,7 +318,7 @@ export function retainerReport(
     forfeited_h: h(p.forfeited),
     overage_h: h(p.overage_minutes),
     overage_invoiced: round2([...p.overage].filter(([id]) => billedIds.has(id)).reduce((s, [id, m]) => s + overageValue(id, m), 0)),
-    state: p.closed ? 'Closed' : p.ended ? 'Ended — not closed' : 'Open',
+    state: p.closed ? 'Closed' : p.ended ? 'Ended: not closed' : 'Open',
   }));
 }
 

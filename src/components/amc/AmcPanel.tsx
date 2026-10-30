@@ -69,7 +69,7 @@ export function AmcPanel({ notify, icon }: { notify: (m: string, tone?: 'success
               const s = contractStatus(c, today);
               return (
                 <li key={c.id}>
-                  <span>{c.client_name} — {c.title} <small>{amcT('contractLine', { end: formatDate(c.end), done: String(s.done), total: String(s.schedule.length) })}</small></span>
+                  <span>{c.client_name} : {c.title} <small>{amcT('contractLine', { end: formatDate(c.end), done: String(s.done), total: String(s.schedule.length) })}</small></span>
                   <strong>{formatCurrency(c.value)}</strong>
                 </li>
               );

@@ -476,7 +476,7 @@ function purchaseVoucher(raw: BooksData['purchases'][number], vendors: BooksData
     c.importType === 'GOODS' && 'import of goods',
     c.importType === 'SERVICES' && 'import of services (RCM)',
     gst > 0 && !n.itcEligible && 'ITC not claimed',
-    tds > 0 && `TDS ${(tds / 100).toFixed(2)} u/s ${c.tdsSection.replace(/-.*/, '') || '—'} deducted`,
+    tds > 0 && `TDS ${(tds / 100).toFixed(2)} u/s ${c.tdsSection.replace(/-.*/, '') || '-'} deducted`,
   ].filter(Boolean);
   return {
     id: `${n.isExpense ? 'exp' : 'pur'}:${n.id}`,
@@ -606,7 +606,7 @@ function assetVouchers(assets: FixedAsset[], today: string, byId: Map<string, Ac
       date: `${fy + 1}-03-31`,
       number: `DEP/${fyLabelOf(fy)}`,
       party: '',
-      narration: `Depreciation for ${fyLabelOf(fy)} — Income-tax Act WDV rates`,
+      narration: `Depreciation for ${fyLabelOf(fy)}: Income-tax Act WDV rates`,
       lines: new Lines().dr(A.depreciation, dep).cr(A.accDep, dep).lines,
     });
   }

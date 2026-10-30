@@ -114,14 +114,14 @@ export function Form27qTab({ data, fy, quarter, canEdit, onChanged, notify }: { 
               {checks.map((x) => (
                 <tr key={x.row.key} data-27q-row>
                   <td>{x.row.payee}<br /><span className={books.muted}>{x.row.pan || 'PANNOTAVBL'} · {formatDate(x.row.creditedOn)}</span></td>
-                  <td>{x.payee.country || '—'}</td>
+                  <td>{x.payee.country || '-'}</td>
                   <td>{x.row.code}</td>
                   <td className={surface.numeric}>{formatMoney(x.row.base)}{x.grossedUp !== undefined && <><br /><span className={books.muted}>{p40T('q27Gross')} {formatMoney(x.grossedUp)}</span></>}</td>
                   <td className={surface.numeric}>{x.row.rate}% · {formatMoney(x.row.amount)}</td>
                   <td className={surface.numeric}>{x.check.actRate}%{x.check.surchargePct ? <><br /><span className={books.muted}>{p40T('q27Sc')} {x.check.surchargePct}%</span></> : null}</td>
-                  <td className={surface.numeric}>{x.check.dtaaRate === null ? '—' : `${x.check.dtaaRate}%${x.check.dtaaBlocked ? ' ✕' : ''}`}</td>
+                  <td className={surface.numeric}>{x.check.dtaaRate === null ? '-' : `${x.check.dtaaRate}%${x.check.dtaaBlocked ? ' ✕' : ''}`}</td>
                   <td className={surface.numeric}>{x.check.required}% ({x.check.basis === 'DTAA' ? 'DTAA' : x.check.basis === 'NO_PAN' ? '206AA' : r7T('q27BasisAct')})</td>
-                  <td className={surface.numeric}>{x.shortBy > 0 ? <strong>{formatMoney(x.shortBy)}</strong> : '—'}</td>
+                  <td className={surface.numeric}>{x.shortBy > 0 ? <strong>{formatMoney(x.shortBy)}</strong> : '-'}</td>
                   <td>{x.payee.trcNo ? `TRC ✓${x.payee.trcTo ? ` (${formatDate(x.payee.trcTo)})` : ''}` : 'TRC ✕'} · {x.payee.form10f ? '10F ✓' : '10F ✕'}</td>
                 </tr>
               ))}
@@ -250,7 +250,7 @@ export function TracesTab({ data, canEdit, notify }: { data: TdsData; canEdit: b
         <>
           <div className={books.toolbar}>
             <span className={books.muted}>
-              {open.file_name} · {r7T('jMeta', { tan: open.meta.tan || '—', fy: open.meta.fy ? `${open.meta.fy}-${String(open.meta.fy + 1).slice(2)}` : '—', q: open.meta.quarter ? `Q${open.meta.quarter}` : '—' })}
+              {open.file_name} · {r7T('jMeta', { tan: open.meta.tan || '-', fy: open.meta.fy ? `${open.meta.fy}-${String(open.meta.fy + 1).slice(2)}` : '-', q: open.meta.quarter ? `Q${open.meta.quarter}` : '-' })}
               {open.skipped ? ` · ${r7T('jSkipped', { n: open.skipped })}` : ''}{open.truncated ? ` · ${r7T('jTruncated')}` : ''}
             </span>
             <div className={books.toolbarGroup}>
@@ -305,10 +305,10 @@ export function TracesTab({ data, canEdit, notify }: { data: TdsData; canEdit: b
                     return (
                       <tr key={i} data-traces-finding={f.kind}>
                         <td>{r7T(KIND_KEY[f.kind])}</td>
-                        <td>{f.pan || '—'}</td>
-                        <td>{f.name || '—'}</td>
-                        <td>{f.section || '—'}</td>
-                        <td>{f.date ? formatDate(f.date) : '—'}</td>
+                        <td>{f.pan || '-'}</td>
+                        <td>{f.name || '-'}</td>
+                        <td>{f.section || '-'}</td>
+                        <td>{f.date ? formatDate(f.date) : '-'}</td>
                         <td className={surface.numeric}>{formatMoney(f.base)}</td>
                         <td className={surface.numeric}>{formatMoney(f.tds)}</td>
                         <td className={surface.numeric}>{formatMoney(f.demand)}</td>

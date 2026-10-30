@@ -256,7 +256,7 @@ function PayHeadModal({
           <label className={controls.field}>
             <span className={controls.label}>{pT('heads.unitType')}</span>
             <select className={controls.select} value={f.unit_type ?? ''} onChange={(e) => set('unit_type', e.target.value || undefined)}>
-              <option value="">—</option>
+              <option value="">-</option>
               <option value={OT_HOURS_TYPE}>{pT('att.ot')}</option>
               {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>

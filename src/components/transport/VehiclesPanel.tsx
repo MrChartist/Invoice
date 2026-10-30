@@ -67,7 +67,7 @@ export function VehiclesPanel({ notify, refresh, tick }: PanelProps) {
             {txt('min', twT('kmplMin'), 'number')}{txt('max', twT('kmplMax'), 'number')}
             {!f.own && (
               <F l={twT('owner')}>
-                <select className={controls.select} value={f.owner} onChange={(e) => setF({ ...f, owner: e.target.value })}><option value="">—</option>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></F>
+                <select className={controls.select} value={f.owner} onChange={(e) => setF({ ...f, owner: e.target.value })}><option value="">-</option>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></F>
             )}
             {!f.own && f.owner && <>{txt('declOn', twT('decl194c6On'), 'date')}{txt('declN', twT('declVehicles'), 'number')}{txt('declPan', 'PAN')}</>}
             {VEHICLE_DOC_KINDS.map((k) => (
@@ -92,8 +92,8 @@ export function VehiclesPanel({ notify, refresh, tick }: PanelProps) {
                 const next = [...v.docs].sort((a, b) => a.expires_on.localeCompare(b.expires_on))[0];
                 return (
                   <tr key={v.id}>
-                    <td className={surface.mono}>{v.reg_no}</td><td>{v.type ?? '—'}</td><td>{v.own ? twT('yes') : vendors.find((x) => x.id === v.owner_id)?.name ?? twT('hired')}</td>
-                    <td>{next ? `${twT(`doc.${next.kind}`)} ${next.expires_on}` : '—'}</td>
+                    <td className={surface.mono}>{v.reg_no}</td><td>{v.type ?? '-'}</td><td>{v.own ? twT('yes') : vendors.find((x) => x.id === v.owner_id)?.name ?? twT('hired')}</td>
+                    <td>{next ? `${twT(`doc.${next.kind}`)} ${next.expires_on}` : '-'}</td>
                     <td className={surface.rowActions}>
                       <button type="button" className={B.gs} onClick={() => open(v)}>{twT('edit')}</button>
                       <button type="button" className={B.gs} onClick={() => del(v.id)}>{twT('remove')}</button>

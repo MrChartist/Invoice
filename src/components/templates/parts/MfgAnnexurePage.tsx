@@ -15,7 +15,7 @@ export default function MfgAnnexurePage({ invoice }: { invoice: InvoiceRecord })
   const sizes = mf?.cmt?.sizes ?? [];
   return (
     <section className={styles.page} data-mfg-annexure>
-      <div className={styles.title}>Annexure — {invoice.invoice_number || 'draft'}</div>
+      <div className={styles.title}>Annexure: {invoice.invoice_number || 'draft'}</div>
       {grid.length > 0 && (
         <table className={styles.table} data-mfg-sizes>
           <thead><tr><th>Colour</th>{sizes.map((s) => <th key={s}>{s}</th>)}<th>Total</th></tr></thead>

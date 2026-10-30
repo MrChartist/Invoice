@@ -38,7 +38,7 @@ import { withTablesRollback } from './table-txn';
 export const PMT09_TABLE = 'gst_pmt09';
 export const REFUNDS_TABLE = 'gst_refunds';
 export const REFUND_VOUCHER_CLASS = 'GST refund (RFD)';
-export const CASH_REFUND_DISCLAIMER = 'Working paper — PMT-09 transfers and refund claims as recorded here. The GST portal’s electronic cash / credit ledgers, RFD forms and refund orders are what count; verify with your CA.';
+export const CASH_REFUND_DISCLAIMER = 'Working paper: PMT-09 transfers and refund claims as recorded here. The GST portal’s electronic cash / credit ledgers, RFD forms and refund orders are what count; verify with your CA.';
 
 export type LedgerDetail = Record<GstHead, Record<MinorHead, number>>;
 
@@ -88,7 +88,7 @@ export type RefundStatus = 'DRAFT' | 'FILED' | 'ACKNOWLEDGED' | 'DEFICIENCY' | '
 export const REFUND_STATUSES: readonly RefundStatus[] = ['DRAFT', 'FILED', 'ACKNOWLEDGED', 'DEFICIENCY', 'PROVISIONAL', 'SANCTIONED', 'REJECTED', 'PAID', 'WITHDRAWN'];
 /** Portal form behind each status (for the trail). */
 export const REFUND_STATUS_FORM: Record<RefundStatus, string> = {
-  DRAFT: '—', FILED: 'RFD-01', ACKNOWLEDGED: 'RFD-02', DEFICIENCY: 'RFD-03', PROVISIONAL: 'RFD-04', SANCTIONED: 'RFD-06', REJECTED: 'RFD-06', PAID: 'RFD-05', WITHDRAWN: 'RFD-01W',
+  DRAFT: '-', FILED: 'RFD-01', ACKNOWLEDGED: 'RFD-02', DEFICIENCY: 'RFD-03', PROVISIONAL: 'RFD-04', SANCTIONED: 'RFD-06', REJECTED: 'RFD-06', PAID: 'RFD-05', WITHDRAWN: 'RFD-01W',
 };
 
 export interface RefundEvent {
@@ -324,9 +324,9 @@ export function rule894Refund(i: Rule894Input): Rule894Result {
   const att = Math.max(num(i.adjustedTotalTurnover), 0);
   const net = cleanHeads(i.netItc);
   const notes: string[] = [];
-  if (!(att > 0)) return { ratio: 0, formula: 0, byHead: zeroHeads(), total: 0, notes: ['Adjusted total turnover is nil — no refund can be worked out.'] };
+  if (!(att > 0)) return { ratio: 0, formula: 0, byHead: zeroHeads(), total: 0, notes: ['Adjusted total turnover is nil: no refund can be worked out.'] };
   const ratio = Math.min(zr / att, 1);
-  if (zr > att) notes.push('Zero-rated turnover exceeds the adjusted total turnover — check both figures.');
+  if (zr > att) notes.push('Zero-rated turnover exceeds the adjusted total turnover: check both figures.');
   const byHead = zeroHeads();
   for (const h of GST_HEADS) byHead[h] = round2(net[h] * ratio);
   const formula = headsTotal(byHead);
@@ -339,7 +339,7 @@ export function rule894Refund(i: Rule894Input): Rule894Result {
       }
     }
   }
-  notes.push('Rule 89(4): the value of zero-rated supply of goods is limited to 1.5 times the value of like goods supplied domestically (from 23 Mar 2020, as understood) and net ITC excludes capital goods — adjust the inputs if they apply. Verify with your CA.');
+  notes.push('Rule 89(4): the value of zero-rated supply of goods is limited to 1.5 times the value of like goods supplied domestically (from 23 Mar 2020, as understood) and net ITC excludes capital goods, adjust the inputs if they apply. Verify with your CA.');
   return { ratio: round2(ratio * 10000) / 10000, formula, byHead, total: headsTotal(byHead), notes };
 }
 

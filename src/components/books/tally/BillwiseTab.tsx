@@ -124,7 +124,7 @@ export function BillwiseTab({ asOf, notify, onChanged }: { asOf: string; notify:
                     {p.bills.map((b) => (
                       <tr key={b.purchaseId}>
                         <td className={surface.mono}>
-                          {b.number || '—'}{b.opening ? ` · ${c6T('openingRef')}` : ''}
+                          {b.number || '-'}{b.opening ? ` · ${c6T('openingRef')}` : ''}
                           {b.allocations.length > 0 && (
                             <div className={styles.alloc}>
                               {b.allocations.map((a, i) => (

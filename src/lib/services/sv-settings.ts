@@ -68,7 +68,7 @@ export function readServiceSettings(): ServiceSettings {
 }
 
 const describe = (s: ServiceSettings): string =>
-  [s.slot_step && `slot ${s.slot_step} min`, s.resources?.length && `${s.resources.length} resource(s)`, s.rule46a && 'Rule 46A title', s.itc_caution && 'ITC caution', s.no_itc_as_exempt === false && 'no-ITC turnover taxable in Rule 42', s.staff_required && 'staff required', s.print_staff && 'staff on paper', s.tips === 'pass-through' && 'tips', s.checkin_gate && `check-in ${s.checkin_gate}`, s.defer_package_income && `package income deferred from ${s.defer_package_from ?? '—'}`].filter(Boolean).join(', ') || 'defaults';
+  [s.slot_step && `slot ${s.slot_step} min`, s.resources?.length && `${s.resources.length} resource(s)`, s.rule46a && 'Rule 46A title', s.itc_caution && 'ITC caution', s.no_itc_as_exempt === false && 'no-ITC turnover taxable in Rule 42', s.staff_required && 'staff required', s.print_staff && 'staff on paper', s.tips === 'pass-through' && 'tips', s.checkin_gate && `check-in ${s.checkin_gate}`, s.defer_package_income && `package income deferred from ${s.defer_package_from ?? '-'}`].filter(Boolean).join(', ') || 'defaults';
 
 /** Owner only: merge `patch` into the service settings (audited). Returns the saved settings. */
 export function saveServiceSettings(patch: Partial<ServiceSettings>): ServiceSettings {

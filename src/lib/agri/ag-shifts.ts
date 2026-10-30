@@ -151,7 +151,7 @@ export function closeShift(id: string): MilkShift {
   return withTablesRollback([T, SJ_TABLE, 'stock_items', 'series_counters'], () => {
     const godown_id = centreGodown(s.centre_id);
     const lines = (Object.entries(t.byMilk) as [MilkKind, { litres: number; amount: number }][]).map(([milk, v]) => ({ item_id: milkItemId(milk), qty: v.litres, rate: v.litres > 0 ? v.amount / v.litres : 0, godown_id }));
-    const sj = lines.some((l) => l.qty > 0) ? milkJournal(s.date, lines, 'in', `Milk collected — ${s.date} ${s.shift === 'M' ? 'morning' : 'evening'} shift`, s.id) : undefined;
+    const sj = lines.some((l) => l.qty > 0) ? milkJournal(s.date, lines, 'in', `Milk collected: ${s.date} ${s.shift === 'M' ? 'morning' : 'evening'} shift`, s.id) : undefined;
     const next: MilkShift = { ...s, closed_at: new Date().toISOString(), ...(currentActor()?.name ? { closed_by: currentActor()!.name } : {}), ...(sj ? { sj_id: sj.id } : {}) };
     put(next);
     return next;

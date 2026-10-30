@@ -218,7 +218,7 @@ function BulkBody({ onClose, from, to, periodLabel }: BulkEInvoiceModalProps) {
                           <td><input type="checkbox" aria-label={einvT('includeDoc', { number: i.invoice_number })} checked={picked.has(i.id)} onChange={() => toggle(i.id)} /></td>
                           <td className={surface.mono}>{i.invoice_number}</td>
                           <td>{formatDate(i.issue_date)} <IrpWindowPill invoice={i} hasIrn={hasIrn} /></td>
-                          <td>{i.client?.company || i.client?.name || '—'}{i.client?.gstin ? '' : einvT('noGstin')}</td>
+                          <td>{i.client?.company || i.client?.name || '-'}{i.client?.gstin ? '' : einvT('noGstin')}</td>
                           <td className={surface.numeric}>{formatMoney(i.total, i.currency)}</td>
                           <td>{hasIrn && <span className={styles.pillOk}>IRN</span>} {hasEwb && <span className={styles.pillOk}>EWB</span>}</td>
                         </tr>

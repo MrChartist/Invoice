@@ -189,14 +189,14 @@ export function RcmDocsPanel({ notify }: RcmDocsPanelProps) {
                 const late = !b.selfInvoice && b.selfInvoiceDue && today > b.selfInvoiceDue;
                 return (
                   <tr key={b.id}>
-                    <th scope="row">{b.number || '—'}<div className={styles.muted}>{formatDate(b.date)}</div></th>
+                    <th scope="row">{b.number || '-'}<div className={styles.muted}>{formatDate(b.date)}</div></th>
                     <td>{b.supplierName}{!b.unregistered && <div className={styles.muted}>{b.supplierGstin}</div>}</td>
                     <td>{formatMoney(b.taxable)}</td>
                     <td>{formatMoney(b.igst + b.cgst + b.sgst + b.cess)}</td>
                     <td className={late ? styles.bad : undefined}>
                       {b.selfInvoice || (b.unregistered ? (b.selfInvoiceDue ? o7T('rcmDueBy', { date: formatDate(b.selfInvoiceDue) }) : o7T('rcmPending')) : o7T('rcmSupplierInvoices'))}
                     </td>
-                    <td>{b.vouchers.join(', ') || '—'}</td>
+                    <td>{b.vouchers.join(', ') || '-'}</td>
                     <td>
                       <span className={styles.actions}>
                         {b.unregistered && !b.selfInvoice && (

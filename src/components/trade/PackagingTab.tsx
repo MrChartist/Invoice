@@ -75,7 +75,7 @@ export default function PackagingTab({ onDone }: { onDone: (msg: string, error?:
           <F label={aT('date')}><input type="date" className={controls.input} value={m.date} onChange={(e) => setM({ ...m, date: e.target.value })} /></F>
           <F label={aT('party')}>
             <select className={controls.select} value={m.party} onChange={(e) => setM({ ...m, party: e.target.value })} data-pack-party>
-              <option value="">—</option>
+              <option value="">-</option>
               {parties.map((p) => <option key={`${p.kind}:${p.id}`} value={`${p.kind}:${p.id}`}>{p.name}</option>)}
             </select>
           </F>

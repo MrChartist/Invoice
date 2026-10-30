@@ -13,7 +13,7 @@ export const lgT = defineArea(
     mbl: 'MBL', hbl: 'HBL', mawb: 'MAWB', hawb: 'HAWB', vessel: 'Vessel', voyage: 'Voyage', flight: 'Flight', igm: 'IGM', sb_no: 'Shipping bill', sb_date: 'SB date', boe_no: 'Bill of entry', boe_date: 'BOE date',
     containers: 'Containers', container: 'Container no.', size: 'Size', addRow: 'Add row', pkgs: 'Packages', gross_kg: 'Gross kg', cbm: 'CBM', dims: 'L × W × H (cm) × pcs', chargeable: 'Chargeable', teu: 'TEU', note: 'Note',     newJob: 'New job', open: 'Open', dup: 'Duplicate', saved: 'Saved.', close: 'Close job', reopen: 'Re-open', none: 'No jobs yet.',
     kind: 'Kind', role: 'Role', unit: 'Unit', rate: 'Rate', currency: 'Currency', sac: 'SAC', active: 'On', addHead: 'Add head', defaults: 'Default heads', name: 'Name',
-        volumetric: 'volumetric', wp: 'Working papers — verify with your CA.',
+        volumetric: 'volumetric', wp: 'Working papers: verify with your CA.',
     modes: 'Sea FCL,Sea LCL,Air,Road,Rail,Multimodal,Courier', dirs: 'Export,Import,Domestic,Cross-trade', statuses: 'Enquiry,Booked,In transit,Arrived,Delivered,Closed,Cancelled', legList: 'Road,Rail,Sea,Air,Inland water',
     kinds: 'Sea freight,Air freight,Road freight,Rail freight,Multimodal,Courier,Origin,Destination,Documentation,Clearance (CHA),C&F,Handling,Storage,GTA leg,Insurance,Customs duty,CFS,Port,DO,Demurrage,Commission,Other',
     roles: 'Own supply,Pure agent (Rule 33),Exempt', units: 'kg,CBM,W/M,Container,Shipment,Bill,Package,Day,% of value,Typed',
@@ -26,12 +26,12 @@ export const lgT = defineArea(
     mbl: 'MBL', hbl: 'HBL', mawb: 'MAWB', hawb: 'HAWB', vessel: 'जहाज़', voyage: 'यात्रा', flight: 'उड़ान', igm: 'IGM', sb_no: 'शिपिंग बिल', sb_date: 'SB तिथि', boe_no: 'बिल ऑफ़ एंट्री', boe_date: 'BOE तिथि',
     containers: 'कंटेनर', container: 'कंटेनर नं.', size: 'आकार', addRow: 'पंक्ति जोड़ें', pkgs: 'पैकेज', gross_kg: 'कुल वज़न kg', cbm: 'CBM', dims: 'माप (cm): L × W × H × नग', chargeable: 'देय वज़न (चार्जेबल)', teu: 'TEU', note: 'टिप्पणी',     newJob: 'नई जॉब', open: 'खोलें', dup: 'प्रतिलिपि', saved: 'सहेजा गया।', close: 'जॉब बंद करें', reopen: 'फिर खोलें', none: 'अभी कोई जॉब नहीं।',
     kind: 'प्रकार', role: 'भूमिका', unit: 'इकाई', rate: 'दर', currency: 'मुद्रा', sac: 'SAC', active: 'चालू', addHead: 'शीर्ष जोड़ें', defaults: 'डिफ़ॉल्ट शीर्ष', name: 'नाम',
-        volumetric: 'आयतनी (वॉल्यूमेट्रिक)', wp: 'कार्य-पत्र — अपने CA से जाँचें।',
+        volumetric: 'आयतनी (वॉल्यूमेट्रिक)', wp: 'कार्य-पत्र: अपने CA से जाँचें।',
     modes: 'समुद्री FCL,समुद्री LCL,हवाई,सड़क,रेल,मल्टीमोडल,कूरियर', dirs: 'निर्यात,आयात,घरेलू,क्रॉस-ट्रेड', statuses: 'पूछताछ,बुक,रास्ते में,पहुँचा,डिलीवर,बंद,रद्द', legList: 'सड़क,रेल,समुद्र,हवाई,अंतर्देशीय जल',
     kinds: 'समुद्री भाड़ा,हवाई भाड़ा,सड़क भाड़ा,रेल भाड़ा,मल्टीमोडल भाड़ा,कूरियर,मूल स्थान शुल्क,गंतव्य शुल्क,दस्तावेज़ शुल्क,सीमा शुल्क निकासी (CHA),क्लियरिंग और फ़ॉरवर्डिंग,हैंडलिंग शुल्क,भंडारण शुल्क,GTA से परिवहन,बीमा,सीमा शुल्क (ड्यूटी),CFS शुल्क,पोर्ट शुल्क,DO शुल्क,डेमरेज / डिटेंशन,कमीशन,अन्य',
     roles: 'अपनी आपूर्ति,शुद्ध एजेंट (नियम 33),छूट', units: 'kg,CBM,W/M,कंटेनर,शिपमेंट,बिल,पैकेज,दिन,मूल्य का %,लिखी राशि',
     eDate: 'जॉब की तिथि चुनें।', eClient: 'ग्राहक चुनें।', ePorts: 'मूल स्थान और गंतव्य लिखें।', eCountry: 'समुद्री या हवाई निर्यात के लिए गंतव्य देश (2 अक्षर) ज़रूरी है।',
-    eBox: 'कंटेनर {c}: 4 अक्षर और 7 अंक।', hDigit: 'कंटेनर {c}: चेक अंक मेल नहीं खाता (ISO 6346) — नंबर जाँचें।', eHouse: 'यह हाउस बिल पहले से जॉब {n} पर है।', hDoc: 'शिपिंग बिल / बिल ऑफ़ एंट्री की तिथि जॉब तिथि से 30 दिन से अधिक पहले की है।',
+    eBox: 'कंटेनर {c}: 4 अक्षर और 7 अंक।', hDigit: 'कंटेनर {c}: चेक अंक मेल नहीं खाता (ISO 6346), नंबर जाँचें।', eHouse: 'यह हाउस बिल पहले से जॉब {n} पर है।', hDoc: 'शिपिंग बिल / बिल ऑफ़ एंट्री की तिथि जॉब तिथि से 30 दिन से अधिक पहले की है।',
     eNoJob: 'जॉब नहीं मिली।', eBilled: 'इस जॉब का एक दस्तावेज़ चालू है; पहले उसे रद्द करें।',   },
 );
 

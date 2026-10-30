@@ -12,7 +12,7 @@ import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
 
 function docLink(ref: SerialRef | undefined) {
-  if (!ref) return '—';
+  if (!ref) return '-';
   const label = `${ref.refNumber || invT('document')} · ${formatDate(ref.date)}`;
   if (ref.refType === 'invoice' && ref.refId) return <Link to={`/invoice/${ref.refId}`}>{label}</Link>;
   if (ref.refType === 'purchase') return <Link to="/expenses">{label}</Link>;
@@ -77,7 +77,7 @@ export function SerialLookup({ tracking, today, godowns, initialQuery = '' }: {
           <div>
             <div className={styles.summaryLabel}>{invT('warrantyHead')}</div>
             {r.warranty === 'none' ? (
-              <div className={styles.muted}>{r.sale ? invT('noWarranty') : '—'}</div>
+              <div className={styles.muted}>{r.sale ? invT('noWarranty') : '-'}</div>
             ) : (
               <div className={r.warranty === 'active' ? styles.in : styles.expired}>
                 {invT(r.warranty === 'active' ? 'warrantyActive' : 'warrantyExpired', { date: formatDate(r.warrantyUntil), n: r.warrantyMonths })}

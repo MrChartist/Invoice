@@ -81,9 +81,9 @@ test('a trial balance with a Dr / Cr mismatch shows the difference before saving
     'Difference in opening balances,Primary,,',
   ].join('\n'), 'trial_balance');
   assert.equal(p.difference, -1_000_00, '264,000 Dr vs 265,000 Cr');
-  assert.match(differenceNote(p), /Difference in opening balances: ₹1,000.00 Cr — posts to "Opening balance difference" \(1090\)/);
+  assert.match(differenceNote(p), /Difference in opening balances: ₹1,000.00 Cr\. It posts to "Opening balance difference" \(1090\)/);
   const rent = p.rows.find((r) => r.label === 'Office Rent Exp')!;
-  assert.ok(rent.issues.some((i) => /not a known group — mapped to Other \(indirect\) expenses/.test(i.message)));
+  assert.ok(rent.issues.some((i) => /not a known group: mapped to Other \(indirect\) expenses/.test(i.message)));
   assert.equal(p.rows.find((r) => r.label.startsWith('Difference'))!.action, 'skip');
   assert.ok(p.rows.find((r) => r.label === 'Shree Packaging')!.issues.some((i) => /New supplier/.test(i.message)));
 

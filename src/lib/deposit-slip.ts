@@ -172,7 +172,7 @@ export function saveDepositSlip(input: { date: string; bank_account_id?: string;
       contra = saveVoucher({
         type: 'CONTRA',
         date: input.date,
-        narration: `Cash deposited in the bank — pay-in slip ${number}`,
+        narration: `Cash deposited in the bank: pay-in slip ${number}`,
         lines: [{ account_id: bankLedgerId(bankId), dr: paise, cr: 0 }, { account_id: A.cash, dr: 0, cr: paise }],
       });
     }

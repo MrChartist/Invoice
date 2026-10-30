@@ -33,7 +33,7 @@ export const GST_SETOFFS_TABLE = 'gst_setoffs';
 export const GST_CHALLANS_TABLE = 'gst_challans';
 
 /** Shown under every set-off / challan output (Critical Rule 10). */
-export const SETOFF_DISCLAIMER = 'Working paper — not filed anywhere. The GST portal set-off and PMT-06 are what count; verify with your CA.';
+export const SETOFF_DISCLAIMER = 'Working paper: not filed anywhere. The GST portal set-off and PMT-06 are what count; verify with your CA.';
 
 export type GstHead = 'igst' | 'cgst' | 'sgst' | 'cess';
 export const GST_HEADS: readonly GstHead[] = ['igst', 'cgst', 'sgst', 'cess'];
@@ -430,7 +430,7 @@ export function postSetOff(plan: SetOffPlan, o: { date: string; gstin?: string; 
   const prev = setOffFor(all, plan.periodKey, gstin);
   const voucherExists = !!prev?.voucher_id && loadVouchers().some((v) => v.id === prev.voucher_id);
   const narration = (o.narration ?? '').trim()
-    || `GST set-off for ${plan.periodKey}${gstin ? ` (${gstin})` : ''}: ITC ${money(sumHeads(plan.itcUsed))}, cash ${money(sumHeads(plan.totalCash))}. Working paper — verify with your CA.`;
+    || `GST set-off for ${plan.periodKey}${gstin ? ` (${gstin})` : ''}: ITC ${money(sumHeads(plan.itcUsed))}, cash ${money(sumHeads(plan.totalCash))}. Working paper: verify with your CA.`;
   const v = saveVoucher({
     ...(voucherExists ? { id: prev!.voucher_id } : {}),
     type: 'JOURNAL',

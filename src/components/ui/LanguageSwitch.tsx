@@ -43,8 +43,8 @@ export function LanguageSwitch({ className, compact }: { className?: string; com
       </select>
       {needsOnline && (
         <span role="alert" className={styles.offline} data-lang-offline>
-          {needsOnline} needs one online visit to download — connect to the internet and try again.{' '}
-          <span lang="hi">यह भाषा एक बार इंटरनेट से डाउनलोड होगी — जुड़कर फिर चुनें।</span>
+          {needsOnline} needs one online visit to download: connect to the internet and try again.{' '}
+          <span lang="hi">यह भाषा एक बार इंटरनेट से डाउनलोड होगी: जुड़कर फिर चुनें।</span>
         </span>
       )}
     </label>

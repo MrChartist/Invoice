@@ -172,7 +172,7 @@ export function SetOffPanel({ report, period, gstin, stateCode, turnover, notify
             <Stat label={soT('statBalance')} value={m(sumHeads(balance))} hint={soT('statBalanceHint')} />
             <Stat label={soT('statShortfall')} value={m(sumHeads(status.shortfall))} hint={soT('statShortfallHint')} />
             <Stat label={o7T('statCredit')} value={m(sumHeads(credit))} hint={o7T('statCreditHint')} />
-            <Stat label={soT('statPosted')} value={record ? '✓' : '—'} hint={record ? soT('statPostedYes', { number: record.voucher_number, date: formatDate(record.date) }) : soT('statPostedNo')} />
+            <Stat label={soT('statPosted')} value={record ? '✓' : '-'} hint={record ? soT('statPostedYes', { number: record.voucher_number, date: formatDate(record.date) }) : soT('statPostedNo')} />
           </div>
 
           {plan.daysLate > 0 && <div className={styles.warn} role="status"><AlertTriangle size={16} aria-hidden /> {soT('wDaysLate', { days: plan.daysLate })}</div>}
@@ -252,10 +252,10 @@ export function SetOffPanel({ report, period, gstin, stateCode, turnover, notify
                 </tr>
               </thead>
               <tbody>
-                <tr><th scope="row">{soT('matrixFrom', { head: 'IGST' })}</th><td>{m(plan.itcMatrix.igst.igst)}</td><td>{m(plan.itcMatrix.igst.cgst)}</td><td>{m(plan.itcMatrix.igst.sgst)}</td><td>—</td></tr>
-                <tr><th scope="row">{soT('matrixFrom', { head: 'CGST' })}</th><td>{m(plan.itcMatrix.cgst.igst)}</td><td>{m(plan.itcMatrix.cgst.cgst)}</td><td>—</td><td>—</td></tr>
-                <tr><th scope="row">{soT('matrixFrom', { head: 'SGST' })}</th><td>{m(plan.itcMatrix.sgst.igst)}</td><td>—</td><td>{m(plan.itcMatrix.sgst.sgst)}</td><td>—</td></tr>
-                <tr><th scope="row">{soT('matrixFrom', { head: 'Cess' })}</th><td>—</td><td>—</td><td>—</td><td>{m(plan.itcMatrix.cess.cess)}</td></tr>
+                <tr><th scope="row">{soT('matrixFrom', { head: 'IGST' })}</th><td>{m(plan.itcMatrix.igst.igst)}</td><td>{m(plan.itcMatrix.igst.cgst)}</td><td>{m(plan.itcMatrix.igst.sgst)}</td><td>-</td></tr>
+                <tr><th scope="row">{soT('matrixFrom', { head: 'CGST' })}</th><td>{m(plan.itcMatrix.cgst.igst)}</td><td>{m(plan.itcMatrix.cgst.cgst)}</td><td>-</td><td>-</td></tr>
+                <tr><th scope="row">{soT('matrixFrom', { head: 'SGST' })}</th><td>{m(plan.itcMatrix.sgst.igst)}</td><td>-</td><td>{m(plan.itcMatrix.sgst.sgst)}</td><td>-</td></tr>
+                <tr><th scope="row">{soT('matrixFrom', { head: 'Cess' })}</th><td>-</td><td>-</td><td>-</td><td>{m(plan.itcMatrix.cess.cess)}</td></tr>
               </tbody>
             </table>
           </div>

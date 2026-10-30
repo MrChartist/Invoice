@@ -25,4 +25,4 @@ export function useRun(onDone: Done) {
   }] as const;
 }
 
-export const opt = <X,>(xs: readonly X[], id: (x: X) => string, name: (x: X) => string) => [['', '—'] as const, ...xs.map((x) => [id(x), name(x)] as const)];
+export const opt = <X,>(xs: readonly X[], id: (x: X) => string, name: (x: X) => string) => [['', '-'] as const, ...xs.map((x) => [id(x), name(x)] as const)];

@@ -48,7 +48,7 @@ export default function OperatorScreen({ ctx, orders, cards, centres, people, on
   }
   return (
     <section data-mf-operator style={{ display: 'grid', gap: '0.75rem', maxWidth: 520 }}>
-      <F label={fT('centre')}><Sel v={centre} set={setCentre} o={[['', '—'], ...centres.filter((c) => c.active).map((c) => [c.id, c.name] as const)]} data-mf="op-centre" /></F>
+      <F label={fT('centre')}><Sel v={centre} set={setCentre} o={[['', '-'], ...centres.filter((c) => c.active).map((c) => [c.id, c.name] as const)]} data-mf="op-centre" /></F>
       <F label={fT('scanOrder')}><In v={find} set={setFind} autoComplete="off" /></F>
       {open.map(({ o, op, good }) => (
         <button key={`${o.id}-${op.id}`} type="button" className={controls.btnOutline} style={big} onClick={() => setRun({ order: o, op, d: { date: todayInput(), start: now(), opKind: 'employee' } })} data-mf="start">

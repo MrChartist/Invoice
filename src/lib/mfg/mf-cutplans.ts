@@ -126,7 +126,7 @@ export function removeCutPlan(id: string): void {
   requireAccess('doc.create');
   const p = cutPlanOf(id);
   if (!p) return;
-  if (p.docs?.issue_id || p.docs?.return_id || p.docs?.waste_id) throw new Error(`${p.number} has fabric issued / returned or waste written: those stay — delete them first.`);
+  if (p.docs?.issue_id || p.docs?.return_id || p.docs?.waste_id) throw new Error(`${p.number} has fabric issued / returned or waste written: those stay, delete them first.`);
   if ((p.bundles ?? []).some((b) => b.history.length)) throw new Error(`${p.number}: bundles have been worked on.`);
   assertUnlocked(lockOf(p), 'delete');
   setTable(T, loadCutPlans().filter((x) => x.id !== id));

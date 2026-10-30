@@ -57,7 +57,7 @@ export default function IncentivesView({ ctx }: { ctx: MfgContext }) {
       </div>
       <Tbl empty={sdT('none')} head={[sdT('name'), sdT('period'), sdT('claimed'), sdT('recognised'), sdT('received'), sdT('pending'), '']} rows={rows.map((r) => {
         const x = claimFigures(r, today);
-        return [`${LABEL[r.scheme]} · ${r.name}`, `${r.period_from} – ${r.period_to}`, rs(r.claimed), r.recognised_on ? `${rs(x.recognised)} (${r.recognised_on})` : '—', rs(x.received), rs(x.pending),
+        return [`${LABEL[r.scheme]} · ${r.name}`, `${r.period_from} – ${r.period_to}`, rs(r.claimed), r.recognised_on ? `${rs(x.recognised)} (${r.recognised_on})` : '-', rs(x.received), rs(x.pending),
           <span key="a">{!r.recognised_on && <button type="button" className={sm} disabled={!ctx.canBooks} onClick={() => run(ctx, () => { recogniseClaim(r.id, act.date); return sdT('saved'); })} data-mfd-b="inc-recognise">{sdT('recognise')}</button>}
             {r.recognised_on && x.receivable > 0 && <button type="button" className={sm} disabled={!ctx.canBooks} onClick={() => run(ctx, () => { receiveClaim(r.id, act.amount || x.receivable, act.date); return sdT('saved'); })} data-mfd-b="inc-receive">{sdT('receive')}</button>}</span>];
       })} />

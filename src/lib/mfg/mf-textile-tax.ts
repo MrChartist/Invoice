@@ -35,7 +35,7 @@ export function classNotice(cls: unknown, date: string, typed: number, perPiece 
   if (!isTextileClass(cls)) return '';
   const want = classRate(cls, date, perPiece);
   const c = textileClassAt(cls, date);
-  return num(typed) === want ? '' : `Rate ${num(typed)}% differs from the class ${cls} (${want}% on this date) — verify with your CA (${c.ca}).`;
+  return num(typed) === want ? '' : `Rate ${num(typed)}% differs from the class ${cls} (${want}% on this date): verify with your CA (${c.ca}).`;
 }
 
 /** C5-2 pricing memo: sizes of a style whose list price per piece falls in the higher band on `date`. */

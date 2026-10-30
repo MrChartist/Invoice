@@ -97,7 +97,7 @@ export function TablesSettings({ catalog, stockGroups, onClose, onSaved, notify 
               <label className={controls.field}>
                 <span className={controls.label}>{rT('areaName')}</span>
                 <select className={controls.select} value={t.area_id} onChange={(e) => setTables((r) => r.map((x) => (x.id === t.id ? { ...x, area_id: e.target.value } : x)))}>
-                  {areas.map((a) => <option key={a.id} value={a.id}>{(a.name === STARTER_AREA_NAME ? rT('chDine') : a.name) || '—'}</option>)}
+                  {areas.map((a) => <option key={a.id} value={a.id}>{(a.name === STARTER_AREA_NAME ? rT('chDine') : a.name) || '-'}</option>)}
                 </select>
               </label>
               <button type="button" className={controls.btnDanger} onClick={() => setTables((r) => r.filter((x) => x.id !== t.id))} aria-label={rT('remove', { name: t.name })}><Trash2 size={14} /></button>

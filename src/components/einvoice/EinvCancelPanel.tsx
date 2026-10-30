@@ -74,7 +74,7 @@ export function EinvCancelPanel({ invoice, afterCancel }: { invoice: InvoiceReco
     const d = which === 'irn' ? plan.irn : plan.ewb;
     return (
       <li>
-        <strong>{which === 'irn' ? 'IRN' : `e-Way Bill ${meta.eway_no}`}</strong> — {left(d)}{' '}
+        <strong>{which === 'irn' ? 'IRN' : `e-Way Bill ${meta.eway_no}`}</strong> : {left(d)}{' '}
         <span className={c?.status === 'done' ? styles.pillOk : c ? styles.pillWarn : styles.pill}>
           {c?.status === 'done' ? ggT('stDone', { date: c.done_on ?? '' }) : c ? ggT('stPrepared') : ggT('stOpen')}
         </span>{' '}

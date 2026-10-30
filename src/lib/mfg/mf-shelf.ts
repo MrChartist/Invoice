@@ -33,11 +33,11 @@ export function bucketOf(pct: number | null, days: number | null): LifeBucket {
 
 /** Suggested action per bucket (the expiry tab stays the list of expired stock). */
 export const BUCKET_ACTION: Readonly<Record<LifeBucket, string>> = {
-  expired: 'Expired — see Inventory → Expiry; a "destroyed" return posts a QC scrap journal (Sec 17(5)(h) note, MF32)',
+  expired: 'Expired: see Inventory → Expiry; a "destroyed" return posts a QC scrap journal (Sec 17(5)(h) note, MF32)',
   lt25: 'Liquidate now (local trade / staff sale) or return to factory',
   lt50: 'Push to general trade; not for modern trade',
   lt70: 'General trade only (most modern-trade buyers want ≥ 70%)',
-  ok: '—',
+  ok: '-',
   unknown: 'Add the MFG / packed date to the batch',
 };
 
@@ -87,7 +87,7 @@ export function bucketTotals(rows: readonly NearExpiryRow[]): Record<LifeBucket,
 
 /** Circular 251/08/2025-GST (12 Sep 2025) note shown with post-sale discounts by financial credit note (MF15). */
 export const CIRCULAR_251_NOTE =
-  'Post-sale discount by financial credit note (FCN, no GST): the supply value does not change and the dealer reverses no ITC (Circular 251/08/2025-GST, 12 Sep 2025); a promotion the dealer is separately paid for is a taxable service — verify MF15.';
+  'Post-sale discount by financial credit note (FCN, no GST): the supply value does not change and the dealer reverses no ITC (Circular 251/08/2025-GST, 12 Sep 2025); a promotion the dealer is separately paid for is a taxable service, verify MF15.';
 
 export interface FoodSchemePreset {
   id: 'free_goods' | 'slab_free' | 'display_claim';

@@ -115,7 +115,7 @@ export default function DepthTab({ items, tracking, onChanged }: { items: StockI
                     <tr key={i.id}>
                       <td>{i.name}</td>
                       <td><input type="checkbox" aria-label={skT('kitFor', { name: i.name })} checked={!!i.kit} onChange={(e) => saveItem(i, e.target.checked ? { kit: true, track_stock: false } : { kit: undefined })} data-kit-toggle={i.name} /></td>
-                      <td className={own.muted}>{bom ? skT('componentsN', { n: bom.components.length, bom: bom.name }) : i.kit ? skT('noBom') : '—'}</td>
+                      <td className={own.muted}>{bom ? skT('componentsN', { n: bom.components.length, bom: bom.name }) : i.kit ? skT('noBom') : '-'}</td>
                     </tr>
                   );
                 })}
@@ -150,7 +150,7 @@ export default function DepthTab({ items, tracking, onChanged }: { items: StockI
                             });
                           }} />
                         </label>
-                      )) : <span className={own.muted}>—</span>}
+                      )) : <span className={own.muted}>-</span>}
                     </td>
                   </tr>
                 ))}

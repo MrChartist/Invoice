@@ -35,7 +35,7 @@ const FILTERS: EwayFilter[] = ['all', 'expiring24', 'expired', 'noPartB'];
 const REASONS: VehicleReason[] = ['breakdown', 'transhipment', 'others'];
 const STATUS_CLASS: Record<EwayRow['status'], string | undefined> = { active: styles.ok, expiring: styles.error, expired: styles.error, unknown: styles.muted };
 
-const when = (d: Date | null) => (d ? `${formatDate(localDay(d))} ${d.toTimeString().slice(0, 5)}` : '—');
+const when = (d: Date | null) => (d ? `${formatDate(localDay(d))} ${d.toTimeString().slice(0, 5)}` : '-');
 
 /**
  * R3-C5 GST → Tools → e-Way desk: active e-Way Bills with validity (typed / imported valid-upto wins over
@@ -128,18 +128,18 @@ export default function EwayDesk({ notify }: { notify: Notify }) {
                   <tr key={r.invoiceId}>
                     <td><input type="checkbox" checked={picked.has(r.invoiceId)} onChange={() => toggle(r.invoiceId)} aria-label={dkT('ew.pick', { no: r.ewayNo })} /></td>
                     <td className={styles.mono}>{r.ewayNo}</td>
-                    <td><Link to={`/invoice/${r.invoiceId}`}>{r.number || '—'}</Link><div className={styles.note}>{r.party}</div></td>
+                    <td><Link to={`/invoice/${r.invoiceId}`}>{r.number || '-'}</Link><div className={styles.note}>{r.party}</div></td>
                     <td className={styles.mono}>{r.vehicle || <span className={styles.error}>{dkT('ew.noPartB')}</span>}</td>
-                    <td className={styles.num}>{r.distance || '—'}</td>
+                    <td className={styles.num}>{r.distance || '-'}</td>
                     <td>
                       <span className={STATUS_CLASS[r.status]}>{when(r.expiresAt)}</span>
                       <div className={styles.note}>
                         {r.source === 'typed' ? dkT('ew.srcTyped') : r.source === 'computed' ? dkT('ew.srcComputed') : dkT('ew.srcNone')}
                         {r.differs && ` · ${dkT('ew.differs', { typed: formatDate(r.typedDay ?? ''), computed: formatDate(r.computedDay ?? '') })}`}
                       </div>
-                      {r.extension && <div className={styles.error}>{dkT('ew.extendNow', { km: r.distance || '—' })}</div>}
+                      {r.extension && <div className={styles.error}>{dkT('ew.extendNow', { km: r.distance || '-' })}</div>}
                     </td>
-                    <td className={styles.num}>{r.hoursLeft ?? '—'}</td>
+                    <td className={styles.num}>{r.hoursLeft ?? '-'}</td>
                   </tr>
                 ))}
               </tbody>

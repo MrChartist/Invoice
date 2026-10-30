@@ -684,12 +684,12 @@ export function runDueSchedules(today: string): RunReport {
           const { invoice, created, heldAsDraft } = generateInvoiceFromSchedule(current, occurrence);
           current = recordGenerated(current, occurrence, invoice);
           if (created) report.generated.push(invoice);
-          if (heldAsDraft) report.errors.push(`${listed.name}: ${invoice.invoice_number} saved as a draft — ${heldAsDraft[0]}`);
+          if (heldAsDraft) report.errors.push(`${listed.name}: ${invoice.invoice_number} saved as a draft, ${heldAsDraft[0]}`);
         } catch (err) {
           // An occurrence inside the locked period is skipped (counted), never forced in.
           if (!isPeriodLockedError(err)) throw err;
           current = recurringDb.save(advanceSchedule(current, [occurrence], [], 1));
-          report.errors.push(`${listed.name}: skipped ${occurrence} — ${err.message}`);
+          report.errors.push(`${listed.name}: skipped ${occurrence}. ${err.message}`);
         }
       }
     } catch (err) {

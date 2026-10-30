@@ -39,7 +39,7 @@ export default function RealisationView() {
     const m = new Map<string, string>();
     for (const s of loadStaff()) m.set(s.id, s.name);
     for (const c of localDb.clients.getAll()) if (c.id) m.set(c.id, c.name);
-    for (const c of loadCostCentres()) m.set(c.id, c.ps?.code ? `${c.ps.code} — ${c.name}` : c.name);
+    for (const c of loadCostCentres()) m.set(c.id, c.ps?.code ? `${c.ps.code}: ${c.name}` : c.name);
     for (const w of loadWorkTypes()) m.set(w.id, w.name);
     return m;
   }, []);

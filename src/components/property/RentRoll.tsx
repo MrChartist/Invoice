@@ -11,7 +11,7 @@ export function RentRoll({ rows, onEnd }: { rows: readonly RentRow[]; onEnd: (r:
     <div className={styles.stack} data-rent-roll>
       <div><B l={iT('csv')} on={() => csv('rent-roll.csv', rentRollCsv(rows, h))} /></div>
       <Tbl h={[iT('property'), iT('tenant'), iT('rent'), iT('nextEsc'), iT('deposit'), iT('due'), '']} rows={rows.map((r) => [
-        `${r.property?.name ?? ''} · ${r.units}`, r.tenant, rs(r.rent), r.next ? `${r.next.date}: ${rs(r.next.from)} → ${rs(r.next.to)}` : '—', rs(r.deposit),
+        `${r.property?.name ?? ''} · ${r.units}`, r.tenant, rs(r.rent), r.next ? `${r.next.date}: ${rs(r.next.from)} → ${rs(r.next.to)}` : '-', rs(r.deposit),
         `${rs(r.dues)}${r.lease.late_fee_pct && r.dues ? ` (+${rs(lateInterest(r.dues, r.lease.late_fee_pct, 30))} / 30 d, info)` : ''}`,
         r.lease.status === 'active' ? <><B g sm l={iT('endLease')} on={() => onEnd(r, false)} /><B g sm l={iT('terminate')} on={() => onEnd(r, true)} /></> : iT(`status.${r.lease.status}`),
       ])} />

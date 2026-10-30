@@ -61,16 +61,16 @@ export default function CmrView({ onDone }: { onDone: Done }) {
 
       {a && acc && (
         <section data-ml-account={acc.balance}>
-          <h4>{T('newAgreement')} — {a.agency_name} · {a.season}</h4>
+          <h4>{T('newAgreement')} : {a.agency_name} · {a.season}</h4>
           <Table d="account" head={[T('paddy'), T('riceDue'), T('delivered'), W('balance'), T('complete'), T('daysLeft'), T('byproductDue'), T('chargesEarned')]} rows={[[
-            acc.paddy, acc.due, acc.delivered, <strong key="b">{acc.balance}</strong>, `${acc.pct}%`, acc.daysLeft === null ? '—' : `${acc.daysLeft}${acc.overdue ? ` · ${T('overdue')}` : ''}`, fmtMoney(acc.byproductDue), fmtMoney(acc.chargesEarned),
+            acc.paddy, acc.due, acc.delivered, <strong key="b">{acc.balance}</strong>, `${acc.pct}%`, acc.daysLeft === null ? '-' : `${acc.daysLeft}${acc.overdue ? ` · ${T('overdue')}` : ''}`, fmtMoney(acc.byproductDue), fmtMoney(acc.chargesEarned),
           ]]} />
           <div style={row}>
             <Txt l={W('date')} v={lot.date} set={(x) => setLot({ ...lot, date: x })} type="date" x={170} />
             <Num l={T('receivePaddy')} v={lot.qty} set={(x) => setLot({ ...lot, qty: x })} x={170} d="paddy-qty" />
             <button type="button" className={B.o} data-ml-add-lot onClick={() => run(() => { addPaddyLot(a.id, { date: lot.date, qty: n(lot.qty) }); setLot({ ...lot, qty: '' }); return T('lotAdded'); })}>{T('add')}</button>
           </div>
-          <Table d="lots" head={[W('date'), T('qtl'), 'JWP', '']} rows={a.paddy_lots.map((l) => [l.date, l.qty, l.wbs_id ? T('slip') : '—', <button key="x" type="button" className={B.gs} onClick={() => run(() => { removePaddyLot(a.id, l.id, today()); })}>{T('del')}</button>])} />
+          <Table d="lots" head={[W('date'), T('qtl'), 'JWP', '']} rows={a.paddy_lots.map((l) => [l.date, l.qty, l.wbs_id ? T('slip') : '-', <button key="x" type="button" className={B.gs} onClick={() => run(() => { removePaddyLot(a.id, l.id, today()); })}>{T('del')}</button>])} />
           <div style={row}>
             <Txt l={W('date')} v={dl.date} set={(x) => setDl({ ...dl, date: x })} type="date" x={170} />
             <Num l={`${T('deliver')} (${T('qtl')})`} v={dl.qty} set={(x) => setDl({ ...dl, qty: x })} x={170} d="deliver-qty" />
@@ -79,7 +79,7 @@ export default function CmrView({ onDone }: { onDone: Done }) {
             <label className={controls.check}><input type="checkbox" checked={dl.fort} onChange={(e) => setDl({ ...dl, fort: e.target.checked })} /> {T('fortified')}</label>
             <button type="button" className={B.o} data-ml-deliver onClick={() => run(() => { const r = addDelivery(a.id, { date: dl.date, qty: n(dl.qty), lot_no: dl.lot, ack_no: dl.ack, fortified: dl.fort }); setDl({ ...dl, qty: '', lot: '', ack: '' }); return T('deliverySaved', { n: r.number }); })}>{T('deliver')}</button>
           </div>
-          <Table d="deliveries" head={['CMR', W('date'), T('qtl'), W('lot'), T('ackNo'), T('billedOn'), '']} rows={a.deliveries.map((x) => [x.number, x.date, x.qty, x.lot_no, x.ack_no ?? '—', billing?.billedBy.get(x.id) ?? '—', <button key="x" type="button" className={B.gs} onClick={() => run(() => { removeDelivery(a.id, x.id); })}>{T('del')}</button>])} />
+          <Table d="deliveries" head={['CMR', W('date'), T('qtl'), W('lot'), T('ackNo'), T('billedOn'), '']} rows={a.deliveries.map((x) => [x.number, x.date, x.qty, x.lot_no, x.ack_no ?? '-', billing?.billedBy.get(x.id) ?? '-', <button key="x" type="button" className={B.gs} onClick={() => run(() => { removeDelivery(a.id, x.id); })}>{T('del')}</button>])} />
           <h4>{T('chargesInvoice')}</h4>
           <p className={controls.hint} data-ml-unbilled={billing?.unbilled ?? 0}>{T('unbilledRice', { q: billing?.unbilled ?? 0 })}</p>
           <div style={row}>
@@ -87,7 +87,7 @@ export default function CmrView({ onDone }: { onDone: Done }) {
             <Num l={`${W('qty')} (${T('qtl')})`} v={bill.qty} set={(x) => setBill({ ...bill, qty: x })} d="bill-qty" />
             <Num l={T('goodsValue')} v={bill.goods} set={(x) => setBill({ ...bill, goods: x })} x={260} d="goods" />
             <span>{T('millingRate')}: {fmtMoney(service)}</span>
-            <button type="button" className={B.p} data-ml-bill onClick={() => run(() => { const r = millingChargesInvoice(a.id, { date: bill.date, ...(n(bill.qty) > 0 ? { qty: n(bill.qty) } : {}), goods_value: n(bill.goods) }); setMade(r.invoice.id); return T('draftMade', { n: r.invoice.invoice_number || '—' }); })}>{T('makeDraft')}</button>
+            <button type="button" className={B.p} data-ml-bill onClick={() => run(() => { const r = millingChargesInvoice(a.id, { date: bill.date, ...(n(bill.qty) > 0 ? { qty: n(bill.qty) } : {}), goods_value: n(bill.goods) }); setMade(r.invoice.id); return T('draftMade', { n: r.invoice.invoice_number || '-' }); })}>{T('makeDraft')}</button>
             {made && <Link to={`/invoice/${made}`}>{T('openDraft')}</Link>}
           </div>
           {service > 0 && <p className={controls.hint} data-ml-pds={test.exempt ? 'exempt' : '5'}>{T(test.exempt ? 'pdsExempt' : 'pdsTaxable', { pct: test.goodsPct, limit: test.limit })}</p>}
@@ -103,7 +103,7 @@ export default function CmrView({ onDone }: { onDone: Done }) {
         <Num l={W('rate')} v={jm.rate} set={(x) => setJm({ ...jm, rate: x })} x={100} />
         <label className={controls.check}><input type="checkbox" checked={jm.reg} onChange={(e) => setJm({ ...jm, reg: e.target.checked })} /> {T('registered')}</label>
         <Num l={T('taxRate')} v={jm.tax} set={(x) => setJm({ ...jm, tax: x })} x={90} />
-        <button type="button" className={B.o} onClick={() => run(() => { const inv = jobMillingInvoice({ client_id: jm.client, date: today(), qty: n(jm.qty), rate: n(jm.rate), process: jm.process, registered: jm.reg, ...(jm.tax !== '' ? { tax_rate: n(jm.tax) } : {}) }); setMade(inv.id); return T('draftMade', { n: inv.invoice_number || '—' }); })}>{T('makeDraft')}</button>
+        <button type="button" className={B.o} onClick={() => run(() => { const inv = jobMillingInvoice({ client_id: jm.client, date: today(), qty: n(jm.qty), rate: n(jm.rate), process: jm.process, registered: jm.reg, ...(jm.tax !== '' ? { tax_rate: n(jm.tax) } : {}) }); setMade(inv.id); return T('draftMade', { n: inv.invoice_number || '-' }); })}>{T('makeDraft')}</button>
       </div>
       <p className={controls.hint}>{T('jobRateHint')} {jm.reg ? `(${jobMillingRate(true).rate}%)` : ''}</p>
     </div>

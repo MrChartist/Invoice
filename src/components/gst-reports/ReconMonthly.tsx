@@ -22,8 +22,8 @@ export interface ReconMonthlyProps {
   filerStateCode: string;
 }
 
-const cell = (n: number | null) => (n === null ? '—' : formatMoney(n));
-const diffCell = (n: number | null) => (n === null ? '—' : <span className={Math.abs(n) > 1 ? styles.bad : styles.ok}>{formatMoney(n)}</span>);
+const cell = (n: number | null) => (n === null ? '-' : formatMoney(n));
+const diffCell = (n: number | null) => (n === null ? '-' : <span className={Math.abs(n) > 1 ? styles.bad : styles.ok}>{formatMoney(n)}</span>);
 
 export function ReconMonthly({ period, gstin, filerStateCode }: ReconMonthlyProps) {
   useT();
@@ -76,7 +76,7 @@ export function ReconMonthly({ period, gstin, filerStateCode }: ReconMonthlyProp
                 <td>{diffCell(r.diff13)}</td>
                 <td>{diffCell(r.diff3Books)}</td>
                 <td>{cell(r.itc3b)}</td>
-                <td>{r.itcBooks === null ? '—' : <span className={Math.abs(r.itc3b - r.itcBooks) > 1 ? styles.bad : undefined}>{formatMoney(r.itcBooks)}</span>}</td>
+                <td>{r.itcBooks === null ? '-' : <span className={Math.abs(r.itc3b - r.itcBooks) > 1 ? styles.bad : undefined}>{formatMoney(r.itcBooks)}</span>}</td>
                 <td className={r.ok ? styles.ok : styles.bad}>{r.ok ? soT('reconOk') : soT('reconDiff')}</td>
               </tr>
             ))}

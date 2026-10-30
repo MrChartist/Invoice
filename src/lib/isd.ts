@@ -33,7 +33,7 @@ import { toCsv } from './csv';
 
 export const ISD_TABLE = 'isd_documents';
 export const ISD_PREFIX = 'ISD';
-export const ISD_DISCLAIMER = 'Working paper — Input Service Distributor credit and GSTR-6 prepared offline; not validated against the GST portal. Verify the distribution ratio, the heads and the dates with your CA.';
+export const ISD_DISCLAIMER = 'Working paper: Input Service Distributor credit and GSTR-6 prepared offline; not validated against the GST portal. Verify the distribution ratio, the heads and the dates with your CA.';
 
 export type IsdKind = 'INWARD' | 'DISTRIBUTION' | 'RECEIVED';
 export const ISD_KINDS: readonly IsdKind[] = ['INWARD', 'DISTRIBUTION', 'RECEIVED'];
@@ -133,7 +133,7 @@ export interface IsdShare {
 export function planIsdDistribution(pool: { eligible: IsdHeads; ineligible: IsdHeads }, units: readonly IsdUnit[], isdState: string): { shares: IsdShare[]; warnings: string[] } {
   const warnings: string[] = [];
   const live = units.filter((u) => num(u.turnover) > 0);
-  for (const u of units) if (!(num(u.turnover) > 0)) warnings.push(`${u.name || u.gstin}: no turnover entered — nothing distributed to it.`);
+  for (const u of units) if (!(num(u.turnover) > 0)) warnings.push(`${u.name || u.gstin}: no turnover entered, nothing distributed to it.`);
   for (const u of units) if (!checkGstin(u.gstin).valid) warnings.push(`${u.name || u.gstin}: recipient GSTIN is not valid.`);
   const total = live.reduce((t, u) => t + num(u.turnover), 0);
   if (!(total > 0)) return { shares: [], warnings: [...warnings, 'Enter the turnover of at least one recipient unit.'] };
@@ -193,13 +193,13 @@ export function buildGstr6(docs: readonly IsdDoc[], month: string, isdGstin: str
   addH(undistributed.ineligible, done.ineligible, -1);
   // Distribution may move CGST / SGST into IGST: compare totals, not heads.
   const left = round2(isdTotal(undistributed.eligible) + isdTotal(undistributed.ineligible));
-  if (left > 0.5) warnings.push(`₹${left.toFixed(2)} of this month's credit is not distributed yet — Rule 39(1)(a): distribute it in the same month.`);
+  if (left > 0.5) warnings.push(`₹${left.toFixed(2)} of this month's credit is not distributed yet, Rule 39(1)(a): distribute it in the same month.`);
   if (left < -0.5) warnings.push(`Distributed ₹${(-left).toFixed(2)} more than the credit received this month.`);
   for (const d of dist) {
     if (d.date.slice(0, 7) !== month) warnings.push(`ISD document ${d.number} is dated ${d.date}, outside ${month} whose credit it distributes (Rule 39(1)(a)).`);
-    if (!checkGstin(d.party_gstin).valid) warnings.push(`ISD document ${d.number}: recipient GSTIN ${d.party_gstin || '—'} is not valid.`);
+    if (!checkGstin(d.party_gstin).valid) warnings.push(`ISD document ${d.number}: recipient GSTIN ${d.party_gstin || '-'} is not valid.`);
   }
-  for (const d of inward) if (!checkGstin(d.party_gstin).valid) warnings.push(`Invoice ${d.number}: supplier GSTIN ${d.party_gstin || '—'} is not valid.`);
+  for (const d of inward) if (!checkGstin(d.party_gstin).valid) warnings.push(`Invoice ${d.number}: supplier GSTIN ${d.party_gstin || '-'} is not valid.`);
   const heads = (d: IsdDoc): IsdHeads => ({ igst: d.igst, cgst: d.cgst, sgst: d.sgst, cess: d.cess });
   return {
     month,
@@ -220,15 +220,15 @@ export function gstr6Csv(p: Gstr6Paper): string {
     [ISD_DISCLAIMER],
     ['GSTR-6', p.isdGstin, p.month, 'Due', p.due],
     [],
-    ['Table 3 — ITC received'], ['Supplier GSTIN', 'Name', 'Invoice / note no.', 'Date', 'Taxable', 'IGST', 'CGST', 'SGST', 'Cess', 'Eligible', 'Credit note'],
+    ['Table 3: ITC received'], ['Supplier GSTIN', 'Name', 'Invoice / note no.', 'Date', 'Taxable', 'IGST', 'CGST', 'SGST', 'Cess', 'Eligible', 'Credit note'],
     ...p.table3.map((r) => [r.gstin, r.name, r.number, r.date, r.taxable, ...h(r.heads), r.eligible ? 'Yes' : 'No', r.creditNote ? 'Yes' : 'No']),
     [],
-    ['Table 4 — total ITC'], ['', 'IGST', 'CGST', 'SGST', 'Cess'], ['Total', ...h(p.table4.total)], ['Eligible', ...h(p.table4.eligible)], ['Ineligible', ...h(p.table4.ineligible)],
+    ['Table 4: total ITC'], ['', 'IGST', 'CGST', 'SGST', 'Cess'], ['Total', ...h(p.table4.total)], ['Eligible', ...h(p.table4.eligible)], ['Ineligible', ...h(p.table4.ineligible)],
     [],
-    ['Table 5 — distribution (ISD invoices)'], ['Recipient GSTIN', 'Name', 'ISD document no.', 'Date', 'IGST', 'CGST', 'SGST', 'Cess', 'Eligible'],
+    ['Table 5: distribution (ISD invoices)'], ['Recipient GSTIN', 'Name', 'ISD document no.', 'Date', 'IGST', 'CGST', 'SGST', 'Cess', 'Eligible'],
     ...p.table5.map((r) => [r.gstin, r.name, r.number, r.date, ...h(r.heads), r.eligible ? 'Yes' : 'No']),
     [],
-    ['Table 8 — ISD credit notes'], ['Recipient GSTIN', 'Name', 'ISD credit note no.', 'Date', 'IGST', 'CGST', 'SGST', 'Cess', 'Eligible'],
+    ['Table 8: ISD credit notes'], ['Recipient GSTIN', 'Name', 'ISD credit note no.', 'Date', 'IGST', 'CGST', 'SGST', 'Cess', 'Eligible'],
     ...p.table8.map((r) => [r.gstin, r.name, r.number, r.date, ...h(r.heads), r.eligible ? 'Yes' : 'No']),
     [],
     ['Warnings'], ...p.warnings.map((w) => [w]),

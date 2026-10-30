@@ -40,7 +40,7 @@ export { MRP_TAG, isMrpMessage, recordMrpOverrides, withMrpIssues } from './reta
  * QA10 (R12): the margin scheme (Rule 32(5), RT-D3): a registered buyer gets no ITC on a margin-scheme sale, so a bill with
  * margin lines (`InvoiceItem.margin`) to a GSTIN is refused on issue (editor save gate below; the counter: `PosDevices`).
  */
-export const MARGIN_B2B = 'Margin scheme: this buyer is registered (GSTIN) and gets no ITC on a margin-scheme sale — bill the full value with GST instead, or remove the GSTIN. Verify with your CA.';
+export const MARGIN_B2B = 'Margin scheme: this buyer is registered (GSTIN) and gets no ITC on a margin-scheme sale, bill the full value with GST instead, or remove the GSTIN. Verify with your CA.';
 export const marginGate = (rec: Pick<InvoiceRecord, 'client' | 'items'>): string[] =>
   (rec.items ?? []).some((l) => l?.margin) && String(rec.client?.gstin ?? '').trim() ? [MARGIN_B2B] : [];
 
@@ -434,7 +434,7 @@ export function docTrackingIssues(
             issues.errors.push(`${label}: serial ${s} is sold or moved later on ${eventLabel(firstShortAfter(w, 1))}, so it cannot leave stock on ${day}.`);
           } else if (multiGodown) {
             const g = dayWindow(evs, day, serialDelta(s, godown));
-            if (g.at < 1) issues.errors.push(`${label}: serial ${s} is in another godown — transfer it first or change the line's godown.`);
+            if (g.at < 1) issues.errors.push(`${label}: serial ${s} is in another godown, transfer it first or change the line's godown.`);
             else if (g.lowest < 1) issues.errors.push(`${label}: serial ${s} leaves this godown later on ${eventLabel(firstShortAfter(g, 1))}.`);
           }
         } else if (w.at >= 1) {
@@ -624,7 +624,7 @@ export function expiryNotices(rows: ExpiryRow[], today: string, days: number, at
       id: `stock-expired:${expired.length}:${expired[0].expiry}:${today}`,
       severity: 'critical',
       title: `${plural(expired.length, 'batch', 'batches')} past expiry still in stock`,
-      detail: `${names(expired)}. Expired stock cannot be sold — write it off with a stock adjustment or return it to the supplier.`,
+      detail: `${names(expired)}. Expired stock cannot be sold: write it off with a stock adjustment or return it to the supplier.`,
       href: '/inventory?tab=batches',
       cta: 'Review batches',
       at,

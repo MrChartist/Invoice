@@ -42,7 +42,7 @@ export function RaItemsTable({ invoice, totals, lineText }: { invoice: InvoiceRe
               <td className={styles.n}>{i + 1}</td>
               <td>{l?.ref ?? src?.boq_ref ?? ''}</td>
               <td>
-                <div>{line.name || '—'}</div>
+                <div>{line.name || '-'}</div>
                 {sub && <div className={styles.sub}>{sub}</div>}
               </td>
               <td>{line.unit ?? ''}</td>

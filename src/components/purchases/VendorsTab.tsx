@@ -106,8 +106,8 @@ export function VendorsTab({ vendors, purchases, onChanged }: VendorsTabProps) {
                         </div>
                       </div>
                     </td>
-                    <td className={`${surface.mono} ${tabStyles.hideSm}`}>{v.gstin || '—'}</td>
-                    <td className={tabStyles.hideSm}>{stateByCode(v.state_code)?.name ?? '—'}</td>
+                    <td className={`${surface.mono} ${tabStyles.hideSm}`}>{v.gstin || '-'}</td>
+                    <td className={tabStyles.hideSm}>{stateByCode(v.state_code)?.name ?? '-'}</td>
                     <td className={`${surface.numeric} ${tabStyles.hideSm}`}>{b?.bills ?? 0}</td>
                     <td className={surface.numeric}>{formatCurrency(b?.outstanding ?? 0)}</td>
                     <td>
@@ -214,7 +214,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
           <select id="v-state" className={controls.select} value={draft.state_code ?? ''} onChange={(e) => set({ state_code: e.target.value })}>
             <option value="">{purT('notSpecified')}</option>
             {INDIAN_STATES.map((s) => (
-              <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
+              <option key={s.code} value={s.code}>{s.code} : {s.name}</option>
             ))}
           </select>
         </div>
@@ -280,7 +280,7 @@ function VendorForm({ vendor, onClose, onSaved }: { vendor?: Vendor; onClose: ()
           <div className={controls.field}>
             <label className={controls.label} htmlFor="v-deductee">{o7T('vDeductee')}</label>
             <select id="v-deductee" className={controls.select} value={draft.deductee_type ?? ''} onChange={(e) => set({ deductee_type: (e.target.value || undefined) as DeducteeType | undefined })}>
-              <option value="">{o7T('vDeducteeAuto', { type: deducteeTypeFromPan(draft.pan) ? o7T(`dt${deducteeTypeFromPan(draft.pan)}` as 'dtOTHER') : '—' })}</option>
+              <option value="">{o7T('vDeducteeAuto', { type: deducteeTypeFromPan(draft.pan) ? o7T(`dt${deducteeTypeFromPan(draft.pan)}` as 'dtOTHER') : '-' })}</option>
               {DEDUCTEE_TYPES.map((t) => <option key={t} value={t}>{o7T(`dt${t}` as 'dtOTHER')}</option>)}
             </select>
           </div>

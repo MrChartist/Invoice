@@ -70,7 +70,7 @@ export default function DistOrders({ onDone }: { onDone: (msg: string, error?: b
       <div><button type="button" className={controls.btnOutline} disabled={!text.trim() || !pass || busy} onClick={() => void verify()} data-order-verify>{distT('verify')}</button></div>
       {payload && split && (
         <div className={own.notice} data-order-preview>
-          <p className={own.muted}>{distT('verified', { salesman: payload.salesman.name || '—', n: split.fresh.length, dup: split.duplicates.length })}</p>
+          <p className={own.muted}>{distT('verified', { salesman: payload.salesman.name || '-', n: split.fresh.length, dup: split.duplicates.length })}</p>
           <ul>{split.fresh.map((o) => (
             <li key={o.id}>
               <label className={controls.check}>

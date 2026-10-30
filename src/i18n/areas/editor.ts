@@ -44,7 +44,7 @@ export const edT = defineArea(
     atNet: 'Net payable',
 
     // Document actions
-    daLockedTitle: 'This document is in a locked period — unlock it with your PIN first',
+    daLockedTitle: 'This document is in a locked period: unlock it with your PIN first',
     daReinstate: 'Reinstate',
     daCancel: 'Cancel document',
     daAmendTitle: "Change a document already reported in a filed GSTR-1: reported as B2BA / CDNRA in this month's return",
@@ -135,7 +135,7 @@ export const edT = defineArea(
     ltExpired: ' · EXPIRED',
     ltSerialOut: 'Serial / IMEI for item {n}',
     ltSerialIn: 'Serials returned on item {n}',
-    ltExpiredAlert: 'Batch {batch} expired on {date} — saving will ask you to confirm.',
+    ltExpiredAlert: 'Batch {batch} expired on {date}: saving will ask you to confirm.',
     ltShort: 'Only {n} left in batch {batch}.',
     ltSplit: 'Split across batches (FEFO)',
 
@@ -181,7 +181,7 @@ export const edT = defineArea(
     atCess: 'सेस',
     atNet: 'शुद्ध देय',
 
-    daLockedTitle: 'यह दस्तावेज़ लॉक अवधि में है — पहले अपने PIN से अनलॉक करें',
+    daLockedTitle: 'यह दस्तावेज़ लॉक अवधि में है: पहले अपने PIN से अनलॉक करें',
     daReinstate: 'फिर से चालू करें',
     daCancel: 'दस्तावेज़ रद्द करें',
     daAmendTitle: 'फ़ाइल हो चुके GSTR-1 में रिपोर्ट हुआ दस्तावेज़ बदलें: इस महीने के रिटर्न में B2BA / CDNRA के रूप में रिपोर्ट होता है',
@@ -267,7 +267,7 @@ export const edT = defineArea(
     ltExpired: ' · एक्सपायर्ड',
     ltSerialOut: 'आइटम {n} का सीरियल / IMEI',
     ltSerialIn: 'आइटम {n} पर लौटे सीरियल',
-    ltExpiredAlert: 'बैच {batch} {date} को एक्सपायर हुआ — सेव करते समय पुष्टि पूछी जाएगी।',
+    ltExpiredAlert: 'बैच {batch} {date} को एक्सपायर हुआ: सेव करते समय पुष्टि पूछी जाएगी।',
     ltShort: 'बैच {batch} में केवल {n} बाकी।',
     ltSplit: 'बैचों में बाँटें (FEFO)',
 

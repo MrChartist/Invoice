@@ -26,7 +26,7 @@ import { downloadBlob } from './download';
 /** Store a picked file and return the reference to put on the record. */
 export async function attachFile(file: File): Promise<AttachmentRef> {
   if (file.size > Math.max(MAX_IMAGE_INPUT_BYTES, MAX_PDF_BYTES)) {
-    throw new AttachmentError(`That file is ${formatBytes(file.size)} — too large to keep in the browser.`);
+    throw new AttachmentError(`That file is ${formatBytes(file.size)}: too large to keep in the browser.`);
   }
   const original = new Uint8Array(await file.arrayBuffer());
   const mime = sniffMime(original);

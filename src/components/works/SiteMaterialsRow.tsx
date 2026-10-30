@@ -19,7 +19,7 @@ export default function SiteMaterialsRow({ columns, period, cellClass }: { colum
   return (
     <tr data-site-materials>
       <td className={cellClass}>{twT('siteMaterialsMemo')}</td>
-      {columns.map((c) => <td key={c.key} className={surface.numeric}>{memo.get(c.key) ? fmtMoney(memo.get(c.key) ?? 0) : '—'}</td>)}
+      {columns.map((c) => <td key={c.key} className={surface.numeric}>{memo.get(c.key) ? fmtMoney(memo.get(c.key) ?? 0) : '-'}</td>)}
       <td className={surface.numeric}>{fmtMoney(total)}</td>
     </tr>
   );

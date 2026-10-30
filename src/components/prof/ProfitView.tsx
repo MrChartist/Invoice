@@ -28,7 +28,7 @@ export default function ProfitView() {
   const names = useMemo(() => {
     const m = new Map<string, string>();
     for (const c of localDb.clients.getAll()) if (c.id) m.set(c.id, c.name);
-    for (const c of loadCostCentres()) m.set(c.id, c.ps?.code ? `${c.ps.code} — ${c.name}` : c.name);
+    for (const c of loadCostCentres()) m.set(c.id, c.ps?.code ? `${c.ps.code}: ${c.name}` : c.name);
     for (const e of engs) m.set(e.id, `${e.number} · ${e.title}`);
     return m;
   }, [engs]);

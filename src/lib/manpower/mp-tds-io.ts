@@ -22,7 +22,7 @@ export function clientTds(client: Pick<Client, 'id' | 'name' | 'mp'>, date: stri
   const e = expectedTds({ client, def: { section }, date, base, invoices, ourForm: ourForm as EntityType, excludeId });
   if (!e?.applies || !e.amount) return null;
   const work = section === '194C' ? ruleAt(MANPOWER_WORK_RULES, date) : null;
-  return { section: e.code, rate: e.rate, expected: e.amount, label: work ? `${sectionText(e.code, date)} — supply of manpower is work (from 1 Apr 2026)` : sectionText(e.code, date) };
+  return { section: e.code, rate: e.rate, expected: e.amount, label: work ? `${sectionText(e.code, date)}: supply of manpower is work (from 1 Apr 2026)` : sectionText(e.code, date) };
 }
 
 /** GST TDS u/s 51 hint (2 % above the contract threshold) for a TDS-only Government client; '' otherwise. */

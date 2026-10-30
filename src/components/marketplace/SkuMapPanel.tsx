@@ -71,7 +71,7 @@ export function SkuMapPanel(props: PanelProps & { unmapped: Unmapped }) {
   };
   const itemSelect = (value: string, onChange: (v: string) => void) => (
     <select className={controls.select} value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">—</option>
+      <option value="">-</option>
       {catalogue.map((c) => <option key={c.id} value={c.id}>{c.name}{c.sku ? ` (${c.sku})` : ''}</option>)}
     </select>
   );
@@ -91,7 +91,7 @@ export function SkuMapPanel(props: PanelProps & { unmapped: Unmapped }) {
           <ul className={styles.list}>
             {unmapped.map((u) => (
               <li key={u.sku || u.listingId}>
-                <span className={surface.mono}>{u.sku || u.listingId}</span> {u.title ? `— ${u.title}` : ''} ×{u.count}{' '}
+                <span className={surface.mono}>{u.sku || u.listingId}</span> {u.title ? `(${u.title})` : ''} ×{u.count}{' '}
                 <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={() => setForm({ sku: u.sku, listing: u.listingId ?? '', item: '', qty: '1' })}>{mT('map')}</button>
                 <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={() => createItem(u)}>{mT('createItem')}</button>
               </li>
@@ -120,8 +120,8 @@ export function SkuMapPanel(props: PanelProps & { unmapped: Unmapped }) {
                   <td><input type="checkbox" checked={m.pick} disabled={!m.item_id} onChange={() => setMatches(matches.map((x, j) => (j === i ? { ...x, pick: !x.pick } : x)))} /></td>
                   <td className={surface.mono}>{m.sku}</td>
                   <td className={surface.mono}>{m.listing_id ?? ''}</td>
-                  <td>{m.item_id ? byId.get(m.item_id)?.name : '—'}</td>
-                  <td>{m.how ? mT(`how.${m.how}`) : '—'}</td>
+                  <td>{m.item_id ? byId.get(m.item_id)?.name : '-'}</td>
+                  <td>{m.how ? mT(`how.${m.how}`) : '-'}</td>
                 </tr>
               ))}
             </tbody>
@@ -138,7 +138,7 @@ export function SkuMapPanel(props: PanelProps & { unmapped: Unmapped }) {
                 <tr key={r.id}>
                   <td className={surface.mono}>{r.channel_sku}</td>
                   <td className={surface.mono}>{r.listing_id ?? ''}</td>
-                  <td>{byId.get(r.item_id)?.name ?? '—'}</td>
+                  <td>{byId.get(r.item_id)?.name ?? '-'}</td>
                   <td className={surface.numeric}>{r.qty_per_unit}</td>
                   <td><button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={() => { try { removeSkuRow(r.id); setTick((n) => n + 1); } catch (err) { notify(errText(err), 'error'); } }}>{mT('remove')}</button></td>
                 </tr>

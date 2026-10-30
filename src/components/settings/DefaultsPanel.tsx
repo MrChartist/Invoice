@@ -29,7 +29,7 @@ export function DefaultsPanel({ settings, onChange }: Props) {
               <select className={controls.select} value={settings.defaultCurrency} onChange={(e) => onChange({ defaultCurrency: e.target.value })}>
                 {CURRENCIES.map((c) => (
                   <option key={c.code} value={c.code}>
-                    {c.symbol} {c.code} — {c.label}
+                    {c.symbol} {c.code} : {c.label}
                   </option>
                 ))}
               </select>

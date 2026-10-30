@@ -24,7 +24,7 @@ export const GV_METHOD = 'Gift voucher';
 /** User ledgers created on first use (looked up by name). */
 export const GV_LIABILITY_ACCOUNT = 'Gift vouchers outstanding';
 export const GV_BREAKAGE_ACCOUNT = 'Unredeemed voucher income';
-export const GV_CA_NOTE = 'Gift vouchers: no invoice and no GST on the sale (Circular 243/37/2024-GST); GST on the goods / services at redemption; breakage is not a supply. Working paper — verify with your CA.';
+export const GV_CA_NOTE = 'Gift vouchers: no invoice and no GST on the sale (Circular 243/37/2024-GST); GST on the goods / services at redemption; breakage is not a supply. Working paper: verify with your CA.';
 
 export const DEFAULT_GV_SETTINGS: GiftVoucherSettings = { validity_months: 12, allow_partial: true, prefix: GV_PREFIX };
 
@@ -199,7 +199,7 @@ export function applyPromoDiscount(rec: InvoiceRecord, amount: number): { record
  */
 export function promoVoucherIssue(applied: readonly { promo?: boolean }[], next?: { promo?: boolean }): string {
   const n = applied.filter((a) => a.promo).length + (next?.promo ? 1 : 0);
-  return n > 1 ? 'One promotional voucher per bill — remove the other one first.' : '';
+  return n > 1 ? 'One promotional voucher per bill: remove the other one first.' : '';
 }
 
 /* ── Live reads and the counter's writes ──────────────────────── */

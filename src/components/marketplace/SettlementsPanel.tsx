@@ -167,7 +167,7 @@ export function SettlementsPanel(props: PanelProps) {
                   <td>{s.deposit_date}</td>
                   <td className={surface.numeric}>{fmtMoney(s.payout)}</td>
                   <td>{s.posted ? mT('stPosted') : mT('stNotPosted')}</td>
-                  <td className={surface.numeric}>{s.posted ? fmtMoney(settlementClearing(s)) : '—'}</td>
+                  <td className={surface.numeric}>{s.posted ? fmtMoney(settlementClearing(s)) : '-'}</td>
                   <td className={surface.rowActions}>
                     {!s.posted && <button type="button" className={`${controls.btn} ${controls.btnPrimary} ${controls.btnSm}`} onClick={() => act(() => postSettlement(s.id, { feeInvoiceReceived: feeInv, bankAccountId: bankId }))} data-mkt-post>{mT('stPost')}</button>}
                     {!s.posted && <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={() => act(() => deleteSettlement(s.id))}>{mT('stDelete')}</button>}
@@ -213,7 +213,7 @@ export function SettlementsPanel(props: PanelProps) {
                     <td className={surface.numeric}>{fmtMoney(o.invoice_value)}</td><td className={surface.numeric}>{fmtMoney(o.sale)}</td>
                     <td className={surface.numeric}>{fmtMoney(o.fees + o.gst_on_fees)}</td><td className={surface.numeric}>{fmtMoney(o.tcs)}</td>
                     <td className={surface.numeric}>{fmtMoney(o.tds)}</td><td className={surface.numeric}>{fmtMoney(o.net)}</td>
-                    <td className={surface.numeric}>{o.settled_pct ?? '—'}</td><td>{mT(`os.${o.status}`)}</td>
+                    <td className={surface.numeric}>{o.settled_pct ?? '-'}</td><td>{mT(`os.${o.status}`)}</td>
                   </tr>
                 ))}
               </tbody>

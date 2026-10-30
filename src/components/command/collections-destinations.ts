@@ -10,7 +10,7 @@ const pT = defineArea(
     terms: 'Payment terms master',
     schedule: 'Reminder schedule and templates',
     group: 'Collections',
-    netting: 'Netting — set off a customer who is also a supplier',
+    netting: 'Netting: set off a customer who is also a supplier',
   } as const,
   {
     followups: 'वसूली फ़ॉलो-अप (भुगतान वादे)',
@@ -18,7 +18,7 @@ const pT = defineArea(
     terms: 'भुगतान शर्तें मास्टर',
     schedule: 'रिमाइंडर अनुसूची और टेम्पलेट',
     group: 'वसूली',
-    netting: 'आपसी समायोजन (नेटिंग) — ग्राहक जो आपूर्तिकर्ता भी है',
+    netting: 'आपसी समायोजन (नेटिंग): ग्राहक जो आपूर्तिकर्ता भी है',
   },
 );
 

@@ -112,7 +112,7 @@ test('Breakage / Expiry Issue: one debit note per bill, one claim per supplier, 
   const beta = claims.find((c) => c.vendor_name === 'Beta Distributors')!;
   assert.throws(() => claimsDb.decide(beta.id, 'rejected', { on: '2026-05-20' }), /remark/);
   claimsDb.decide(beta.id, 'rejected', { remarks: 'Past return window', on: '2026-05-20' });
-  assert.ok(audit.all().some((r) => /Expiry claim .* rejected — Past return window/.test(r.summary)));
+  assert.ok(audit.all().some((r) => /Expiry claim .* rejected: Past return window/.test(r.summary)));
   as('viewer');
   assert.throws(() => createBrkExpIssue(rows, '2026-05-10', { createNote: (d) => purchaseReturnsDb.create(d) }), isAccessDeniedError);
 });

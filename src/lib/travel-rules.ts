@@ -26,9 +26,9 @@ export interface TvRegimeRule {
   decl: string;
 }
 
-const TO5_DECL = 'Tour operator service — the amount is the gross amount charged including accommodation and transportation; GST 5 % without ITC (N 11/2017-CT(R) Sl. 23(ii)). Verify with your CA.';
+const TO5_DECL = 'Tour operator service: the amount is the gross amount charged including accommodation and transportation; GST 5 % without ITC (N 11/2017-CT(R) Sl. 23(ii)). Verify with your CA.';
 const AGENT_DECL = 'Fares / hotel / visa fees recovered at actual as a pure agent (Rule 33). Verify with your CA.';
-const EXEMPT_DECL = 'Exempt — tour operator service to a foreign tourist for a tour wholly outside India (entry to confirm). Verify with your CA.';
+const EXEMPT_DECL = 'Exempt: tour operator service to a foreign tourist for a tour wholly outside India (entry to confirm). Verify with your CA.';
 const REGIMES: Readonly<Record<TvRegime, TvRegimeRule>> = {
   to5: { rate: 5, sac: '998555', itc: 'blocked', decl: TO5_DECL },
   to18: { rate: 18, sac: '998555', itc: 'allowed', decl: '' },
@@ -74,7 +74,7 @@ export const TOUR_PACKAGE_TCS_RULES: readonly TvRule<TourTcsRule>[] = [
   { from: '2020-10-01', value: { rate: 5 }, source: 'Finance Act 2020, Sec 206C(1G)(b): 5 %, no threshold (as reported; TV2)', verified: false },
   { from: '2023-10-01', value: { slabs: [{ upTo: 700000, rate: 5 }, { rate: 20 }] }, source: 'Finance Act 2023: 5 % up to ₹7 lakh per buyer per FY, 20 % above (as reported; TV2)', verified: false },
   { from: '2025-04-01', value: { slabs: [{ upTo: 1000000, rate: 5 }, { rate: 20 }] }, source: 'Finance Act 2025: threshold ₹10 lakh per buyer per FY (restated as current in the Memorandum to the Finance Bill 2026; TV2)', verified: false },
-  { from: '2026-04-01', value: { rate: 2 }, source: 'Income-tax Act 2025 Sec 394(1) Table Sl. No. 8 — Finance Bill 2026 cl. 73(f), Memorandum ¶8; the enacted Act not read (TV1)', verified: false },
+  { from: '2026-04-01', value: { rate: 2 }, source: 'Income-tax Act 2025 Sec 394(1) Table Sl. No. 8: Finance Bill 2026 cl. 73(f), Memorandum ¶8; the enacted Act not read (TV1)', verified: false },
 ];
 
 /** D1: rate without the buyer's PAN — at least `floor` %, or the higher of twice the rate and `floor` when `twice`. */

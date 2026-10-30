@@ -68,7 +68,7 @@ export function stateByName(name?: string): IndianState | undefined {
 /** "27" -> "27 — Maharashtra" for display on the invoice's Place of Supply line. */
 export function formatPlaceOfSupply(code?: string): string {
   const st = stateByCode(code);
-  return st ? `${st.code} — ${st.name}` : '';
+  return st ? `${st.code} (${st.name})` : '';
 }
 
 /** Resolve a state code from either an explicit code, a GSTIN, or a state name. */

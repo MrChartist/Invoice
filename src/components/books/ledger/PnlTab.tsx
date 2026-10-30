@@ -155,7 +155,7 @@ function PnlRoot({ ledger, period, stock, onStockChanged, notify }: Props) {
 
   const csv = () =>
     toCsv([
-      ['Trading and Profit & Loss account', `${period.start} to ${period.end}`, 'Working paper — verify with your CA'],
+      ['Trading and Profit & Loss account', `${period.start} to ${period.end}`, 'Working paper: verify with your CA'],
       ['Side', 'Particulars', 'Amount', ...(compare ? ['Previous period'] : [])],
       ...([['Dr', s.tradingDr], ['Cr', s.tradingCr], ['Dr', s.pnlDr], ['Cr', s.pnlCr]] as const).flatMap(([side, lines]) =>
         lines.map((l) => [side, `${'  '.repeat(l.depth)}${l.label}`, l.amount / 100, ...(compare ? [(l.prev ?? 0) / 100] : [])]),

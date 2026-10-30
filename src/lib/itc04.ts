@@ -193,13 +193,13 @@ export function buildItc04(outs: readonly MaterialOut[], ins: readonly MaterialI
 /** Table 4 and Table 5 as CSV (one file, a header row per table). */
 export function itc04Csv(r: Itc04Report): string {
   const t4 = [
-    ['Table 4 — goods sent to job worker'],
+    ['Table 4: goods sent to job worker'],
     ['Challan no', 'Challan date', 'Job worker GSTIN', 'State', 'Description', 'HSN', 'UQC', 'Quantity', 'Taxable value', 'Type of goods', 'Rate %', 'IGST', 'CGST', 'SGST'],
     ...r.table4.map((x) => [x.challan_no, x.challan_date, x.jw_gstin, x.jw_state, x.item, x.hsn, x.uqc, x.qty, x.taxable_value, x.goods_type, x.rate, x.igst, x.cgst, x.sgst]),
   ];
   const t5 = [
     [],
-    ['Table 5 — goods received back / supplied from job worker'],
+    ['Table 5: goods received back / supplied from job worker'],
     ['Table', 'Job worker GSTIN', 'State', 'Job worker challan / invoice', 'Date', 'Original challan', 'Original date', 'Description', 'UQC', 'Quantity', 'Nature of job work', 'Losses / wastes qty', 'Via job worker'],
     ...r.table5.map((x) => [x.table, x.jw_gstin, x.jw_state, x.jw_challan_no, x.jw_challan_date, x.original_challan_no, x.original_challan_date, x.item, x.uqc, x.qty, x.nature, x.loss_qty, x.via ?? '']),
     [],

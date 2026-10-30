@@ -211,7 +211,7 @@ export function ClientFormModal({ open, client, onClose, onSaved }: ClientFormMo
               <option value="">{salesT('cf.selectState')}</option>
               {INDIAN_STATES.map((s) => (
                 <option key={s.code} value={s.code}>
-                  {s.code} — {s.name}
+                  {s.code} : {s.name}
                 </option>
               ))}
             </select>

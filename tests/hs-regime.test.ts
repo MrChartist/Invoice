@@ -26,7 +26,7 @@ test('limit by date: ₹5,000 to 24 Jan 2018, ₹7,500 from 25 Jan 2018; rows so
 test('₹7,500.00 exempt (Bill of Supply, Sl. 77(c) sentence); ₹7,500.01 taxable on the whole amount (tax invoice, 18 %)', () => {
   const ex = hsRegime({ ...base, rows: [R('svc', 'service', 7500)] });
   assert.deepEqual([ex.regime, ex.doc, ex.counted, ex.rate], ['exempt77c', 'BILL_OF_SUPPLY', 7500, 0 + 18]);
-  assert.match(ex.decl, /^Exempt — contribution by a member .* up to ₹7,500 a month \(N 12\/2017-CT\(R\) Sl\. 77\(c\)\).*Verify with your CA\.$/);
+  assert.match(ex.decl, /^Exempt: contribution by a member .* up to ₹7,500 a month \(N 12\/2017-CT\(R\) Sl\. 77\(c\)\).*Verify with your CA\.$/);
   const tx = hsRegime({ ...base, rows: [R('svc', 'service', 7500.01)] });
   assert.deepEqual([tx.regime, tx.doc], ['taxable_whole', 'TAX_INVOICE']);
   assert.match(tx.decl, /exceeds ₹7,500: GST on the whole amount \(Circular 109\/28\/2019-GST\)/);
@@ -50,7 +50,7 @@ test('excess (setting): an exempt line for ₹7,500 × months, the rest apportio
   const rows = [R('svc', 'service', 3000), R('snk', 'sinking', 1250), R('rep', 'repair', 3750), R('prk', 'parking', 1000), R('edu', 'education', 10), R('ptx', 'statutory', 3000)];
   const r = hsRegime({ ...base, rows, valuation: 'excess' });
   assert.equal(r.regime, 'taxable_excess');
-  assert.match(r.decl, /above ₹7,500 a month \(Madras High Court, 2021 — under appeal\)/);
+  assert.match(r.decl, /above ₹7,500 a month \(Madras High Court, 2021: under appeal\)/);
   const lines = regimeLines(rows, r);
   assert.deepEqual(lines[0], { name: 'Exempt contribution (Sl. 77(c), ₹7,500 × 1)', amount: 7500, tax: 0, exempt: true });
   const taxed = lines.filter((l) => l.tax === 18);

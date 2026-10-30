@@ -56,7 +56,7 @@ export default function RateChartsView({ onDone }: { onDone: Done }) {
           <thead><tr><th>{bT('name')}</th><th>{bT('milk')}</th><th>{bT('basis')}</th><th>{bT('from')}</th><th>{bT('to')}</th><th /></tr></thead>
           <tbody>{charts.map((x) => (
             <tr key={x.id}>
-              <td>{x.name}{x.buyer_id ? ` · ${bT('buyerChart')}` : ''}</td><td>{bT(`milk.${x.milk}`)}</td><td>{bT(`basis.${x.basis}`)} / {x.unit}</td><td>{x.effective_from}</td><td>{x.effective_to ?? '—'}</td>
+              <td>{x.name}{x.buyer_id ? ` · ${bT('buyerChart')}` : ''}</td><td>{bT(`milk.${x.milk}`)}</td><td>{bT(`basis.${x.basis}`)} / {x.unit}</td><td>{x.effective_from}</td><td>{x.effective_to ?? '-'}</td>
               <td>
                 {x.matrix && <button type="button" className={sm} onClick={() => downloadTextFile(`${x.name}.csv`, matrixCsv(x.matrix!))}>CSV</button>}
                 <button type="button" className={sm} onClick={() => run(() => { deleteChart(x.id); return bT('deleted'); })}>{bT('delete')}</button>

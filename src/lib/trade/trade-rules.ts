@@ -12,13 +12,13 @@ import { ruleAt, todayIso, type Versioned } from '../tax-rules';
  * for exports made from the RBI amendment of November 2025. The exact notification date / number is an open point.
  */
 export const EXPORT_REALISATION_MONTHS_RULES: readonly Versioned<number>[] = [
-  { from: '2013-04-01', value: 9, source: 'RBI Master Direction — Export of Goods and Services (9 months) — verify' },
-  { from: '2025-11-13', value: 15, source: 'RBI FEMA (Export of Goods & Services) amendment, Nov 2025 (15 months) — verify the date' },
+  { from: '2013-04-01', value: 9, source: 'RBI Master Direction: Export of Goods and Services (9 months), verify' },
+  { from: '2025-11-13', value: 15, source: 'RBI FEMA (Export of Goods & Services) amendment, Nov 2025 (15 months): verify the date' },
   // QA17 R9: FEMA 23(R)/(8)/2026-RB (First Amendment Regulations 2026, Reg 9), in force 5 Jun 2026: back to 9 months.
-  { from: '2026-06-05', value: 9, source: 'FEMA 23(R)/(8)/2026-RB of 5 Jun 2026 (9 months) — taxmann; verify the transition (PS15)' },
+  { from: '2026-06-05', value: 9, source: 'FEMA 23(R)/(8)/2026-RB of 5 Jun 2026 (9 months): taxmann; verify the transition (PS15)' },
   // R14 PS-C2 (PS15 / X1): FEMA (Export and Import of Goods and Services) Regulations 2026 in force 1 Oct 2026; services
   // count from the invoice date (Reg 5(1)(a)). Goods exports read the same row.
-  { from: '2026-10-01', value: 9, source: 'FEMA 23(R)/2026-RB Reg 5(1)(a), as amended by FEMA 23(R)(1)/2026-RB of 22 Sep 2026 — verify transition (PS15)' },
+  { from: '2026-10-01', value: 9, source: 'FEMA 23(R)/2026-RB Reg 5(1)(a), as amended by FEMA 23(R)(1)/2026-RB of 22 Sep 2026: verify transition (PS15)' },
 ];
 export const exportRealisationMonths = (shipDate?: string): number => ruleAt(EXPORT_REALISATION_MONTHS_RULES, shipDate);
 
@@ -27,7 +27,7 @@ export const exportRealisationMonths = (shipDate?: string): number => ruleAt(EXP
  * first row the foreign-currency rule above applies.
  */
 export const EXPORT_REALISATION_INR_MONTHS_RULES: readonly Versioned<number>[] = [
-  { from: '2026-10-01', value: 12, source: 'FEMA 23(R)/2026-RB Reg 5(1) first proviso, as amended 22 Sep 2026 — verify (PS15)' },
+  { from: '2026-10-01', value: 12, source: 'FEMA 23(R)/2026-RB Reg 5(1) first proviso, as amended 22 Sep 2026: verify (PS15)' },
 ];
 export const exportRealisationInrMonths = (date?: string): number =>
   (date || todayIso()) >= EXPORT_REALISATION_INR_MONTHS_RULES[0].from ? ruleAt(EXPORT_REALISATION_INR_MONTHS_RULES, date) : exportRealisationMonths(date);
@@ -35,14 +35,14 @@ export const exportRealisationInrMonths = (date?: string): number =>
 /** Social Welfare Surcharge, % of basic customs duty (Finance Act 2018, from 2 Feb 2018). Per-tariff exemptions are typed per line. */
 export const CUSTOMS_SWS_PCT_RULES: readonly Versioned<number>[] = [
   { from: '2000-01-01', value: 0 },
-  { from: '2018-02-02', value: 10, source: 'Sec 110, Finance Act 2018 — verify exemptions per tariff line' },
+  { from: '2018-02-02', value: 10, source: 'Sec 110, Finance Act 2018: verify exemptions per tariff line' },
 ];
 export const customsSwsPct = (date?: string): number => ruleAt(CUSTOMS_SWS_PCT_RULES, date);
 
 /** Landing charge added to CIF for the assessable value (old Rule 10(2) proviso: 1%; omitted from late 2017). */
 export const CUSTOMS_LANDING_CHARGE_PCT_RULES: readonly Versioned<number>[] = [
-  { from: '2000-01-01', value: 1, source: 'Customs Valuation Rules 2007, Rule 10(2) — verify' },
-  { from: '2017-09-26', value: 0, source: 'Notification 91/2017-Customs (N.T.) as understood — verify the date' },
+  { from: '2000-01-01', value: 1, source: 'Customs Valuation Rules 2007, Rule 10(2): verify' },
+  { from: '2017-09-26', value: 0, source: 'Notification 91/2017-Customs (N.T.) as understood: verify the date' },
 ];
 export const customsLandingChargePct = (date?: string): number => ruleAt(CUSTOMS_LANDING_CHARGE_PCT_RULES, date);
 
@@ -58,7 +58,7 @@ export interface CustomsIgstBase {
   roundRupee: boolean;
 }
 export const CUSTOMS_IGST_BASE_RULES: readonly Versioned<CustomsIgstBase>[] = [
-  { from: '2017-07-01', value: { includeOther: true, roundRupee: true }, source: 'Sec 3(8), (9) Customs Tariff Act; Sec 154A Customs Act — verify' },
+  { from: '2017-07-01', value: { includeOther: true, roundRupee: true }, source: 'Sec 3(8), (9) Customs Tariff Act; Sec 154A Customs Act: verify' },
 ];
 export const customsIgstBase = (date?: string): CustomsIgstBase => ruleAt(CUSTOMS_IGST_BASE_RULES, date);
 

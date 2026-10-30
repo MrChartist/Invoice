@@ -44,7 +44,7 @@ export function chargeLine(job: Pick<AlterationJob, 'number' | 'garment' | 'char
   const charge = round2(num(job.charge));
   if (charge <= 0) return null;
   const r = alterationRule(date);
-  return { id, name: `Alteration — ${job.garment}`, description: job.number, type: 'Service', hsn: r.sac, unit: 'NOS', quantity: 1, rate: charge, tax_rate: r.rate, discount_percent: 0, amount: charge };
+  return { id, name: `Alteration: ${job.garment}`, description: job.number, type: 'Service', hsn: r.sac, unit: 'NOS', quantity: 1, rate: charge, tax_rate: r.rate, discount_percent: 0, amount: charge };
 }
 
 /** Jobs whose charge is on a (not cancelled) bill: a line that names the slip number. */
@@ -79,7 +79,7 @@ export function tailorJobs(jobs: readonly AlterationJob[], tailorId: string, fro
 }
 
 export function tailorBillLines(jobs: readonly AlterationJob[], newId: () => string): PurchaseLine[] {
-  return jobs.map((j) => ({ id: newId(), name: `${j.number} — ${j.garment}`, quantity: 1, rate: round2(num(j.tailor_rate)), tax_rate: 0, unit: 'NOS', hsn: alterationRule(j.date).sac }));
+  return jobs.map((j) => ({ id: newId(), name: `${j.number}: ${j.garment}`, quantity: 1, rate: round2(num(j.tailor_rate)), tax_rate: 0, unit: 'NOS', hsn: alterationRule(j.date).sac }));
 }
 
 /** Due today or earlier and not ready yet (the POS header count). */
@@ -170,7 +170,7 @@ export async function makeTailorBill(tailor: { id: string; name: string }, from:
   const draft = draftsDb.save({
     kind: 'EXPENSE', vendor_id: tailor.id, vendor_name: tailor.name, bill_number: `${RT_SERIES.alterations} ${from} – ${to}`, date: to, category: 'Tailoring charges',
     lines, taxable: total, cgst: 0, sgst: 0, igst: 0, total, amount_paid: 0, itc_eligible: false,
-    notes: 'Tailor\'s alteration jobs (draft) — no GST charged by an unregistered tailor; verify with your CA (RT3).',
+    notes: 'Tailor\'s alteration jobs (draft): no GST charged by an unregistered tailor; verify with your CA (RT3).',
     draft: { source: 'manual', created_at: new Date().toISOString() },
   });
   const ids = new Set(jobs.map((j) => j.id));

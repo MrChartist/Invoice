@@ -54,7 +54,7 @@ export function RetentionPanel({ notify, refresh, tick }: PanelProps) {
                   <td>{b.client?.name}</td>
                   <td className={`${surface.numeric} ${own.due}`} data-ra-due>{fmtMoney(split.dueNow)}</td>
                   <td>
-                    {split.held.length === 0 ? '—' : split.held.map((h) => (
+                    {split.held.length === 0 ? '-' : split.held.map((h) => (
                       <div key={h.kind} className={styles.toolbar}>
                         <span className={own.held} data-ra-held={h.kind}>{h.label}: {fmtMoney(h.amount)}{h.release_on ? ` · ${twT('releaseOn')} ${h.release_on}` : ''}</span>
                         {CLEARING_KINDS.includes(h.kind as RaDeductionKind) && <button type="button" className={B.gs} onClick={() => run(() => recordDeductionRow(b.id, h.kind as ClearingKind, { date: f.day }))}>{twT('recordDeducted')}</button>}

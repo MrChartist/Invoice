@@ -31,7 +31,7 @@ export default function IncentivesTab({ rows, notify, changed }: { rows: Realisa
   const [day, setDay] = useState(todayInput());
   const [scripNo, setScripNo] = useState('');
   const canBooks = can('books.edit');
-  const numberOf = (id: string) => rows.find((r) => r.invoiceId === id)?.number ?? '—';
+  const numberOf = (id: string) => rows.find((r) => r.invoiceId === id)?.number ?? '-';
   const run = (fn: () => string | void) => {
     try {
       const msg = fn();
@@ -51,7 +51,7 @@ export default function IncentivesTab({ rows, notify, changed }: { rows: Realisa
           <thead><tr><th>{trT('incTotals')}</th><th className={styles.num}>{trT('incClaimed')}</th><th className={styles.num}>{trT('incCredited')}</th><th className={styles.num}>{trT('incReceivable')}</th><th className={styles.num}>{trT('incScripBalance')}</th></tr></thead>
           <tbody>
             {INCENTIVE_KINDS.map((k) => (
-              <tr key={k}><td>{trT(`k_${k}`)}</td><td className={styles.num}>{money(totals[k].claimed)}</td><td className={styles.num}>{money(totals[k].credited)}</td><td className={styles.num}>{money(totals[k].receivable)}</td><td className={styles.num}>{k === 'rodtep' ? money(totals[k].scripBalance) : '—'}</td></tr>
+              <tr key={k}><td>{trT(`k_${k}`)}</td><td className={styles.num}>{money(totals[k].claimed)}</td><td className={styles.num}>{money(totals[k].credited)}</td><td className={styles.num}>{money(totals[k].receivable)}</td><td className={styles.num}>{k === 'rodtep' ? money(totals[k].scripBalance) : '-'}</td></tr>
             ))}
           </tbody>
         </table>
@@ -101,8 +101,8 @@ export default function IncentivesTab({ rows, notify, changed }: { rows: Realisa
                     <td className={styles.num}>{money(f.claimed)}</td>
                     <td className={styles.num}>{money(f.credited)}{r.credited_on ? <div className={styles.muted}>{formatDate(r.credited_on)}</div> : null}</td>
                     <td className={styles.num}>{money(f.receivable)}</td>
-                    <td>{r.scrip_no ?? '—'}</td>
-                    <td className={styles.num}>{r.kind === 'rodtep' ? money(f.scripBalance) : '—'}</td>
+                    <td>{r.scrip_no ?? '-'}</td>
+                    <td className={styles.num}>{r.kind === 'rodtep' ? money(f.scripBalance) : '-'}</td>
                     <td>
                       {canBooks && !r.claim_voucher_id && <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => run(() => trT('incPosted', { number: voucherNo(postIncentiveClaim(r.id, r.date, numberOf(r.invoice_id)).claim_voucher_id) }))}>{trT('incPostClaim')}</button>}
                       {canBooks && f.receivable > 0.005 && <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => { setActing({ id: r.id, mode: 'credit' }); setAmount(f.receivable); }}>{trT('incCredit')}</button>}

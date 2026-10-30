@@ -41,7 +41,7 @@ export function addStarter(key: string, milk: 'cow' | 'buffalo' = 'buffalo', dat
   if (!s) throw new Error('Unknown product.');
   const product = itemFor(s.name, s.unit, s.hsn, s.cls, starterRate(s, date)?.rate);
   const outputs = s.by ? [{ id: generateId(), item_id: itemFor(s.by.name, s.by.unit, '0404'), qty: s.by.qty, kind: 'by_product' as const, rate: s.by.rate }] : [];
-  return bomsDb.save({ item_id: product, name: 'Starter (practice — adjust)', batch_qty: 1, components: [{ id: generateId(), item_id: milkItemId(milk), qty: s.milkL }], outputs, notes: 'Typical yield — adjust to your own (AG-B5).' }, stockDb.items());
+  return bomsDb.save({ item_id: product, name: 'Starter (practice: adjust)', batch_qty: 1, components: [{ id: generateId(), item_id: milkItemId(milk), qty: s.milkL }], outputs, notes: 'Typical yield: adjust to your own (AG-B5).' }, stockDb.items());
 }
 
 /** Fat memo: kg fat in the milk used vs kg fat in the products made (and the loss). */

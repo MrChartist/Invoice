@@ -29,7 +29,7 @@ export default function ServiceRecipeRow({ item, onChange }: { item: StockItem; 
       {lines.map((l, n) => (
         <div key={n} className={controls.row}>
           <select className={controls.select} value={l.item_id} onChange={(e) => put(lines.map((x, i) => (i === n ? { ...x, item_id: e.target.value } : x)))} aria-label={`${mcT('product')} ${n + 1}`} data-sv-recipe-product={n}>
-            <option value="">—</option>
+            <option value="">-</option>
             {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
           <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={l.qty} onChange={(e) => put(lines.map((x, i) => (i === n ? { ...x, qty: e.target.value } : x)))} aria-label={`${mcT('recipeQty')} ${n + 1}`} data-sv-recipe-qty={n} />

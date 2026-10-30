@@ -79,14 +79,14 @@ export default function MatrixEntryDialog<L extends AnyLine>({ open, onClose, li
   const set = (key: string, patch: { qty?: number; rate?: number }) => setCells((c) => ({ ...c, [key]: { ...c[key], ...patch, qty: patch.qty ?? c[key]?.qty ?? 0 } }));
 
   return (
-    <Modal open={open} onClose={onClose} size="lg" title={<><Boxes size={16} aria-hidden="true" /> {rtcT('gridTitle')}{parent ? ` — ${parent.name}` : ''}</>}
+    <Modal open={open} onClose={onClose} size="lg" title={<><Boxes size={16} aria-hidden="true" /> {rtcT('gridTitle')}{parent ? `: ${parent.name}` : ''}</>}
       footer={<><span className={controls.hint}>{rtcT('gridTotal', { n: total })}</span><button type="button" className={controls.btnOutline} onClick={onClose}>✕</button><button type="button" className={controls.btnPrimary} disabled={!parent} onClick={apply} data-grid-apply>{rtcT('gridApply')}</button></>}>
       {parents.length === 0 ? <p className={controls.hint}>{rtcT('gridNoStyle')}</p> : (
         <>
           <div className={controls.row} style={{ flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
             <label className={controls.field}><span className={controls.label}>{rtcT('gridStyle')}</span>
               <select className={controls.select} value={parent?.id ?? ''} onChange={(e) => setPid(e.target.value)} data-grid-style>
-                <option value="">—</option>
+                <option value="">-</option>
                 {parents.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </label>
@@ -122,7 +122,7 @@ export function GridTables<C extends { key: string; attrs: Record<string, string
         <div className={surface.tableWrap} key={tv}>
           {tabAx && <strong>{tabAx.name}: {tv}</strong>}
           <table className={surface.table} data-grid-table>
-            <thead><tr><th>{rowAx.name}</th>{cols.map((c) => <th key={c} className={surface.numeric}>{c || '—'}</th>)}</tr></thead>
+            <thead><tr><th>{rowAx.name}</th>{cols.map((c) => <th key={c} className={surface.numeric}>{c || '-'}</th>)}</tr></thead>
             <tbody>
               {rowAx.values.map((r) => (
                 <tr key={r}>

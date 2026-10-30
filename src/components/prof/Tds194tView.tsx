@@ -27,7 +27,7 @@ export default function Tds194tView({ ctx }: { ctx: PsDeskCtx }) {
         </Fld>
         <Fld l={fdT('kind')}>
           <select className={controls.select} value={f.partner} onChange={(e) => setF({ ...f, partner: e.target.value })} data-ps="t-partner">
-            <option value="">—</option>{data.partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            <option value="">-</option>{data.partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Fld>
         <Fld l={fdT('credit')}>
@@ -38,8 +38,8 @@ export default function Tds194tView({ ctx }: { ctx: PsDeskCtx }) {
         <button type="button" className={controls.btnPrimary} onClick={() => ctx.run(() => { const r = creditPartner({ partnerId: f.partner, kind: f.kind, amount: f.amount, date: f.date }); return r.tds ? `${fdT('tds')}: ${inr(r.tds)}` : fdT('saved'); })} data-ps-b="t-credit">{fdT('post')}</button>
       </div>
       <p className={controls.hint}>{fdT('note194t')} {sectionText('194T', f.date)}</p>
-      <Tbl empty={fdT('none')} head={[fdT('name'), fdT('total'), fdT('tds'), fdT('due')]} rows={reg.map((r) => [r.partner.name, inr(r.total), inr(r.tds), r.credits.filter((c) => c.due).map((c) => c.due).join(', ') || '—'])} />
-      <Tbl empty="" head={[fdT('date'), fdT('name'), fdT('credit'), fdT('amount'), fdT('tds'), '']} rows={credits.map((c) => [c.date, data.partners.find((p) => p.id === c.partner_id)?.name ?? '—', fdT(`k.${c.credit_kind ?? 'remuneration'}`), inr(c.amount ?? 0), inr(c.tds ?? 0),
+      <Tbl empty={fdT('none')} head={[fdT('name'), fdT('total'), fdT('tds'), fdT('due')]} rows={reg.map((r) => [r.partner.name, inr(r.total), inr(r.tds), r.credits.filter((c) => c.due).map((c) => c.due).join(', ') || '-'])} />
+      <Tbl empty="" head={[fdT('date'), fdT('name'), fdT('credit'), fdT('amount'), fdT('tds'), '']} rows={credits.map((c) => [c.date, data.partners.find((p) => p.id === c.partner_id)?.name ?? '-', fdT(`k.${c.credit_kind ?? 'remuneration'}`), inr(c.amount ?? 0), inr(c.tds ?? 0),
         <button key="u" type="button" className={sm} onClick={() => ctx.run(() => undoPartnerRun(c.id))}>{fdT('undo')}</button>])} />
     </>
   );

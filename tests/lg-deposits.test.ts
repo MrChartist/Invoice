@@ -32,7 +32,7 @@ afterEach(() => thawDate());
 test('the deposit input: 0 %, pass-through, the job in lg and the description', () => {
   const i = depositInput({ id: 'j', number: 'JOB/FY26-27/0002' }, { name: 'X' }, '27', { amount: 200000.004, date: D, method: '' });
   assert.deepEqual([i.tax_rate, i.amount, i.method, i.booking, i.lg, i.place_of_supply], [0, 200000, 'Bank transfer', { pass_through: true }, { job_id: 'j' }, '27']);
-  assert.equal(i.description, `${DEPOSIT_TEXT} — job JOB/FY26-27/0002`);
+  assert.equal(i.description, `${DEPOSIT_TEXT}: job JOB/FY26-27/0002`);
   assert.equal(applyAmount(200000, 204510), 200000);
   assert.equal(applyAmount(50000, 4510), 4510);
 });
@@ -68,7 +68,7 @@ test('another job: the excess deposit is refunded with the job in the narration'
   addDisbursement({ job, kind: 'duty', payee: 'Customs', amount: 45000, date: D, in_client_name: true });
   const dep = loadDeposits()[0];
   const r = refundDeposit({ ...dep, open: 5000 }, job.number, D, 'Bank transfer');
-  assert.deepEqual([r.amount, r.number, r.note], [5000, 'RFV/FY26-27/0001', `Excess duty deposit — job ${job.number}`]);
+  assert.deepEqual([r.amount, r.number, r.note], [5000, 'RFV/FY26-27/0001', `Excess duty deposit: job ${job.number}`]);
   assert.deepEqual([loadDeposits()[0].refunded, loadDeposits()[0].open], [5000, 45000]);
   assert.equal(loadAdvances()[0].refunds?.length, 1);
 });

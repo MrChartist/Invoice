@@ -42,9 +42,9 @@ const stateOf = (c: Party) => resolveStateCode({ code: c?.state_code, gstin: c?.
 /** Sec 12(7)(a) for an event (TV21). `eventState` = GST state code of the venue, `96` = abroad. */
 export function eventPos(client: Party, eventState?: string): TvPos {
   const reg = regOf(client);
-  if (reg) return { key: 'event_reg', state: reg, note: 'Place of supply — location of the registered recipient (Sec 12(7)(a)(i) IGST).' + VERIFY };
-  if (eventState && eventState !== '96') return { key: 'event_venue', state: eventState, note: 'Place of supply — where the event is held (Sec 12(7)(a)(ii) IGST).' + VERIFY };
-  if (eventState === '96') return { key: 'event_abroad', state: stateOf(client), note: 'Event outside India — place of supply is the recipient\'s location (Sec 12(7)(a)(ii) IGST).' + VERIFY };
+  if (reg) return { key: 'event_reg', state: reg, note: 'Place of supply: location of the registered recipient (Sec 12(7)(a)(i) IGST).' + VERIFY };
+  if (eventState && eventState !== '96') return { key: 'event_venue', state: eventState, note: 'Place of supply: where the event is held (Sec 12(7)(a)(ii) IGST).' + VERIFY };
+  if (eventState === '96') return { key: 'event_abroad', state: stateOf(client), note: 'Event outside India: place of supply is the recipient\'s location (Sec 12(7)(a)(ii) IGST).' + VERIFY };
   return { key: 'unknown', state: '', note: '' };
 }
 
@@ -53,14 +53,14 @@ export function travelPos(trip: Pick<TripInfo, 'kind' | 'scope' | 'regime' | 'ev
   if (trip.kind === 'event') return eventPos(client, trip.event?.state);
   if (isForeign(client)) {
     return trip.scope === 'outbound'
-      ? { key: 'outside', state: '96', exempt: trip.regime !== 'exempt_outside', note: 'Tour wholly outside India for a foreign tourist — exempt entry may apply (as reported).' + VERIFY }
-      : { key: 'inbound', state: '', note: 'Performed in India — place of supply India, not an export even in foreign currency (Sec 13(3)(b) IGST, as recalled).' + VERIFY };
+      ? { key: 'outside', state: '96', exempt: trip.regime !== 'exempt_outside', note: 'Tour wholly outside India for a foreign tourist: exempt entry may apply (as reported).' + VERIFY }
+      : { key: 'inbound', state: '', note: 'Performed in India: place of supply India, not an export even in foreign currency (Sec 13(3)(b) IGST, as recalled).' + VERIFY };
   }
   const reg = regOf(client);
   const hotel = trip.regime === 'agent' && components.includes('hotel');
   const s = reg || stateOf(client);
   if (!s) return { key: 'unknown', state: '', note: '', hotel };
-  return { key: reg ? 'reg' : 'addr', state: s, hotel, note: `Place of supply — ${reg ? 'location of the registered recipient' : 'address of the recipient on record'} (Sec 12(2) IGST).` + VERIFY };
+  return { key: reg ? 'reg' : 'addr', state: s, hotel, note: `Place of supply: ${reg ? 'location of the registered recipient' : 'address of the recipient on record'} (Sec 12(2) IGST).` + VERIFY };
 }
 
 /**

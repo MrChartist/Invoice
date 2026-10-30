@@ -66,7 +66,7 @@ test('overdue after the due date; a reasoned write-off closes it; drafts and dom
   const rows = reg([exp('1'), exp('d', { status: 'Draft' }), exp('b2b', { supply_type: 'B2B', place_of_supply: '27' })], { today: '2026-07-10' });
   assert.deepEqual(rows.map((r) => [r.number, r.status, r.daysLeft]), [['EXP/FY25-26/1', 'overdue', -5]]);
   assert.throws(() => writeoffsDb.save({ invoice_id: '1', date: '2026-07-10', reason: ' ', fcy: 10000 }), /woReason/);
-  writeoffsDb.save({ invoice_id: '1', date: '2026-07-10', reason: 'Buyer insolvent — AD bank approval 12/2026', fcy: 10000 });
+  writeoffsDb.save({ invoice_id: '1', date: '2026-07-10', reason: 'Buyer insolvent: AD bank approval 12/2026', fcy: 10000 });
   const [r] = reg([exp('1')], { today: '2026-07-10' });
   assert.deepEqual([r.status, r.writtenOffFcy, r.outstandingFcy], ['written_off', 10000, 0]);
   assert.match(r.writeOffReason ?? '', /insolvent/);
@@ -147,7 +147,7 @@ test('bell: overdue (with the Rule 96A note), due within 60 days', () => {
   const rows = reg([exp('1'), exp('2', { shipping_bill_date: '2025-06-01', issue_date: '2025-06-01' })], { today: '2026-05-20' });
   const n = realisationNotices(rows, 'now');
   assert.deepEqual(n.map((x) => [x.id.split(':')[0], x.severity]), [['exp-overdue', 'critical'], ['exp-due', 'warning']]);
-  assert.match(n[0].detail, /Rule 96A — verify with your CA/);
+  assert.match(n[0].detail, /Rule 96A: verify with your CA/);
 });
 
 test('QA6 F6: an export saved as "Tax Invoice" is followed for realisation; non-supply documents are not', () => {

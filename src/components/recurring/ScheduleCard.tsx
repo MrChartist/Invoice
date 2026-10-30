@@ -82,7 +82,7 @@ export function ScheduleCard({
         <div>
           <span className={styles.factLabel}>{recT('nextRun')}</span>
           <span className={cn(styles.factValue, rel?.tone)}>
-            {status === 'ended' ? '—' : formatDate(s.next_run)}
+            {status === 'ended' ? '-' : formatDate(s.next_run)}
             {rel && <span style={{ fontWeight: 500 }}> · {rel.text}</span>}
           </span>
         </div>

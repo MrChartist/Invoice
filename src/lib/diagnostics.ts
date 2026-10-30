@@ -95,7 +95,7 @@ const kb = (chars: number) => `${Math.max(0, Math.round(chars / 1024)).toLocaleS
 export function buildDiagnostics(d: DiagnosticsInput): string {
   const s = d.storage;
   const lines = [
-    'Mr. Chartist Invoice — beta diagnostic report',
+    'Mr. Chartist Invoice: beta diagnostic report',
     `Generated: ${d.now.toISOString()}`,
     '',
     '[App]',

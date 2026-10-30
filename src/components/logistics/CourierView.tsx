@@ -63,7 +63,7 @@ export default function CourierView({ notify }: LgViewProps) {
         <button type="button" className={controls.btnOutline} onClick={() => act(() => { saveLogisticsSettings({ zones: zones.filter((z) => z.zone.trim()) }); })} data-lg-save-zones>{t('common.save')}</button>
       </div>
       <div style={row}>
-        <Pick label={lgT('client')} value={client} ids={d.clients.map((c) => c.id ?? '').filter(Boolean)} name={name} blank="—" onChange={setClient} attr="courier-client" />
+        <Pick label={lgT('client')} value={client} ids={d.clients.map((c) => c.id ?? '').filter(Boolean)} name={name} blank="-" onChange={setClient} attr="courier-client" />
         <input type="file" accept=".csv,text/csv" aria-label={lgdT('import')} onChange={async (e) => { const f = e.target.files?.[0]; if (f) setCsv(await f.text()); }} />
         <button type="button" className={controls.btnOutline} onClick={run} data-lg-import-dockets>{lgdT('import')}</button>
       </div>

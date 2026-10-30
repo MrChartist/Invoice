@@ -108,7 +108,7 @@ export function UsersPanel({ notify }: Props) {
             <li key={u.id} className={styles.userRow}>
               <div className={styles.rowText}>
                 <strong>{u.name}</strong>
-                <span>{u.id === OWNER_ID ? `${roleLabel('owner')} — ${secT('hint.owner')}` : secT(`hint.${u.role}`)}</span>
+                <span>{u.id === OWNER_ID ? `${roleLabel('owner')}: ${secT('hint.owner')}` : secT(`hint.${u.role}`)}</span>
               </div>
               {u.id !== OWNER_ID && (
                 <div className={styles.buttons}>

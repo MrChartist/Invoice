@@ -139,12 +139,12 @@ export function narcoticRegister(items: readonly NarcoticItem[], purchases: read
 }
 
 export const NARCOTIC_HEAD = ['Item', 'Batch', 'Unit', 'Opening', 'Received', 'Sold', 'Closing'] as const;
-export const narcoticCells = (r: NarcoticRow): (string | number)[] => [r.item, r.batch || '—', r.unit, r.opening, r.received, r.sold, r.closing];
+export const narcoticCells = (r: NarcoticRow): (string | number)[] => [r.item, r.batch || '-', r.unit, r.opening, r.received, r.sold, r.closing];
 
 /* ── CSV and the printed book ── */
 
 export function registerCsv(title: string, period: { from: string; to: string }, head: readonly string[], rows: readonly (string | number)[][]): string {
-  return toCsv([[`${title} ${period.from} to ${period.to} — verify the format with your drug inspector / CA`], [...head], ...rows]);
+  return toCsv([[`${title} ${period.from} to ${period.to}: verify the format with your drug inspector / CA`], [...head], ...rows]);
 }
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -162,7 +162,7 @@ export function registerBook(opts: { title: string; shop: string; licence?: stri
   const pages = paginate(opts.rows.map((r, i) => ({ r, bad: !!opts.flagged?.[i] })), opts.perPage ?? 25);
   const body = pages.map((p, i) => `<section class="pg"><header><b>${esc(opts.shop)}</b>${opts.licence ? ` · DL: ${esc(opts.licence)}` : ''}<br>${esc(opts.title)} · ${esc(opts.period.from)} to ${esc(opts.period.to)} · Page ${i + 1} of ${pages.length}</header>
 <table><thead><tr>${opts.head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${p.map((x) => `<tr${x.bad ? ' class="bad"' : ''}>${x.r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>
-<footer>Working paper — verify the register format with your drug inspector / CA. Rows shaded: prescription details missing.</footer></section>`).join('\n');
+<footer>Working paper: verify the register format with your drug inspector / CA. Rows shaded: prescription details missing.</footer></section>`).join('\n');
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(opts.title)}</title><style>${PRINT_FONT_FACE}@page{size:A4;margin:12mm}body{font:12px ${PRINT_FONT};color:#000}.pg{page-break-after:always}.pg:last-child{page-break-after:auto}header{margin-bottom:6px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #444;padding:2px 4px;text-align:left}tr.bad td{background:#eee}footer{margin-top:6px;font-size:12px}</style></head><body>${body}</body></html>`;
 }
 

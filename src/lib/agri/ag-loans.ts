@@ -88,7 +88,7 @@ export function splitRepayment(loan: Pick<AgriLoan, 'date' | 'principal' | 'rate
 export function ltvWarning(principal: number, bags: number, bagRate: number | undefined, maxPct: number | undefined): string | undefined {
   if (!(num(maxPct) > 0) || !(num(bagRate) > 0)) return undefined;
   const cap = round2((num(bags) * num(bagRate) * num(maxPct)) / 100);
-  return num(principal) > cap + 0.005 ? `Loan ₹${round2(num(principal)).toFixed(2)} is above ${num(maxPct)}% of the stored value (₹${cap.toFixed(2)} at ₹${num(bagRate)} a bag) — check the security.` : undefined;
+  return num(principal) > cap + 0.005 ? `Loan ₹${round2(num(principal)).toFixed(2)} is above ${num(maxPct)}% of the stored value (₹${cap.toFixed(2)} at ₹${num(bagRate)} a bag): check the security.` : undefined;
 }
 
 /** Open loans (anything due at `asOf`) with a lien on the lot. */
@@ -131,7 +131,7 @@ export function loanStatementHtml(loan: AgriLoan, asOf: string, company: string)
   return smallPaper(`Interest statement ${loan.number}`, `${company} · ${loan.borrower_name} · ${num(loan.rate_pct)}% a year, as at ${asOf}`, [
     ...interestStatement(loan, asOf).map((r): [string, unknown] => [`${r.date} · ${r.what}`, `${r.days} days · interest ₹${r.interest.toFixed(2)} · paid ₹${r.paid.toFixed(2)} · principal ₹${r.principal.toFixed(2)}`]),
     ['Due now', `₹${s.total.toFixed(2)} (principal ₹${s.principal.toFixed(2)} + interest ₹${s.interest.toFixed(2)})`],
-  ], 'Simple interest by days, 365-day year. Interest is GST-exempt; money-lenders law — verify AG24.');
+  ], 'Simple interest by days, 365-day year. Interest is GST-exempt; money-lenders law: verify AG24.');
 }
 
 /** Loans past their due date with anything due (the bell / list flag). */
@@ -196,7 +196,7 @@ export function repayLoan(loanId: string, r: { date: string; amount: number; by:
   return withTablesRollback([LOANS_TABLE, 'vouchers', 'accounts'], () => {
     const p = (n: number) => Math.round(n * 100);
     const v = saveVoucher({
-      type: 'RECEIPT', date: r.date, narration: `Repayment of loan ${loan.number} by ${loan.borrower_name}: principal ${split.principal_part.toFixed(2)}, interest ${split.interest_part.toFixed(2)} (interest exempt — verify with your CA)`,
+      type: 'RECEIPT', date: r.date, narration: `Repayment of loan ${loan.number} by ${loan.borrower_name}: principal ${split.principal_part.toFixed(2)}, interest ${split.interest_part.toFixed(2)} (interest exempt, verify with your CA)`,
       lines: [
         { account_id: money(r.by), dr: p(amount), cr: 0 },
         ...(split.principal_part > 0 ? [{ account_id: ledger(), dr: 0, cr: p(split.principal_part), party: loan.borrower_name }] : []),

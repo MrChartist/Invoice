@@ -88,7 +88,7 @@ export function buildCommissionInvoice(rows: readonly Indent[], ctx: { principal
     const amount = commissionOf(i);
     return {
       id: generateId(),
-      name: `Indent commission — ${i.number}`,
+      name: `Indent commission: ${i.number}`,
       description: `${i.item}: ${i.qty}${i.unit ? ` ${i.unit}` : ''} × ₹${num(i.rate)} for ${i.buyer_name}${i.principal_invoice_no ? `, your invoice ${i.principal_invoice_no}` : ''} (${i.commission_basis === 'per_unit' ? `₹${i.commission_rate} per unit` : `${i.commission_rate}%`})`,
       type: 'Service',
       hsn: COMMISSION_SAC,
@@ -116,7 +116,7 @@ export function buildCommissionInvoice(rows: readonly Indent[], ctx: { principal
     notes: [
       `Commission as indenting agent on ${rows.length} indent(s).`,
       // R14 PS-C1 (PS4): Sec 13(8)(b) was omitted from 30 Mar 2026 — the dated rule decides the note.
-      ...(foreign ? [intermediaryPos(ctx.date) === 'supplier' ? 'Principal outside India: an intermediary service (Sec 13(8)(b) IGST Act), not an export — verify with your CA.' : 'Principal outside India: an intermediary service, place of supply Sec 13(2) from 30 Mar 2026 — an export if Sec 2(6) is met — verify with your CA.'] : []),
+      ...(foreign ? [intermediaryPos(ctx.date) === 'supplier' ? 'Principal outside India: an intermediary service (Sec 13(8)(b) IGST Act), not an export, verify with your CA.' : 'Principal outside India: an intermediary service, place of supply Sec 13(2) from 30 Mar 2026, an export if Sec 2(6) is met, verify with your CA.'] : []),
     ].join('\n'),
   };
   const t = calculateInvoice(calcInputFromRecord(rec, { amount_paid: 0 }));

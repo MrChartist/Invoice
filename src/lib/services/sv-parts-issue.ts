@@ -37,7 +37,7 @@ export function issuedNet(job: Pick<ServiceJob, 'parts_issue'>, transfers: reado
 
 function move(job: ServiceJob, lines: readonly PartQty[], date: string, back: boolean, note: string): StockTransfer {
   const wip = wipGodown().id;
-  const t = transfersDb.save({ date, from_godown: back ? wip : MAIN_GODOWN_ID, to_godown: back ? MAIN_GODOWN_ID : wip, lines: lines.filter((l) => num(l.qty) > 0).map((l) => ({ id: generateId(), item_id: l.item_id, qty: num(l.qty), ...(l.batch_no ? { batch_no: l.batch_no } : {}) })), notes: `${note} — job ${job.number}` });
+  const t = transfersDb.save({ date, from_godown: back ? wip : MAIN_GODOWN_ID, to_godown: back ? MAIN_GODOWN_ID : wip, lines: lines.filter((l) => num(l.qty) > 0).map((l) => ({ id: generateId(), item_id: l.item_id, qty: num(l.qty), ...(l.batch_no ? { batch_no: l.batch_no } : {}) })), notes: `${note}: job ${job.number}` });
   const fresh = loadJobs().find((j) => j.id === job.id) ?? job;
   patchJob(job.id, { parts_issue: [...(fresh.parts_issue ?? []), t.id] }, true);
   return t;

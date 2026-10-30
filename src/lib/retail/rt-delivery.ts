@@ -189,7 +189,7 @@ export function settleRider(input: { riderId: string; day: string; counted: numb
   const id = generateId();
   assertUnlocked({ id, issue_date: input.day, invoice_number: `Rider ${rider.name}` }, 'create');
   const lines = settlementLines(expected, counted, riderCashLedger(), input.differenceAccountId);
-  const v = saveVoucher({ type: 'JOURNAL', date: input.day, narration: `Cash settled by rider ${rider.name}: expected ₹${expected}, counted ₹${counted} — verify with your CA`, lines, voucher_class: RIDER_SETTLEMENT_CLASS });
+  const v = saveVoucher({ type: 'JOURNAL', date: input.day, narration: `Cash settled by rider ${rider.name}: expected ₹${expected}, counted ₹${counted}, verify with your CA`, lines, voucher_class: RIDER_SETTLEMENT_CLASS });
   const returned = deliveryRows(localDb.invoices.getAll()).filter((r) => r.delivery.rider_id === rider.id && r.delivery.status === 'returned' && (r.delivery.done_on ?? '') <= input.day).map((r) => r.invoice.id);
   const row: RiderSettlement = {
     id, date: input.day, rider_id: rider.id, rider_name: rider.name, payment_ids: open.map((p) => p.id), expected, counted,

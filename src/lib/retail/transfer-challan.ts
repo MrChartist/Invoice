@@ -80,17 +80,17 @@ export function transferChallanHtml(t: Pick<StockTransfer, 'transfer_number' | '
   const body = rows.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.name)}${r.batch ? ` · batch ${esc(r.batch)}` : ''}${r.serials ? `<div style="font-size:12px;color:#555">S/N ${esc(r.serials.join(', '))}</div>` : ''}</td><td>${esc(r.hsn)}</td><td class="n">${esc(r.qty)} ${esc(r.unit)}</td><td class="n">${esc(formatMoney(r.value))}</td><td class="n">${esc(r.rate)}%</td></tr>`).join('');
   const tr = o.transport ?? {};
   const transport = [tr.mode && `Mode: ${tr.mode}`, tr.vehicle && `Vehicle: ${tr.vehicle}`, tr.transporter && `Transporter: ${tr.transporter}`, tr.lr && `LR no.: ${tr.lr}`, tr.eway && `e-Way bill: ${tr.eway}`].filter(Boolean).join(' · ');
-  const party = (who: string, p: { name: string; address?: string }) => `<strong>${who}</strong><br>${esc(o.company.name)} — ${esc(p.name)}${p.address ? `<br>${esc(p.address)}` : ''}${o.company.gstin ? `<br>GSTIN: ${esc(o.company.gstin)}` : ''}${o.company.stateCode ? `<br>State code: ${esc(o.company.stateCode)}` : ''}`;
+  const party = (who: string, p: { name: string; address?: string }) => `<strong>${who}</strong><br>${esc(o.company.name)}: ${esc(p.name)}${p.address ? `<br>${esc(p.address)}` : ''}${o.company.gstin ? `<br>GSTIN: ${esc(o.company.gstin)}` : ''}${o.company.stateCode ? `<br>State code: ${esc(o.company.stateCode)}` : ''}`;
   const section = (copy: string) => `<section class="c">
   <div class="head"><div><h1>${esc(o.company.name || 'Your business')}</h1>${o.company.gstin ? `<div>GSTIN: ${esc(o.company.gstin)}</div>` : ''}</div>
   <div style="text-align:right"><div><strong>${esc(copy)}</strong></div><div>Challan no.: <strong>${esc(t.transfer_number.slice(0, 16))}</strong></div><div>Date: <strong>${esc(formatDate(t.date))}</strong></div>${o.requestNumber ? `<div>Against request: ${esc(o.requestNumber)}</div>` : ''}</div></div>
-  <div class="title">Delivery challan — stock transfer (own use, same GSTIN)</div>
+  <div class="title">Delivery challan: stock transfer (own use, same GSTIN)</div>
   <div class="grid"><div>${party('Consignor (from)', o.from)}</div><div>${party('Consignee (to)', o.to)}</div></div>
   <table><thead><tr><th>#</th><th>Description</th><th>HSN</th><th class="n">Quantity</th><th class="n">Value at cost (₹)</th><th class="n">GST rate</th></tr></thead>
   <tbody>${body}<tr class="total"><td></td><td>Total</td><td></td><td></td><td class="n">${esc(formatMoney(total))}</td><td></td></tr></tbody></table>
   ${transport ? `<div class="note">${esc(transport)}</div>` : ''}
-  <div class="note">Goods moved between places of business of the same registered person (Rule 55(1)(c) CGST Rules) — not a supply; no tax is charged on this challan (rates shown for information). Value at cost. ${t.notes ? esc(t.notes) : ''} Working paper — verify with your CA.</div>
-  <div class="sign"><span>Received in good condition</span><span>For ${esc(o.company.name || 'Your business')} — Authorised signatory</span></div>
+  <div class="note">Goods moved between places of business of the same registered person (Rule 55(1)(c) CGST Rules): not a supply; no tax is charged on this challan (rates shown for information). Value at cost. ${t.notes ? esc(t.notes) : ''} Working paper: verify with your CA.</div>
+  <div class="sign"><span>Received in good condition</span><span>For ${esc(o.company.name || 'Your business')}: Authorised signatory</span></div>
 </section>`;
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">

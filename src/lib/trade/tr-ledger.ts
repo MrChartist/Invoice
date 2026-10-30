@@ -18,7 +18,7 @@ export function postPair(o: { type: 'JOURNAL' | 'RECEIPT' | 'PAYMENT'; date: str
   return saveVoucher({
     type: o.type,
     date: o.date,
-    narration: `${o.narration} — verify with your CA`,
+    narration: `${o.narration}: verify with your CA`,
     lines: [
       { account_id: o.dr, dr: p, cr: 0, ...(o.drParty ? { party: o.drParty } : {}) },
       { account_id: o.cr, dr: 0, cr: p, ...(o.crParty ? { party: o.crParty } : {}) },

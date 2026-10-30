@@ -123,7 +123,7 @@ export function PaperView({ ctx }: { ctx: MfgContext }) {
       if (e.status !== 'lost') r.kg += estimateBreaks(e)[0]?.kg ?? 0;
       m.set(k, r);
     }
-    return [...m.values()].sort((a, b) => a.gsm - b.gsm).map((r) => ({ ...r, name: stock.get(r.item)?.item.name ?? '—', unit: stock.get(r.item)?.item.unit ?? '', qty: stock.get(r.item)?.qty ?? 0 }));
+    return [...m.values()].sort((a, b) => a.gsm - b.gsm).map((r) => ({ ...r, name: stock.get(r.item)?.item.name ?? '-', unit: stock.get(r.item)?.item.unit ?? '', qty: stock.get(r.item)?.qty ?? 0 }));
   }, [ctx.inputs]);
   return (
     <div data-mfb-view="paper">

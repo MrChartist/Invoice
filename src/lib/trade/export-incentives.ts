@@ -175,7 +175,7 @@ export function postIncentiveClaim(id: string, date: string, ref = ''): ExportIn
     const row = incentivesDb.all().find((r) => r.id === id);
     if (!row) throw new Error('incMissing');
     if (row.claim_voucher_id) throw new Error('incPostedClaim');
-    const v = saveVoucher({ type: 'JOURNAL', date, narration: `${KIND_LABEL[row.kind]} claimed${ref ? ` on ${ref}` : ''} — accrual and tax treatment: verify with your CA`, lines: claimLines(row.claimed, ledgers()), voucher_class: INCENTIVE_CLASS });
+    const v = saveVoucher({ type: 'JOURNAL', date, narration: `${KIND_LABEL[row.kind]} claimed${ref ? ` on ${ref}` : ''}, accrual and tax treatment: verify with your CA`, lines: claimLines(row.claimed, ledgers()), voucher_class: INCENTIVE_CLASS });
     return update(id, (r) => ({ ...r, claim_voucher_id: v.id, voucher_ids: [...r.voucher_ids, v.id] }));
   });
 }
@@ -224,7 +224,7 @@ export function transferScrip(id: string, amount: number, value: number, date: s
     if (!row || row.kind !== 'rodtep') throw new Error('incMissing');
     if (row.transferred) throw new Error('incTransferred');
     if (!(amount > 0) || amount > incentiveFigures(row).scripBalance + 0.005 || !(value >= 0)) throw new Error('incScripShort');
-    const v = saveVoucher({ type: 'RECEIPT', date, narration: `RoDTEP scrip ${row.scrip_no ?? ''} sold — GST / income-tax treatment: verify with your CA`.replace(/\s+/g, ' '), lines: transferLines(amount, value, ledgers()), voucher_class: INCENTIVE_CLASS });
+    const v = saveVoucher({ type: 'RECEIPT', date, narration: `RoDTEP scrip ${row.scrip_no ?? ''} sold, GST / income-tax treatment: verify with your CA`.replace(/\s+/g, ' '), lines: transferLines(amount, value, ledgers()), voucher_class: INCENTIVE_CLASS });
     return update(id, (r) => ({ ...r, transferred: { date, value: round2(value), amount: round2(amount), voucher_id: v.id }, voucher_ids: [...r.voucher_ids, v.id] }));
   });
 }

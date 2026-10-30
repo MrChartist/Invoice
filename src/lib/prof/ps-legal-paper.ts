@@ -25,9 +25,9 @@ export const docRegime = (regimes: readonly LegalRegime[]): LegalRegime =>
 export function legalSentence(legal: { regime: LegalRegime; entry?: string } | null | undefined, registered: boolean): string {
   if (!legal || legal.regime === 'taxable') return registered ? '' : 'Not registered under GST.';
   const s = legal.regime === 'rcm'
-    ? `Legal services — GST payable by the recipient under reverse charge (${legal.entry || 'N 13/2017-CT(R), entry 2'}).`
-    : `Exempt — ${legal.entry || 'N 12/2017-CT(R), entry 45'}.`;
-  return registered ? s : `Not registered under GST — legal services under reverse charge / exempt as stated. ${s}`;
+    ? `Legal services: GST payable by the recipient under reverse charge (${legal.entry || 'N 13/2017-CT(R), entry 2'}).`
+    : `Exempt: ${legal.entry || 'N 12/2017-CT(R), entry 45'}.`;
+  return registered ? s : `Not registered under GST: legal services under reverse charge / exempt as stated. ${s}`;
 }
 
 export interface LegalApplyInput {

@@ -50,7 +50,7 @@ function Esc({ c, notify, refresh }: Pick<PanelProps, 'notify' | 'refresh'> & { 
     components: ROWS.filter((i) => String(cl[`k${i}`]).trim() && Number(cl[`s${i}`]) > 0).map((i) => ({ key: String(cl[`k${i}`]).trim().toLowerCase(), share_pct: Number(cl[`s${i}`]), base_index: Number(cl[`b${i}`]) })),
   } }));
   const input = () => ({ contract: c, date: String(st.date), period_from: String(st.from), period_to: String(st.to), work_value: n(st.w), indices: (esc?.components ?? []).map((x) => ({ key: x.key, current_index: Number(st[`i:${x.key}`]) })) });
-  let preview = '—';
+  let preview = '-';
   try {
     if (esc && st.from && st.to) preview = fmtMoney(pvWorking(input(), localDb.invoices.getAll()).amount ?? 0);
   } catch (e) {
@@ -73,7 +73,7 @@ function Esc({ c, notify, refresh }: Pick<PanelProps, 'notify' | 'refresh'> & { 
       </section>
       {esc && (
         <section className={styles.box}>
-          <Fields spec={[['from', twT('from'), 'date'], ['to', twT('to'), 'date'], ['date', twT('date'), 'date'], ['w', cbT('workValue'), 'number'], ...esc.components.map((x) => [`i:${x.key}`, `${x.key} — ${cbT('current')}`, 'number'] as const)]} v={st} set={setSt} />
+          <Fields spec={[['from', twT('from'), 'date'], ['to', twT('to'), 'date'], ['date', twT('date'), 'date'], ['w', cbT('workValue'), 'number'], ...esc.components.map((x) => [`i:${x.key}`, `${x.key}: ${cbT('current')}`, 'number'] as const)]} v={st} set={setSt} />
           <F l={cbT('indexSheet')}><input type="file" accept=".csv,.xlsx,text/csv" onChange={(e) => void onFile(e.target.files?.[0])} /></F>
           <p className={styles.note} data-cn-pv-preview>{cbT('pvAmount')}: {preview}</p>
           <div className={styles.toolbar}><button type="button" className={B.p} onClick={() => run(() => savePv(input()))} data-cn-pv-save>{cbT('saveStatement')}</button></div>

@@ -71,7 +71,7 @@ export async function printKots(kots: readonly Kot[], ctxOf: (k: Kot) => TicketC
   }
   if (paper.length) {
     const w = window.open('', '_blank', 'popup,width=420,height=600');
-    if (!w) failed.push({ station: kots[0]?.station ?? '', error: 'Pop-ups are blocked — allow them to print kitchen tickets.' });
+    if (!w) failed.push({ station: kots[0]?.station ?? '', error: 'Pop-ups are blocked: allow them to print kitchen tickets.' });
     else {
       w.document.open();
       w.document.write(kotHtml(paper, kots.map((k) => k.number).join(' ')));

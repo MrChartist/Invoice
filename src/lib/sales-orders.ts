@@ -269,7 +269,7 @@ export function groupOutstanding(rows: readonly SoOutstandingRow[], by: Outstand
   const order = ['overdue', 'week', 'later', 'none'];
   const map = new Map<string, OutstandingGroup>();
   for (const r of rows) {
-    const label = by === 'party' ? r.party || '—' : by === 'item' ? r.item || '—' : bucket(r);
+    const label = by === 'party' ? r.party || '-' : by === 'item' ? r.item || '-' : bucket(r);
     const key = label.toLowerCase();
     const g = map.get(key) ?? { key, label, rows: [], value: 0, overdue: 0 };
     g.rows.push(r);

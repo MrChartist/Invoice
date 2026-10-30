@@ -302,7 +302,7 @@ const PreviewBody = ({ isOpen, onClose, autoAction }: InvoicePreviewModalProps) 
             >
               {TEMPLATES.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name} — {t.category}
+                  {t.name} : {t.category}
                 </option>
               ))}
             </select>

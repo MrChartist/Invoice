@@ -198,7 +198,7 @@ test('recurring: an occurrence inside the lock is skipped and counted, later one
   const report = R.runDueSchedules('2025-07-20');
   assert.deepEqual(report.generated.map((g) => g.issue_date), ['2025-06-10', '2025-07-10']);
   assert.equal(report.errors.length, 2);
-  assert.match(report.errors[0], /skipped 2025-04-10 — Books are locked/);
+  assert.match(report.errors[0], /skipped 2025-04-10\. Books are locked/);
   const saved = R.recurringDb.getById(s.id)!;
   assert.equal(saved.skipped_count, 2);
   assert.equal(saved.next_run, '2025-08-10');

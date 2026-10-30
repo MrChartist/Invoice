@@ -86,12 +86,12 @@ export function purchaseHsnRegister(
     const sg = spread(heads.sgst, w);
     const ce = spread(c.cess, w);
     parts.forEach((p, i) => {
-      const code = p.hsn.replace(/\s+/g, '') || '—';
-      if (code === '—') noHsn++;
+      const code = p.hsn.replace(/\s+/g, '') || '-';
+      if (code === '-') noHsn++;
       const uqc = (p.uqc || '').toUpperCase();
       const key = `${code}|${p.rate}|${uqc}`;
       // The master's description is used for an exact code only; a prefix match keeps the line's own name.
-      const found = code !== '—' && o.master ? findHsn(o.master, code) : undefined;
+      const found = code !== '-' && o.master ? findHsn(o.master, code) : undefined;
       const master = found?.code === code ? found : undefined;
       const row = acc.get(key) ?? { hsn: code, description: master?.description || p.name, uqc: uqc || master?.uqc || '', rate: p.rate, qty: 0, taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0, bills: 0, ineligible: 0, billIds: new Set<string>() };
       row.qty = round2(row.qty + p.qty);
@@ -107,7 +107,7 @@ export function purchaseHsnRegister(
   }
   const rows = [...acc.values()]
     .map(({ billIds, ...r }) => ({ ...r, bills: billIds.size }))
-    .sort((a, b) => Number(a.hsn === '—') - Number(b.hsn === '—') || a.hsn.localeCompare(b.hsn) || a.rate - b.rate);
+    .sort((a, b) => Number(a.hsn === '-') - Number(b.hsn === '-') || a.hsn.localeCompare(b.hsn) || a.rate - b.rate);
   const rate = new Map<number, PurchaseRateRow>();
   const totals = { taxable: 0, igst: 0, cgst: 0, sgst: 0, cess: 0 };
   for (const r of rows) {

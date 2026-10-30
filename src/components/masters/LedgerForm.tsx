@@ -206,9 +206,9 @@ export function LedgerForm({ mode, ledgerId, initialName = '', initialGroup = 'I
         <DrCrAmount id={`${uid}-open`} label={mastersT('openingBalance', { date: formatDate(booksBegin) })} amount={amount} side={side} onAmount={setAmount} onSide={setSide} disabled={!canOpening} />
         {!isParty && !system && (
           <>
-            <label htmlFor={`${uid}-rate`}>{mastersT('interest')} — {mastersT('interestRate')}</label>
+            <label htmlFor={`${uid}-rate`}>{mastersT('interest')} : {mastersT('interestRate')}</label>
             <div className={styles.inline}>
-              <input id={`${uid}-rate`} className={`${controls.input} ${styles.amount}`} inputMode="decimal" value={rate} readOnly={readOnly} placeholder="—" onChange={(e) => setRate(e.target.value)} />
+              <input id={`${uid}-rate`} className={`${controls.input} ${styles.amount}`} inputMode="decimal" value={rate} readOnly={readOnly} placeholder="-" onChange={(e) => setRate(e.target.value)} />
               <select className={controls.select} aria-label={mastersT('interestOn')} value={on} disabled={readOnly} onChange={(e) => setOn(e.target.value as LedgerInterestParams['on'])}>
                 <option value="dr">{mastersT('interestOnDr')}</option>
                 <option value="cr">{mastersT('interestOnCr')}</option>

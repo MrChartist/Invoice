@@ -91,7 +91,7 @@ export function expectedTds(input: { client: Pick<Client, 'id' | 'name'>; def: C
   const label = sectionText(code, input.date);
   return {
     applies, section: def.section, code, rate, base: round2(input.base), amount, fyBefore, threshold: limit,
-    message: applies ? `TDS expected u/s ${label} at ${rate}% on the fee base ₹${round2(input.base)} (GST and pure-agent recoveries out) — verify with your CA.` : `TDS not expected yet (₹${after} of ₹${limit} this FY, ${label}).`,
+    message: applies ? `TDS expected u/s ${label} at ${rate}% on the fee base ₹${round2(input.base)} (GST and pure-agent recoveries out): verify with your CA.` : `TDS not expected yet (₹${after} of ₹${limit} this FY, ${label}).`,
   };
 }
 

@@ -121,7 +121,7 @@ export function buildFreightBill(lrs: readonly ConsignmentNote[], ctx: FreightBi
   const party = payerId(lrs[0]);
   if (lrs.some((l) => payerId(l) !== party)) throw new LrError('All LRs on one bill must have the same billing party.');
   const registered = isValidGstin(ctx.party.gstin ?? '');
-  if (!registered && lrs.some((l) => (l.from?.state ?? '') !== (lrs[0].from?.state ?? ''))) throw new LrError('An unregistered party is billed per origin state (place of supply = where the goods were handed over) — bill these LRs separately.');
+  if (!registered && lrs.some((l) => (l.from?.state ?? '') !== (lrs[0].from?.state ?? ''))) throw new LrError('An unregistered party is billed per origin state (place of supply = where the goods were handed over): bill these LRs separately.');
   const option = optionFor(ctx.date, ctx.options);
   const effective = liable === 'recipient' ? 'rcm' : option === 'rcm' ? 'fcm_5' : option;
   const rate = gtaRate(effective, ctx.date).rate;
@@ -133,9 +133,9 @@ export function buildFreightBill(lrs: readonly ConsignmentNote[], ctx: FreightBi
       id: generateId(), name, description, type: 'Service', hsn: sac, unit: 'TRIP', quantity: 1, rate: round2(amount), tax_rate: rate, discount_percent: 0, amount: round2(amount),
     });
     const desc = `${lr.number} / ${lr.date}, ${lr.from.place} → ${lr.to.place}, ${sum(lr, (l) => l.packages)} pkgs, ${sum(lr, (l) => l.charged_weight ?? l.actual_weight ?? 0)} kg`;
-    items.push(line(`Freight — LR ${lr.number}`, desc, round2(f.freight + f.charges)));
+    items.push(line(`Freight: LR ${lr.number}`, desc, round2(f.freight + f.charges)));
     for (const c of lr.charges.filter((x) => x.kind === 'detention' || x.kind === 'other')) {
-      if (num(c.amount) > 0) items.push(line(`${c.kind === 'detention' ? 'Detention' : 'Other charges'} — LR ${lr.number}`, lr.pod?.detention_days ? `${lr.pod.detention_days} day(s)` : '', num(c.amount)));
+      if (num(c.amount) > 0) items.push(line(`${c.kind === 'detention' ? 'Detention' : 'Other charges'}: LR ${lr.number}`, lr.pod?.detention_days ? `${lr.pod.detention_days} day(s)` : '', num(c.amount)));
     }
   }
   const docType: DocumentType = registered ? 'TAX_INVOICE' : 'INVOICE';
@@ -160,7 +160,7 @@ export function buildFreightBill(lrs: readonly ConsignmentNote[], ctx: FreightBi
       `Freight bill for ${lrs.length} consignment note(s).`,
       `GST payable by: ${liableText({ liable })}.`,
       optionLine(option, ctx.date),
-      ...(registered ? [] : [`Place of supply: where the goods were handed over for transport (Sec 12(8)(b) IGST Act, unregistered recipient) — verify with your CA.`]),
+      ...(registered ? [] : [`Place of supply: where the goods were handed over for transport (Sec 12(8)(b) IGST Act, unregistered recipient), verify with your CA.`]),
     ].join('\n'),
   });
 }

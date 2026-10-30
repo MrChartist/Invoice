@@ -58,7 +58,7 @@ export default function TicketAnnexurePage({ invoice }: { invoice: InvoiceRecord
             )}
           </tbody>
         </table>
-        <div className={styles.foot}>Fares are recovered at actual as a pure agent (Rule 33) and are outside our taxable value. Working paper — verify with your CA.</div>
+        <div className={styles.foot}>Fares are recovered at actual as a pure agent (Rule 33) and are outside our taxable value. Working paper: verify with your CA.</div>
       </section>
     </>
   );

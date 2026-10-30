@@ -145,7 +145,7 @@ so that it can be reconciled. If we do not hear from you within 15 days, the bal
 <p><strong>Closing balance in words:</strong> ${esc(l.closingWords)}</p>
 ${bills}
 <div class="sign"><div>For ${esc(company)}<br><br>Authorised signatory</div><div>Confirmed: for ${esc(l.party)}<br><br>Signature, seal &amp; PAN</div></div>
-<p class="note">Dr = the party owes us; Cr = we owe the party. Working paper — verify with your CA.</p>
+<p class="note">Dr = the party owes us; Cr = we owe the party. Working paper: verify with your CA.</p>
 </section>`;
 }
 

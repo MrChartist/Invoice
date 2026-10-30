@@ -107,7 +107,7 @@ export function saveEngagement(i: EngagementInput, ctx: { kind?: ProfKind; check
   };
   setTable(PS_TABLES.engagements, prev ? all.map((e) => (e.id === id ? row : e)) : [...all, row]);
   if (!prev) recordSeries(number);
-  if (prompt && i.ethics_reason !== prev?.ethics_reason) audit.record({ entity: 'invoice', entity_id: id, action: 'update', summary: `Engagement ${number}: ${row.model} fee kept by the owner — ${i.ethics_reason}` });
+  if (prompt && i.ethics_reason !== prev?.ethics_reason) audit.record({ entity: 'invoice', entity_id: id, action: 'update', summary: `Engagement ${number}: ${row.model} fee kept by the owner, ${i.ethics_reason}` });
   const client = localDb.clients.getById(i.client_id)?.name ?? '';
   const warnings = prev ? [] : conflictWarnings([client, ...(ctx.partyNames ?? [])], ctx.checks ?? loadChecks()).map((c) => `Conflict recorded on ${c.date} for ${c.terms.join(', ')} (not waived).`);
   return { row, warnings };

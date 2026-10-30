@@ -46,7 +46,7 @@ export function absorbPatch(s: Pick<MfgSettings, 'absorb'> | null | undefined, o
 /** Audit line for a switch change (the settings save itself is audited by `saveMfgSettings`). */
 export function auditAbsorb(on: boolean, from: string): void {
   try {
-    audit.record({ entity: 'settings', entity_id: 'mfg_settings', action: 'update', summary: `Conversion absorption ${on ? 'ON' : 'OFF'} from ${from} (stock values change from that date — MF24)` });
+    audit.record({ entity: 'settings', entity_id: 'mfg_settings', action: 'update', summary: `Conversion absorption ${on ? 'ON' : 'OFF'} from ${from} (stock values change from that date: MF24)` });
   } catch {
     /* logging never blocks */
   }

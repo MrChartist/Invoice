@@ -116,7 +116,7 @@ export function PricingPanel({ notify }: { notify: Notify }) {
               {levels.map((l) => (
                 <tr key={l.id}>
                   <td className={styles.name}>{l.name}</td>
-                  <td className={surface.numeric}>{l.percent_off ? `${l.percent_off}%${l.basis === 'mrp' ? ` ${retailT('offMrp')}` : ''}` : '—'}</td>
+                  <td className={surface.numeric}>{l.percent_off ? `${l.percent_off}%${l.basis === 'mrp' ? ` ${retailT('offMrp')}` : ''}` : '-'}</td>
                   <td className={surface.numeric}>{Object.keys(l.rates ?? {}).length}</td>
                   <td className={surface.numeric}>{usage.get(l.id) ?? 0}</td>
                   <td>

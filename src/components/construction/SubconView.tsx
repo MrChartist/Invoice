@@ -88,7 +88,7 @@ export default function SubconView({ boq, notify }: { boq?: InvoiceRecord; notif
       <Table d="bills" head={[T('scb'), T('date'), T('wo'), T('total'), T('tds'), T('deds'), T('net'), '']} rows={d.bills.map((m) => {
         const p = d.purchases.find((x) => x.id === m.purchase_id);
         const cn = p?.cn_sub;
-        return [m.number, m.date, d.wos.find((w) => w.id === m.wo_id)?.number ?? '', p ? fmtMoney(p.total) : '—', fmtMoney(cn?.tds ?? 0), cn?.deductions?.map((x) => `${x.label}: ${fmtMoney(x.amount)}`).join('; ') ?? '', fmtMoney(cn?.net ?? 0),
+        return [m.number, m.date, d.wos.find((w) => w.id === m.wo_id)?.number ?? '', p ? fmtMoney(p.total) : '-', fmtMoney(cn?.tds ?? 0), cn?.deductions?.map((x) => `${x.label}: ${fmtMoney(x.amount)}`).join('; ') ?? '', fmtMoney(cn?.net ?? 0),
           m.status === 'cancelled' ? T('st.cancelled') : <span key="a" style={row}>{p && <button type="button" className={B.os} onClick={() => printHtml(subBillHtml(p, company), m.number)}>{T('print')}</button>}<button type="button" className={B.gs} onClick={() => run(() => { cancelSubBill(m.id); })}>{T('cancel')}</button>{!p && <small>{T('billGone')}</small>}</span>];
       })} />
       <h4>{T('retPayable')}</h4>

@@ -97,7 +97,7 @@ export function saveVoucher(i: VoucherInput, opts: { acceptReject?: boolean } = 
     kind: 'PURCHASE', vendor_id: i.vendor.id, vendor_name: i.vendor.name, bill_number: number, date: i.date, category: 'Farm produce purchase',
     lines: w.lines, taxable: t.taxable, cgst: t.cgst, sgst: t.sgst, igst: t.igst, total: t.total, amount_paid: 0, itc_eligible: !!rcm && t.tax > 0,
     ...(rcm ? { reverse_charge: true } : {}), ag: { voucher: ag },
-    notes: `Farmer purchase voucher ${number} — ${w.declaration || 'purchase from a farmer'} Verify with your CA.`,
+    notes: `Farmer purchase voucher ${number}: ${w.declaration || 'purchase from a farmer'} Verify with your CA.`,
   });
   recordSeries(number);
   return bill;

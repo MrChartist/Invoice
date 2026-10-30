@@ -26,7 +26,7 @@ test('declarations: agriculturist line, RCM line for notified goods only, loose 
   assert.match(voucherDeclaration(farmer, [{ hsn: '100610', name: 'Paddy' }], '2026-10-01'), /^Purchased from an agriculturist/);
   assert.match(voucherDeclaration(farmer, [{ hsn: '5201', name: 'Raw cotton' }], '2026-10-01'), /reverse charge/);
   assert.equal(voucherDeclaration({ gstin: '27AAAAA0000A1Z5', principal_kind: 'registered' }, [{ hsn: '100610' }], '2026-10-01'), '');
-  assert.equal(agriDeclaration({ doc_type: 'BILL_OF_SUPPLY', items: [{ ag_class: 'cereal_loose' }] } as never), 'Agricultural produce — not pre-packaged and labelled.');
+  assert.equal(agriDeclaration({ doc_type: 'BILL_OF_SUPPLY', items: [{ ag_class: 'cereal_loose' }] } as never), 'Agricultural produce: not pre-packaged and labelled.');
   assert.equal(agriDeclaration({ doc_type: 'INVOICE', items: [{ ag_class: 'cereal_loose' }] } as never), '');
   assert.match(agriDeclaration({ doc_type: 'BILL_OF_SUPPLY', items: [], ag: { kind: 'rent', rent: { exempt: true } } } as never), /storage of agricultural produce/);
   assert.equal(agriDeclaration({ doc_type: 'INVOICE', items: [] } as never), '');

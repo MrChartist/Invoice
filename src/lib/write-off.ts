@@ -86,7 +86,7 @@ export function bulkWriteOff(ids: readonly string[], opts: { date: string; reaso
         entity_id: out.done.map((d) => d.id).join(','),
         action: 'create',
         doc_number: out.done.map((d) => d.number).join(', ').slice(0, 200),
-        summary: `Bulk write-off of ${out.done.length} invoice(s), ₹${out.total.toFixed(2)}${opts.reason ? ` — ${opts.reason}` : ''}`,
+        summary: `Bulk write-off of ${out.done.length} invoice(s), ₹${out.total.toFixed(2)}${opts.reason ? `: ${opts.reason}` : ''}`,
       });
     } catch {
       /* logging never breaks a write-off */
@@ -260,7 +260,7 @@ export function recordRecovery(input: RecoveryInput): WriteOffRecovery {
     }
     setTable(WRITE_OFF_RECOVERIES_TABLE, [...loadRecoveries(), rec]);
     try {
-      audit.record({ entity: 'payment', entity_id: inv.id, action: 'create', doc_number: inv.invoice_number, summary: `Bad debt recovered on ${inv.invoice_number}: ₹${amount.toFixed(2)} (${rec.mode === 'same_fy' ? 'same year — write-off reduced' : rec.mode === 'locked_period' ? 'write-off in a locked period — Bad debts recovered' : 'earlier year — Bad debts recovered'})` });
+      audit.record({ entity: 'payment', entity_id: inv.id, action: 'create', doc_number: inv.invoice_number, summary: `Bad debt recovered on ${inv.invoice_number}: ₹${amount.toFixed(2)} (${rec.mode === 'same_fy' ? 'same year: write-off reduced' : rec.mode === 'locked_period' ? 'write-off in a locked period: Bad debts recovered' : 'earlier year: Bad debts recovered'})` });
     } catch {
       /* logging never blocks */
     }

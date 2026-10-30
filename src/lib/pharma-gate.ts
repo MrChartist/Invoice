@@ -71,7 +71,7 @@ export function pharmaGate<T extends Issues>(
     for (const l of doc.items) {
       const exp = l.batch_expiry ?? '';
       if (!l.name.trim() || !exp || exp < doc.issue_date || exp > limit) continue;
-      const msg = `${l.name}: batch ${l.batch_no ?? '—'} expires on ${exp} (within ${settings.near_expiry_days} days).`;
+      const msg = `${l.name}: batch ${l.batch_no ?? '-'} expires on ${exp} (within ${settings.near_expiry_days} days).`;
       (settings.block_near_expiry ? out.errors : out.warnings).push(msg);
     }
   }
@@ -87,7 +87,7 @@ export function rxRequiredErrors(doc: { doc_type?: string; status?: string; item
   if (!raw?.enabled || !raw.require_rx || !SALE_TYPES.has(doc.doc_type ?? '') || doc.status === 'Draft' || (doc.rx?.patient?.trim() && doc.rx.prescriber?.trim())) return [];
   const strict = new Set(getTable<{ name?: string; drug_schedule?: string }>('stock_items').filter((i) => i?.drug_schedule === 'H1' || i?.drug_schedule === 'X').map((i) => String(i.name ?? '').trim().toLowerCase()));
   const names = doc.items.filter((l) => (Number(l.quantity) || 0) > 0 && strict.has(l.name.trim().toLowerCase())).map((l) => l.name);
-  return names.length ? [`Schedule H1 / X (${names.join(', ')}): enter the patient and the prescriber — "Require prescription" is on (pharma setting).`] : [];
+  return names.length ? [`Schedule H1 / X (${names.join(', ')}): enter the patient and the prescriber, "Require prescription" is on (pharma setting).`] : [];
 }
 
 /* ── 8F sale limits: non-saleable godowns and the batch MRP ceiling ── */
@@ -117,7 +117,7 @@ export function saleLimitGate<T extends Issues>(
   for (const l of doc.items) {
     if (!l.name?.trim() || !((Number(l.quantity) || 0) > 0)) continue;
     // R8-C (TR-C1): an agency line sells its principal's lot from a consignment godown; our own lines may not.
-    if (l.godown_id && opts.nonSaleable.has(l.godown_id) && !(l.arrival_id && opts.agencyOk?.has(l.godown_id))) errors.push(`${l.name}: ${opts.godownName(l.godown_id)} holds non-saleable (expired / breakage) stock — sell from another godown.`);
+    if (l.godown_id && opts.nonSaleable.has(l.godown_id) && !(l.arrival_id && opts.agencyOk?.has(l.godown_id))) errors.push(`${l.name}: ${opts.godownName(l.godown_id)} holds non-saleable (expired / breakage) stock, sell from another godown.`);
     if (settings.enabled && settings.block_above_mrp && opts.mrpOf) {
       const mrp = opts.mrpOf(l);
       const price = linePricePerBase(l);
@@ -169,7 +169,7 @@ export function heldStockGate<T extends Issues>(
     const have = Math.max(Number(bal[r.godown]) || 0, 0);
     if (r.qty <= have + 1e-9) continue;
     const held = heldIn.reduce((s, g) => s + (Number(bal[g]) || 0), 0);
-    errors.push(`${r.name}: only ${fmt(have)} saleable in ${opts.godownName(r.godown)}; ${fmt(held)} is held in ${heldIn.map(opts.godownName).join(', ')} (not for sale) — release it first or sell from another godown.`);
+    errors.push(`${r.name}: only ${fmt(have)} saleable in ${opts.godownName(r.godown)}; ${fmt(held)} is held in ${heldIn.map(opts.godownName).join(', ')} (not for sale), release it first or sell from another godown.`);
   }
   return errors.length ? { ...issues, errors: [...issues.errors, ...errors] } : issues;
 }

@@ -14,33 +14,33 @@ export const ACCOMMODATION_RATE_RULES: readonly Versioned<AccommodationRule>[] =
   { from: '2017-07-01', value: { basis: 'declared_tariff', bands: [
       { upTo: 999.99, rate: 0, itc: false, exempt: true }, { upTo: 2499.99, rate: 12, itc: true },
       { upTo: 7499.99, rate: 18, itc: true }, { upTo: null, rate: 28, itc: true }] },
-    source: 'N 11/2017 & 12/2017-CT(R) (bands as understood) — verify' },
+    source: 'N 11/2017 & 12/2017-CT(R) (bands as understood): verify' },
   { from: '2019-10-01', value: { basis: 'value_of_supply', bands: [
       { upTo: 1000, rate: 0, itc: false, exempt: true }, { upTo: 7500, rate: 12, itc: true }, { upTo: null, rate: 18, itc: true }] },
-    source: 'N 20/2019-CT(R) — verify' },
+    source: 'N 20/2019-CT(R): verify' },
   { from: '2022-07-18', value: { basis: 'value_of_supply', bands: [
       { upTo: 7500, rate: 12, itc: true }, { upTo: null, rate: 18, itc: true }] },
-    source: 'N 03/2022 & 04/2022-CT(R) — verify' },
+    source: 'N 03/2022 & 04/2022-CT(R): verify' },
   { from: '2025-09-22', value: { basis: 'value_of_supply', bands: [
       { upTo: 7500, rate: 5, itc: false }, { upTo: null, rate: 18, itc: true }] },
-    source: 'N 15/2025-CT(R) Sl 7(i) (17 Sep 2025, w.e.f. 22 Sep 2025); PIB FAQ 56th Council Q71 — verify' },
+    source: 'N 15/2025-CT(R) Sl 7(i) (17 Sep 2025, w.e.f. 22 Sep 2025); PIB FAQ 56th Council Q71: verify' },
 ];
 export interface RestaurantRule { specified: { rate: number; itc: boolean }; other: { rate: number; itc: boolean } }
 export const HOTEL_RESTAURANT_RATE_RULES: readonly Versioned<RestaurantRule>[] = [
   { from: '2017-11-15', value: { specified: { rate: 18, itc: true }, other: { rate: 5, itc: false } },
-    source: 'N 46/2017-CT(R) (declared tariff ≥ ₹7,500) — verify' },
+    source: 'N 46/2017-CT(R) (declared tariff ≥ ₹7,500): verify' },
   { from: '2025-04-01', value: { specified: { rate: 18, itc: true }, other: { rate: 5, itc: false } },
-    source: 'N 05/2025-CT(R) cl. (xxxvi) (value of supply, previous FY) — verify' },
+    source: 'N 05/2025-CT(R) cl. (xxxvi) (value of supply, previous FY): verify' },
 ];
 export interface PremisesRule { threshold: number; window: { fromMonth: 1; fromDay: 1; toMonth: 3; toDay: 31 }; newRegDays: 15; testPreviousFy: boolean }
 export const SPECIFIED_PREMISES_RULES: readonly Versioned<PremisesRule | null>[] = [
-  { from: '2017-07-01', value: null, source: 'declared-tariff test (no declarations) — verify' },
+  { from: '2017-07-01', value: null, source: 'declared-tariff test (no declarations): verify' },
   { from: '2025-04-01', value: { threshold: 7500, window: { fromMonth: 1, fromDay: 1, toMonth: 3, toDay: 31 }, newRegDays: 15, testPreviousFy: true },
-    source: 'N 05/2025-CT(R) cl. (xxxvi), Annexures VII–IX — verify' },
+    source: 'N 05/2025-CT(R) cl. (xxxvi), Annexures VII–IX: verify' },
 ];
 export const FORM_C_HOURS_RULES: readonly Versioned<{ hours: number; penalty?: number; law: string }>[] = [
-  { from: '1946-01-01', value: { hours: 24, law: 'Foreigners Act 1946; Registration of Foreigners Rules 1992 (Form C)' }, source: 'as understood — verify' },
-  { from: '2025-09-01', value: { hours: 24, penalty: 50000, law: 'Immigration and Foreigners Act 2025 s.8; Rules 2025 r.17' }, source: 'Govt of Goa DIP release 10 Dec 2025 — verify' },
+  { from: '1946-01-01', value: { hours: 24, law: 'Foreigners Act 1946; Registration of Foreigners Rules 1992 (Form C)' }, source: 'as understood: verify' },
+  { from: '2025-09-01', value: { hours: 24, penalty: 50000, law: 'Immigration and Foreigners Act 2025 s.8; Rules 2025 r.17' }, source: 'Govt of Goa DIP release 10 Dec 2025: verify' },
 ];
 
 /* ── Readers (pure). C1 `hotel-gst.ts` builds on these; R7-A needs them for tax-inclusive plans and advances. ── */

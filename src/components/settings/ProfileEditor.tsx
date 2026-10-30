@@ -180,7 +180,7 @@ export function ProfileEditor({ profile, onChange, onError }: Props) {
               <option value="">{setT('selectState')}</option>
               {INDIAN_STATES.map((s) => (
                 <option key={s.code} value={s.code}>
-                  {s.code} — {s.name}
+                  {s.code} : {s.name}
                 </option>
               ))}
             </select>
@@ -215,7 +215,7 @@ export function ProfileEditor({ profile, onChange, onError }: Props) {
         </div>
         {profile.gst_scheme === 'composition' && (
           <p className={controls.hint}>
-            {setT('compositionRate', { rate: compositionRate(profile.composition_category ?? 'trader', todayIso()) ?? '—' })}{' '}
+            {setT('compositionRate', { rate: compositionRate(profile.composition_category ?? 'trader', todayIso()) ?? '-' })}{' '}
             {setT('compositionDocs', { declaration: COMPOSITION_DECLARATION })}
           </p>
         )}

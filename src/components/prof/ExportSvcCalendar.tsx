@@ -13,8 +13,8 @@ import surface from '../../styles/surface.module.css';
 export default function ExportSvcCalendar({ today }: { today: string }) {
   useT();
   const rows = [
-    ...edfDueList(edfDb.all(), today).map((r) => [`${pcT('cal.edf')} — ${r.period} ${pcT(`k.${r.kind}`)} ${r.currency}`, r.due]),
-    ...realisationReminders(servicesRows(liveRegister(today), localDb.invoices.getAll(), today)).map(({ kind, row }) => [`${pcT(kind === 'past' ? 'cal.past' : 'cal.soon')} — ${row.number}`, row.dueDate]),
+    ...edfDueList(edfDb.all(), today).map((r) => [`${pcT('cal.edf')}: ${r.period} ${pcT(`k.${r.kind}`)} ${r.currency}`, r.due]),
+    ...realisationReminders(servicesRows(liveRegister(today), localDb.invoices.getAll(), today)).map(({ kind, row }) => [`${pcT(kind === 'past' ? 'cal.past' : 'cal.soon')}: ${row.number}`, row.dueDate]),
   ];
   if (!rows.length) return null;
   return (

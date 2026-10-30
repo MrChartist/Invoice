@@ -28,7 +28,7 @@ export function Fc4Panel({ ledger, funds, notify, refresh }: { ledger: Ledger; f
   return (
     <div className={styles.stack} data-fc4>
       <S l="FY" v={fy} o={[0, 1, 2, 3].map((k) => [fyNow() - k, `${fyNow() - k}-${String(fyNow() - k + 1).slice(2)}`] as const)} on={(v) => setFy(+v)} />
-      {banks.map((b) => <S key={b.id} l={b.name} v={b.fcra ?? ''} o={[['', '—'], ['designated', iT('fcraDesignated')], ['utilisation', iT('fcraUtil')]]} on={(v) => save(() => { const { fcra: _f, ...rest } = b; void _f; bankAccountsDb.save(v ? { ...rest, fcra: v as BankAccount['fcra'] } : rest); })} />)}
+      {banks.map((b) => <S key={b.id} l={b.name} v={b.fcra ?? ''} o={[['', '-'], ['designated', iT('fcraDesignated')], ['utilisation', iT('fcraUtil')]]} on={(v) => save(() => { const { fcra: _f, ...rest } = b; void _f; bankAccountsDb.save(v ? { ...rest, fcra: v as BankAccount['fcra'] } : rest); })} />)}
       <details><summary>{iT('adminAccounts')}</summary>
         {ledger.accounts.filter((a) => ['INDIRECT_EXPENSES', 'EMPLOYEE', 'FINANCE', 'DIRECT_EXPENSES'].includes(a.group)).map((a) => <C key={a.id} l={a.name} v={admin.includes(a.id)} on={(on) => setSt({ npo_admin_accounts: on ? [...admin, a.id] : admin.filter((x) => x !== a.id) })} />)}
       </details>

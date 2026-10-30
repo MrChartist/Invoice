@@ -47,7 +47,7 @@ export default function GuaranteesView({ notify, refresh, tick }: PanelProps) {
       <section className={styles.box}>
         <h4 className={styles.toolbar}><ShieldCheck size={16} aria-hidden="true" /> {cbT('bgNo')}</h4>
         <Fields spec={[
-          ['contract_id', cbT('contract'), [['', '—'], ...contracts.map((x) => [x.id, x.name_of_work] as const)]], ['kind', twT('kind'), KINDS.map((k) => [k, cbT(`bg.${k}`)] as const)],
+          ['contract_id', cbT('contract'), [['', '-'], ...contracts.map((x) => [x.id, x.name_of_work] as const)]], ['kind', twT('kind'), KINDS.map((k) => [k, cbT(`bg.${k}`)] as const)],
           ['bank', cbT('bank')], ['bg_no', cbT('bgNo')], ['amount', twT('amount'), 'number'], ['issued_on', cbT('issuedOn'), 'date'], ['expires_on', twT('expires'), 'date'], ['claim_until', cbT('claimUntil'), 'date'],
           ['fd_ref', cbT('fdRef')], ['fd_amount', cbT('fdAmount'), 'number'], ['commission_pct', cbT('commissionPct'), 'number'], ['ext', cbT('extendTo'), 'date'],
         ]} v={f} set={setF} />

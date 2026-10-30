@@ -223,7 +223,7 @@ function RestaurantFloor() {
                 <label className={controls.field}>
                   <span className={controls.label}>{rT('mark86')}</span>
                   <select className={controls.select} value={pick86} onChange={(e) => setPick86(e.target.value)} data-86-pick>
-                    <option value="">—</option>
+                    <option value="">-</option>
                     {data.catalog.filter((c) => !isUnavailable(c, day)).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </label>
@@ -234,7 +234,7 @@ function RestaurantFloor() {
                   <label className={controls.field}>
                     <span className={controls.label}>{rT('appliesGroups')}</span>
                     <select className={controls.select} value={group86} onChange={(e) => setGroup86(e.target.value)}>
-                      <option value="">—</option>
+                      <option value="">-</option>
                       {data.groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                     </select>
                   </label>

@@ -246,7 +246,7 @@ export function Expenses() {
         />
         <StatCard
           label={purT('statTopCategory')}
-          value={topCategory ? purCategory(topCategory.category) : '—'}
+          value={topCategory ? purCategory(topCategory.category) : '-'}
           icon={Tags}
           hint={topCategory ? purT('statAmountThisMonth', { amount: formatCurrency(topCategory.total) }) : purT('statNothingMonth')}
         />

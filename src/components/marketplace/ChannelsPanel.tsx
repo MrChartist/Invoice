@@ -91,8 +91,8 @@ export function ChannelsPanel({ channels, notify, refresh, tick }: PanelProps) {
                 <tr key={c.id}>
                   <td><Store size={14} aria-hidden="true" /> {c.name}</td>
                   <td>{mT(`platform.${c.platform}`)}</td>
-                  <td className={surface.mono}>{c.gstins.map((g) => g.gstin).join(', ') || '—'}</td>
-                  <td>{banks.get(c.clearing_bank_id) ?? '—'}</td>
+                  <td className={surface.mono}>{c.gstins.map((g) => g.gstin).join(', ') || '-'}</td>
+                  <td>{banks.get(c.clearing_bank_id) ?? '-'}</td>
                   <td className={surface.numeric}>{fmtMoney(clearingBalance(c.clearing_bank_id, today()))}</td>
                   <td><button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={() => setF(toForm(c))}>{mT('edit')}</button></td>
                 </tr>

@@ -117,7 +117,7 @@ export function OutputDialog({ ctx, order, boms, onClose }: { ctx: MfgContext; o
               {components.map((c, i) => (
                 <tr key={c.id}>
                   <td>{name(c.item_id)}</td>
-                  <td>{c.batch_no ?? '—'}</td>
+                  <td>{c.batch_no ?? '-'}</td>
                   <td><input className={cn(controls.input, controls.inputNumeric)} inputMode="decimal" aria-label={`${pT('qty')} · ${name(c.item_id)} ${i + 1}`} value={String(c.qty)} onChange={(e) => setComponents((cs) => cs.map((x) => (x.id === c.id ? { ...x, qty: num(e.target.value) } : x)))} /></td>
                 </tr>
               ))}

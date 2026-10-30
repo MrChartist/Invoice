@@ -42,7 +42,7 @@ const page = (title: string, sub: string, body: string): string =>
  * The HTML GST summary and README of the ZIP are left out (the 3B table and the footer line carry them). Pure.
  */
 export function packPdfPapers(month: string, files: readonly PackFile[], company = ''): PackPdfPaper[] {
-  const sub = `${company ? `${company} · ` : ''}${month} · working paper, not portal-validated — verify with your CA`;
+  const sub = `${company ? `${company} · ` : ''}${month} · working paper, not portal-validated: verify with your CA`;
   const out: PackPdfPaper[] = [];
   const one = (title: string, f: PackFile | undefined) => {
     if (!f) return;

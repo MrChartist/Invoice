@@ -88,7 +88,7 @@ export function transportExtras({ today, base }: ProfileContext): DemoExtras {
     status: 'Sent',
     client: { ...consignor },
     items: [{
-      id: 'demo-freight-1-l1', name: `Freight — LR ${first.number}`, description: `${first.number} / ${first.date}, Pune → Bengaluru, 40 pkgs, 800 kg`,
+      id: 'demo-freight-1-l1', name: `Freight: LR ${first.number}`, description: `${first.number} / ${first.date}, Pune → Bengaluru, 40 pkgs, 800 kg`,
       type: 'Service', hsn: gtaSac(billDay), unit: 'TRIP', quantity: 1, rate: freight, tax_rate: gtaRate('rcm', billDay).rate, discount_percent: 0, amount: freight,
     }],
     place_of_supply: pos,

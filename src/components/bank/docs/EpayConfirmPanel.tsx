@@ -121,7 +121,7 @@ export default function EpayConfirmPanel({ notify, version, onFile }: { notify: 
                       <td className={surface.numeric}>{formatMoney(r.amount)}</td>
                       <td>{fxbT(statusLabel[r.status])}{r.utr ? ` · ${r.utr}` : ''}</td>
                       <td>
-                        {m ? `${fxbT(statusLabel[m.status])} · ${fxbT(m.how === 'reference' ? 'byRef' : m.how === 'account' ? 'byAccount' : 'byAmount')}${m.utr ? ` · ${m.utr}` : ''}${m.date ? ` · ${formatDate(m.date)}` : ''}` : '—'}
+                        {m ? `${fxbT(statusLabel[m.status])} · ${fxbT(m.how === 'reference' ? 'byRef' : m.how === 'account' ? 'byAccount' : 'byAmount')}${m.utr ? ` · ${m.utr}` : ''}${m.date ? ` · ${formatDate(m.date)}` : ''}` : '-'}
                         {m && needsConfirmation(m) && (
                           <label style={{ display: 'block' }}>
                             <input type="checkbox" checked={confirmed.has(m.rowId)} onChange={(e) => toggle(m.rowId, e.target.checked)} /> {fxbT('confirmAmount')}

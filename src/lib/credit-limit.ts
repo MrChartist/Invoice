@@ -170,9 +170,9 @@ export function creditCheck(input: {
   }
   if (overdue.count > 0) {
     warnings.push(
-      `${overdue.count} bill${overdue.count === 1 ? '' : 's'} (${inr(overdue.amount)}) older than the ${creditDays}-day credit period — oldest ${overdue.oldestDays} days.`,
+      `${overdue.count} bill${overdue.count === 1 ? '' : 's'} (${inr(overdue.amount)}) older than the ${creditDays}-day credit period: oldest ${overdue.oldestDays} days.`,
     );
   }
-  if (bounced > 0) warnings.push(`${bounced} cheque${bounced === 1 ? '' : 's'} from this client bounced — consider advance payment.`);
+  if (bounced > 0) warnings.push(`${bounced} cheque${bounced === 1 ? '' : 's'} from this client bounced: consider advance payment.`);
   return { limit, creditDays, outstanding, openOrders: orders, thisInvoice, projected, overBy, overdue, bounced, warnings };
 }

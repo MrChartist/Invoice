@@ -47,7 +47,7 @@ export default function SiteForm({ site, sites, clients, entity, notify, onDone 
         <F label={mpT('code')}><input className={controls.input} value={mp.code} onChange={(e) => set({ code: e.target.value })} data-mp-site-code /></F>
         <F label={mpT('client')}>
           <select className={controls.select} value={clientId} onChange={(e) => { setClientId(e.target.value); setFlags(clients.find((c) => c.id === e.target.value)?.mp ?? {}); }} data-mp-site-client>
-            <option value="">—</option>
+            <option value="">-</option>
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}{c.gstin ? ` (${c.gstin})` : ''}</option>)}
           </select>
         </F>
@@ -124,12 +124,12 @@ function DeployList({ site, notify }: { site: Site; notify: Notify }) {
       <legend className={controls.label}>{mbT('staff')}</legend>
       {here.map((e) => (
         <span key={e.id} className={controls.hint} data-mp-deployed-row={e.code}>
-          {e.code} {e.name} — {site.mp.posts.find((p) => p.id === e.mp?.post_id)?.name ?? '—'}{' '}
+          {e.code} {e.name} : {site.mp.posts.find((p) => p.id === e.mp?.post_id)?.name ?? '-'}{' '}
           <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => void go(e.id, '')}>{mbT('release')}</button>
         </span>
       ))}
       <select className={controls.select} aria-label={mbT('person')} value={pick.e} onChange={(ev) => setPick({ ...pick, e: ev.target.value })} data-mp-deploy-person>
-        <option value="">—</option>
+        <option value="">-</option>
         {staff.filter((e) => e.cost_centre_id !== site.id && e.active !== false).map((e) => <option key={e.id} value={e.id}>{e.code} {e.name}</option>)}
       </select>
       <select className={controls.select} aria-label={mpT('post')} value={pick.p} onChange={(ev) => setPick({ ...pick, p: ev.target.value })}>

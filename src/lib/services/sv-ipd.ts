@@ -58,7 +58,7 @@ export function admissionLines(a: Admission, until: string, mode: 'midnight' | '
   if (a.room && num(a.room.rate) > 0) {
     const days = roomDays(a.admit_date, a.admit_time, end, a.discharge_time, mode);
     const c = roomClass(a.room, a.room.rate, a.admit_date);
-    lines.push(clinicLine(`Room — ${a.room.name} (${days} day${days === 1 ? '' : 's'})`, num(a.room.rate), { qty: days, cls: c.cls, hsn: c.sac, taxRate: c.rate, date: end }));
+    lines.push(clinicLine(`Room: ${a.room.name} (${days} day${days === 1 ? '' : 's'})`, num(a.room.rate), { qty: days, cls: c.cls, hsn: c.sac, taxRate: c.rate, date: end }));
   }
   for (const ch of a.charges ?? []) {
     const doc = ch.doctor_id ? doctorsDb.get(ch.doctor_id) : undefined;
@@ -194,7 +194,7 @@ export function interimHtml(a: Admission, o: { asOn: string; business: string; d
   const lines = admissionLines(a, o.asOn, o.mode);
   const gross = linesGross(lines);
   const rows = lines.map((l) => `<tr><td>${esc(l.name)}</td><td class="n">${num(l.quantity)}</td><td class="n">${esc(o.money(num(l.rate)))}</td><td class="n">${num(l.tax_rate) ? `${num(l.tax_rate)}%` : 'Exempt'}</td><td class="n">${esc(o.money(round2(num(l.quantity) * num(l.rate) * (1 + num(l.tax_rate) / 100))))}</td></tr>`).join('');
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Interim bill ${esc(a.number)}</title><style>${PRINT_FONT_FACE}body{font:11pt ${PRINT_FONT};margin:14mm}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #999;padding:4px;text-align:left}.n{text-align:right}</style></head><body><h2>${esc(o.business)}</h2><p><strong>Interim bill — not a tax invoice</strong> · ${esc(a.number)} · ${esc(a.patient_name)}${a.uhid ? ` · UHID ${esc(a.uhid)}` : ''} · admitted ${esc(a.admit_date)} · as on ${esc(o.asOn)}</p><table><thead><tr><th>Charge</th><th class="n">Qty</th><th class="n">Rate</th><th class="n">GST</th><th class="n">Amount</th></tr></thead><tbody>${rows}</tbody></table><p class="n">Charges ${esc(o.money(gross))} · Less deposits ${esc(o.money(o.deposits))} · <strong>Balance ${esc(o.money(round2(gross - o.deposits)))}</strong></p></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Interim bill ${esc(a.number)}</title><style>${PRINT_FONT_FACE}body{font:11pt ${PRINT_FONT};margin:14mm}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #999;padding:4px;text-align:left}.n{text-align:right}</style></head><body><h2>${esc(o.business)}</h2><p><strong>Interim bill: not a tax invoice</strong> · ${esc(a.number)} · ${esc(a.patient_name)}${a.uhid ? ` · UHID ${esc(a.uhid)}` : ''} · admitted ${esc(a.admit_date)} · as on ${esc(o.asOn)}</p><table><thead><tr><th>Charge</th><th class="n">Qty</th><th class="n">Rate</th><th class="n">GST</th><th class="n">Amount</th></tr></thead><tbody>${rows}</tbody></table><p class="n">Charges ${esc(o.money(gross))} · Less deposits ${esc(o.money(o.deposits))} · <strong>Balance ${esc(o.money(round2(gross - o.deposits)))}</strong></p></body></html>`;
 }
 
 /** Bell rows: admissions open more than 7 days; deposits short of charges by more than the alert limit. */

@@ -196,7 +196,7 @@ function TagsView({ onDone }: { onDone: Done }) {
                   <tr key={t.id} data-tag-row={t.tag}>
                     <td className={surface.mono}>{t.tag}</td><td>{t.item_name}</td><td>{purityLabel(t.metal, t.purity)}</td>
                     <td className={surface.numeric}>{g3(t.gross_wt)}</td><td className={surface.numeric}>{g3(t.net_wt)}</td>
-                    <td>{t.huid ?? (t.metal === 'gold' ? <small style={{ color: 'var(--warning)' }}>{rteT('noHuid')}</small> : '—')}</td>
+                    <td>{t.huid ?? (t.metal === 'gold' ? <small style={{ color: 'var(--warning)' }}>{rteT('noHuid')}</small> : '-')}</td>
                     <td><button type="button" className={ghost} onClick={() => window.confirm(rteT('confirmDel', { tag: t.tag })) && run(() => (deleteTag(t.id, data.tr), `${t.tag} ✓`))}>{rteT('del')}</button></td>
                   </tr>
                 ))}
@@ -283,7 +283,7 @@ function OldGoldView({ onDone }: { onDone: Done }) {
                   <td>{p.vendor_name}{p.old_metal?.kyc?.pan ? <><br /><small>PAN {maskPan(p.old_metal.kyc.pan)}</small></> : null}</td>
                   <td className={surface.numeric}>{g3(p.old_metal!.fine_wt)}<br /><small>{g3(p.old_metal!.gross_wt)} g @ {p.old_metal!.purity_pct}%</small></td>
                   <td className={surface.numeric}>{formatCurrency(p.total)}</td>
-                  <td className={surface.numeric}>{p.exchanged ? formatCurrency(p.exchanged) : '—'}</td>
+                  <td className={surface.numeric}>{p.exchanged ? formatCurrency(p.exchanged) : '-'}</td>
                   <td className={surface.numeric}>{formatCurrency(p.open)}</td>
                   <td style={{ textAlign: 'right' }}>{p.open > 0.004 && <>
                     <button type="button" className={sm} onClick={() => settle(p.id)} data-og-settle>{rteT('settle')}</button>
@@ -329,7 +329,7 @@ function KarigarView({ onDone }: { onDone: Done }) {
       <h3 className={surface.cardHeadIcon}><Calculator size={16} aria-hidden="true" /> {rteT('kTitle')}</h3>
       <p className={surface.sectionNote}>{rteT('kHint')}</p>
       <div className={controls.row} style={row} data-k-form>
-        <F l={rteT('karigar')}><select className={controls.select} value={f.karigar} onChange={(e) => s('karigar')(e.target.value)} data-k="karigar"><option value="">—</option>{[...d.vendors].sort((a, b) => Number(!!b.karigar) - Number(!!a.karigar)).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></F>
+        <F l={rteT('karigar')}><select className={controls.select} value={f.karigar} onChange={(e) => s('karigar')(e.target.value)} data-k="karigar"><option value="">-</option>{[...d.vendors].sort((a, b) => Number(!!b.karigar) - Number(!!a.karigar)).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></F>
         <F l={rteT('kind')} w={150}><select className={controls.select} value={f.kind} onChange={(e) => s('kind')(e.target.value as typeof f.kind)} data-k="kind">{(['issue', 'receipt', 'return_metal'] as const).map((k) => <option key={k} value={k}>{rteT(`k.${k}`)}</option>)}</select></F>
         <F l={rteT('item')}><input className={controls.input} list="jw-k-items" value={f.item} onChange={(e) => s('item')(e.target.value)} data-k="item" /></F>
         <datalist id="jw-k-items">{d.items.map((i) => <option key={i.id} value={i.name} />)}</datalist>
@@ -343,7 +343,7 @@ function KarigarView({ onDone }: { onDone: Done }) {
           <N l={rteT('wastageAllowed')} v={f.wastage} set={s('wastage')} w={110} d="k-wastage" />
           <N l={rteT('labourRate')} v={f.labour} set={s('labour')} d="k-labour" />
           <F l={rteT('basis')} w={130}><select className={controls.select} value={f.basis} onChange={(e) => s('basis')(e.target.value as typeof f.basis)}><option value="per_gram">{rteT('mk.per_gram')}</option><option value="per_piece">{rteT('perPiece')}</option></select></F>
-          <F l={rteT('consume')}><select className={controls.select} value={f.consume} onChange={(e) => s('consume')(e.target.value)}><option value="">—</option>{d.items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select></F>
+          <F l={rteT('consume')}><select className={controls.select} value={f.consume} onChange={(e) => s('consume')(e.target.value)}><option value="">-</option>{d.items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select></F>
           <F l={rteT('bulk')}><textarea className={controls.input} rows={1} value={f.tags} placeholder="6.420, 0.380, 22K, AB12CD" onChange={(e) => s('tags')(e.target.value)} /></F>
         </>}
         <button type="button" className={controls.btnPrimary} disabled={!f.karigar || !(f.gross > 0 || f.net > 0)} onClick={save} data-k-save>{rteT('save')}</button>
@@ -352,7 +352,7 @@ function KarigarView({ onDone }: { onDone: Done }) {
         <div className={surface.tableWrap}>
           <table className={surface.table} data-k-ledger>
             <thead><tr><th>{rteT('karigar')}</th><th className={surface.numeric}>{rteT('k.issue')}</th><th className={surface.numeric}>{rteT('k.receipt')}</th><th className={surface.numeric}>{rteT('wastageAllowed')}</th><th className={surface.numeric}>{rteT('k.return_metal')}</th><th className={surface.numeric}>{rteT('balance')}</th><th className={surface.numeric}>{rteT('days')}</th></tr></thead>
-            <tbody>{ledger.map((l) => <tr key={l.karigar_id} data-k-row={l.name}><td>{l.name}</td><td className={surface.numeric}>{g3(l.issued)}</td><td className={surface.numeric}>{g3(l.received)}</td><td className={surface.numeric}>{g3(l.wastage)}</td><td className={surface.numeric}>{g3(l.returned)}</td><td className={surface.numeric}><strong>{g3(l.balance)}</strong></td><td className={surface.numeric}>{l.days || '—'}</td></tr>)}</tbody>
+            <tbody>{ledger.map((l) => <tr key={l.karigar_id} data-k-row={l.name}><td>{l.name}</td><td className={surface.numeric}>{g3(l.issued)}</td><td className={surface.numeric}>{g3(l.received)}</td><td className={surface.numeric}>{g3(l.wastage)}</td><td className={surface.numeric}>{g3(l.returned)}</td><td className={surface.numeric}><strong>{g3(l.balance)}</strong></td><td className={surface.numeric}>{l.days || '-'}</td></tr>)}</tbody>
           </table>
         </div>
       )}
@@ -438,7 +438,7 @@ function KycFields({ kyc, set }: { kyc?: SaleKyc; set: (k: SaleKyc | undefined) 
   return (
     <span className={controls.row} style={row} data-kyc>
       <F l="PAN" w={130}><input className={controls.input} value={kyc?.pan ?? ''} maxLength={10} onChange={(e) => set({ ...kyc, pan: e.target.value.toUpperCase() || undefined })} data-kyc-pan /></F>
-      <F l={rteT('declaration')} w={160}><select className={controls.select} value={kyc?.form ?? ''} onChange={(e) => set({ ...kyc, form: (e.target.value || undefined) as SaleKyc['form'] })}><option value="">—</option><option value="60">Form 60</option><option value="97">Form 97</option></select></F>
+      <F l={rteT('declaration')} w={160}><select className={controls.select} value={kyc?.form ?? ''} onChange={(e) => set({ ...kyc, form: (e.target.value || undefined) as SaleKyc['form'] })}><option value="">-</option><option value="60">Form 60</option><option value="97">Form 97</option></select></F>
     </span>
   );
 }

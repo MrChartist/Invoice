@@ -29,7 +29,7 @@ test('every dated row: none before Oct 2020, 5 %, slabs 7 / 10 lakh, 2 % from 20
 test('2 % from 2026-04-01 at any amount, labelled Sec 394(1) Sl. 8', () => {
   const r = tourTcs({ date: '2026-05-10', base: 340000, pan: PAN, components: pkg });
   assert.deepEqual([r.status, r.rate, r.amount, r.slab], ['ok', 2, 6800, undefined]);
-  assert.match(r.label, /^Sec 394\(1\) Sl\. 8 — overseas tour package 2 %$/);
+  assert.match(r.label, /^Sec 394\(1\) Sl\. 8: overseas tour package 2 %$/);
   assert.equal(tourTcs({ date: '2026-04-01', base: 50_00_00_000, pan: PAN, prior: 9e9 }).rate, 2);
 });
 
@@ -81,7 +81,7 @@ test('base total vs taxable: the invoice maths computes the amount from the appl
 
 const doc = (id: string, date: string, base: number, tcs: number, extra: object = {}) => ({
   id, issue_date: date, status: 'Sent', doc_type: 'TAX_INVOICE', currency: 'INR', invoice_number: id, total: base + tcs, tcs_amount: tcs, tcs_rate: 2,
-  tcs_label: tcs ? 'Sec 394(1) Sl. 8 — overseas tour package 2 %' : 'TCS', client: { id: 'c1', name: 'Mehta', pan: PAN }, tv: { tcs: { rate: 2, base, label: 'x' } }, ...extra,
+  tcs_label: tcs ? 'Sec 394(1) Sl. 8: overseas tour package 2 %' : 'TCS', client: { id: 'c1', name: 'Mehta', pan: PAN }, tv: { tcs: { rate: 2, base, label: 'x' } }, ...extra,
 });
 
 test('buyer FY aggregate: same buyer, same FY, flagged, live, dated on or before', () => {

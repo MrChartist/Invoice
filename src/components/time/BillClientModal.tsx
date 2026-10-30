@@ -173,7 +173,7 @@ function BillForm({ clientKey: key, projectId, prefs, onClose, onCreated }: {
                     {changes.map((c) => (
                       <tr key={c.id}>
                         <td>{formatDate(c.date)}</td>
-                        <td>{c.description || '–'}</td>
+                        <td>{c.description || '-'}</td>
                         <td className={surface.numeric}>{formatCurrency(c.from)}</td>
                         <td className={surface.numeric}>{formatCurrency(c.to)}</td>
                         <td><RateSourceTag source={c.source} /></td>

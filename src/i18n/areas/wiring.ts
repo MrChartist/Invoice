@@ -48,7 +48,7 @@ export const wireT = defineArea(
     nAmcTitle: 'AMC: {text}',
     nAmcCta: 'Open AMC contracts',
     nSetoffTitle: 'GST set-off for {period} not posted',
-    nSetoffDetail: 'GSTR-3B / payment due {date}. Post the set-off and PMT-06 challan in the GST page (working paper — verify with your CA).',
+    nSetoffDetail: 'GSTR-3B / payment due {date}. Post the set-off and PMT-06 challan in the GST page (working paper: verify with your CA).',
     nSetoffCta: 'Open set-off',
   },
   {
@@ -93,7 +93,7 @@ export const wireT = defineArea(
     nAmcTitle: 'AMC: {text}',
     nAmcCta: 'AMC अनुबंध खोलें',
     nSetoffTitle: '{period} का GST समायोजन दर्ज नहीं',
-    nSetoffDetail: 'GSTR-3B / भुगतान की अंतिम तिथि {date}। GST पेज में समायोजन और PMT-06 चालान दर्ज करें (कार्य-पत्र — अपने CA से जाँच कराएँ)।',
+    nSetoffDetail: 'GSTR-3B / भुगतान की अंतिम तिथि {date}। GST पेज में समायोजन और PMT-06 चालान दर्ज करें (कार्य-पत्र: अपने CA से जाँच कराएँ)।',
     nSetoffCta: 'समायोजन खोलें',
   },
 );

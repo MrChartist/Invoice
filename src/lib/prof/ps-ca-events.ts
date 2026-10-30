@@ -59,7 +59,7 @@ export function companyEvents(clientId: string, companyId: string, t: PracticeTa
 
 /** UDIN events of the month for a client (revoked ones out). */
 export const udinEvents = (rows: readonly UdinRow[], clientId: string, month: string): CaEvent[] =>
-  rows.filter((u) => u.client_id === clientId && !u.revoked && inMonth(u.date, month)).map((u) => ({ key: udinRef(u.id), client_id: clientId, kind: UDIN_KIND[u.kind], period: u.date, date: u.date, label: `${u.description || u.kind} — UDIN ${u.udin}`, udin: u.udin }));
+  rows.filter((u) => u.client_id === clientId && !u.revoked && inMonth(u.date, month)).map((u) => ({ key: udinRef(u.id), client_id: clientId, kind: UDIN_KIND[u.kind], period: u.date, date: u.date, label: `${u.description || u.kind} (UDIN ${u.udin})`, udin: u.udin }));
 
 /** Every event of `month` for the linked clients, with its billed state. `peeks` maps company id → peeked tables. */
 export function caEvents(input: { settings: ProfCaSettings; peeks: ReadonlyMap<string, PracticeTables | undefined>; udins: readonly UdinRow[]; month: string; invoices: readonly InvoiceRecord[]; retainerClients?: ReadonlySet<string> }): CaEvent[] {

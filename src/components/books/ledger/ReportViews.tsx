@@ -175,7 +175,7 @@ export function GroupVouchersView({ groupId, period }: { groupId: string; period
                 <td>{formatDate(r.voucher.date)}</td>
                 <td>{r.accounts.join(', ')}<div className={books.narration}>{[r.voucher.party, r.voucher.narration].filter(Boolean).join(' · ')}</div></td>
                 <td><span className={r.voucher.source === 'manual' ? styles.badgeManual : styles.badge}>{r.voucher.kind}</span></td>
-                <td className={surface.mono}>{r.voucher.number || '—'}</td>
+                <td className={surface.mono}>{r.voucher.number || '-'}</td>
                 <td className={surface.numeric}>{r.debit ? money(r.debit) : ''}</td>
                 <td className={surface.numeric}>{r.credit ? money(r.credit) : ''}</td>
               </tr>
@@ -298,13 +298,13 @@ export function LedgerVouchersView({ accountId, party, period }: { accountId: st
                 <tr key={r.voucher.id} {...nav.row(i)}>
                   <td>{formatDate(r.voucher.date)}</td>
                   <td>
-                    <div>{r.particulars || '—'}</div>
+                    <div>{r.particulars || '-'}</div>
                     {prefs.showNarration && <div className={books.narration}>{[r.voucher.party, r.voucher.narration].filter(Boolean).join(' · ')}</div>}
                   </td>
                   <td><span className={r.voucher.source === 'manual' ? styles.badgeManual : styles.badge}>{r.voucher.kind}</span></td>
                   <td>
                     {voucherTarget(r.voucher).type === 'none' ? (
-                      <span className={surface.mono}>{r.voucher.number || '—'}</span>
+                      <span className={surface.mono}>{r.voucher.number || '-'}</span>
                     ) : (
                       <button type="button" className={styles.rowButton} onClick={() => openVoucher(r.voucher)}>{r.voucher.number || reportsT('open')}</button>
                     )}

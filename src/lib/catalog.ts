@@ -64,7 +64,7 @@ export function validateCatalogItem(
   if (barcode) {
     if (!isCode128BText(barcode)) return { field: 'barcode', message: 'A barcode takes letters, digits and plain punctuation only.' };
     if (/^\d{13}$/.test(barcode) && ean13CheckDigit(barcode.slice(0, 12)) !== Number(barcode[12])) {
-      return { field: 'barcode', message: `This EAN-13 has a wrong check digit — it should end in ${ean13CheckDigit(barcode.slice(0, 12))}.` };
+      return { field: 'barcode', message: `This EAN-13 has a wrong check digit: it should end in ${ean13CheckDigit(barcode.slice(0, 12))}.` };
     }
     const twin = existing.find((i) => i.id !== draft.id && codeKey((i as InvoiceItem).barcode) === codeKey(barcode));
     if (twin) return { field: 'barcode', message: `“${twin.name}” already has this barcode.` };

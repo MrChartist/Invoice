@@ -91,7 +91,7 @@ export function gstDropNote(inv: InvoiceRecord, rows: PriceDropRun['rows'], drop
   const rec: InvoiceRecord = {
     ...inv, id: generateId(), invoice_number: '', doc_type: 'CREDIT_NOTE', issue_date: date, due_date: date, status: 'Sent', items, attachments: undefined,
     discount_type: 'PERCENT', discount_rate: 0, shipping: 0, other_charges: 0, amount_paid: 0, po_number: inv.invoice_number, goods_returned: false,
-    notes: `Credit note against ${inv.invoice_number} dated ${inv.issue_date}. Reason: Rate difference (price drop agreed before supply, Sec 15(3) / 34 — verify with your CA).`,
+    notes: `Credit note against ${inv.invoice_number} dated ${inv.issue_date}. Reason: Rate difference (price drop agreed before supply, Sec 15(3) / 34, verify with your CA).`,
     created_at: undefined, updated_at: undefined, approval: undefined, party_balance_snapshot: undefined, pos: undefined, transport: undefined, late_fee_for: undefined, recurring_id: undefined,
   };
   const t = calculateInvoice(calcInputFromRecord(rec));

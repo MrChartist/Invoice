@@ -55,12 +55,12 @@ export function StatementsPanel({ statements, index, onClosingBalance, onRemove 
                     <strong>{s.bank_label}</strong>
                     <div className={styles.muted}>{bankT('importedOn', { file: s.file_name, date: formatDate(s.imported_at.slice(0, 10)) })}</div>
                   </td>
-                  <td>{dates.length ? `${formatDate(dates[0])} – ${formatDate(dates[dates.length - 1])}` : '—'}</td>
+                  <td>{dates.length ? `${formatDate(dates[0])} – ${formatDate(dates[dates.length - 1])}` : '-'}</td>
                   <td className={surface.numeric}>{sum.total}</td>
                   <td className={surface.numeric}>{sum.pctReconciled}%</td>
                   <td className={surface.numeric}>
                     {fromFile ? (
-                      <span title={bankT('fromFile')}>{closing === null ? '—' : `₹${formatMoney(closing)}`}</span>
+                      <span title={bankT('fromFile')}>{closing === null ? '-' : `₹${formatMoney(closing)}`}</span>
                     ) : (
                       <NumberInput
                         aria-label={bankT('closingFor', { file: s.file_name })}

@@ -45,7 +45,7 @@ const COL: Record<ColKey, GwKey> = {
 const memory = new Map<string, number>();
 
 const amount = (p: number) => formatMoney(p / 100);
-const balance = (p: number) => (p ? `${formatMoney(Math.abs(p) / 100)} ${p > 0 ? 'Dr' : 'Cr'}` : '—');
+const balance = (p: number) => (p ? `${formatMoney(Math.abs(p) / 100)} ${p > 0 ? 'Dr' : 'Cr'}` : '-');
 
 function cellText(c: Cell, kind: 'text' | 'amount' | 'balance'): string {
   if (c === null || c === undefined) return '';

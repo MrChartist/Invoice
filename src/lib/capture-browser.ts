@@ -189,7 +189,7 @@ export function captureFromQrText(text: string, source: InboxSource = 'camera'):
   notifyInbox();
   const extra = [...res.warnings.map((w) => capT(QR_WARN_KEY[w])), ...(preview.buyerMismatch ? [capT('warnBuyer', { gstin: res.data.buyerGstin })] : [])];
   return {
-    message: `${capT('drafted', { no: res.data.docNo || '—' })} ${capT('sigNote')}${extra.length ? ` ${extra.join(' ')}` : ''}`,
+    message: `${capT('drafted', { no: res.data.docNo || '-' })} ${capT('sigNote')}${extra.length ? ` ${extra.join(' ')}` : ''}`,
     tone: extra.length ? 'info' : 'success',
     route: `/expenses?tab=inbox&doc=${encodeURIComponent(row.id)}`,
   };
@@ -204,7 +204,7 @@ function captureJson(j: EinvoiceJsonData, warnings: readonly (keyof typeof QR_WA
   const route = `/expenses?tab=inbox&doc=${encodeURIComponent(row.id)}`;
   if (!res.bill) return { message: capT('creditNote'), tone: 'info', route, inboxId: row.id };
   const extra = [...warnings.map((w) => capT(QR_WARN_KEY[w])), ...(res.buyerMismatch ? [capT('warnBuyer', { gstin: j.qr.buyerGstin })] : [])];
-  return { message: `${capT('draftedLines', { no: j.qr.docNo || '—', n: j.lines.length })}${extra.length ? ` ${extra.join(' ')}` : ''}`, tone: extra.length ? 'info' : 'success', route, inboxId: row.id };
+  return { message: `${capT('draftedLines', { no: j.qr.docNo || '-', n: j.lines.length })}${extra.length ? ` ${extra.join(' ')}` : ''}`, tone: extra.length ? 'info' : 'success', route, inboxId: row.id };
 }
 
 function notifyInbox() {
