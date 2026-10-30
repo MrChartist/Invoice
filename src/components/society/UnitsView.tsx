@@ -71,7 +71,7 @@ export default function UnitsView({ notify }: HsViewProps) {
         <div className={surface.tableWrap}>
           <table className={surface.table}>
             <thead><tr><th>{hsT('row')}</th><th>{hsT('unit')}</th><th>{hsT('member')}</th><th>{hsT('error')}</th></tr></thead>
-            <tbody>{p.rows.slice(0, 50).map((r) => <tr key={r.line} data-hs-import-row={r.code}><td>{r.line}</td><td>{r.code}</td><td>{r.owner?.name}</td><td style={{ color: r.error ? 'var(--danger)' : 'var(--warning)' }}>{r.error ?? r.warning}</td></tr>)}</tbody>
+            <tbody>{p.rows.slice(0, 50).map((r) => <tr key={r.line} data-hs-import-row={r.code}><td>{r.line}</td><td>{r.code}</td><td>{r.owner?.name}</td><td style={{ color: r.error ? 'var(--danger)' : 'var(--sys-orange-ink)' }}>{r.error ?? r.warning}</td></tr>)}</tbody>
           </table>
         </div>
         {p.errors > 0 && <p className={controls.hint}>{hsT('impFix')}</p>}
@@ -103,7 +103,7 @@ export default function UnitsView({ notify }: HsViewProps) {
         {pick('wing', wingsOf(data.units), (w) => w)}
         {pick('occupancy', OCCUPANCIES, (o) => hsList('occs', OCCUPANCIES, o))}
       </div>
-      {unitWarnings(data.units).map((w) => <p key={w} className={controls.hint} style={{ color: 'var(--warning)' }}>{w}</p>)}
+      {unitWarnings(data.units).map((w) => <p key={w} className={controls.hint} style={{ color: 'var(--sys-orange-ink)' }}>{w}</p>)}
       {data.units.length ? (
         <div className={surface.tableWrap}>
           <table className={surface.table} data-hs-units>

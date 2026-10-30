@@ -47,7 +47,7 @@ export function ReconMonthly({ period, gstin, filerStateCode }: ReconMonthlyProp
   return (
     <div className={local.tabBody} style={{ padding: 0 }} data-gst-recon-monthly>
       <div className={`${surface.card} ${local.disclaimer}`} role="note">
-        <AlertTriangle size={16} aria-hidden style={{ flexShrink: 0, color: 'var(--warning)' }} />
+        <AlertTriangle size={16} aria-hidden style={{ flexShrink: 0, color: 'var(--sys-orange-ink)' }} />
         <span>{soT('disclaimer')}</span>
       </div>
       <p className={styles.muted}>{soT('reconIntro')} {soT('reconFyHint')}</p>

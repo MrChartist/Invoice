@@ -129,7 +129,7 @@ function CancelForm({ invoice, onClose, onDone }: CancelDialogProps) {
             </div>
             {paid > 0 && (
               <div className={styles.warn} role="alert">
-                <AlertTriangle size={16} color="var(--warning)" aria-hidden="true" />
+                <AlertTriangle size={16} color="var(--sys-orange-ink)" aria-hidden="true" />
                 <div>
                   {areaNodes(salesT('cn.paidWarn'), { amount: <strong>{formatCurrency(paid, invoice.currency || 'INR')}</strong> })}
                   <label className={styles.check}>

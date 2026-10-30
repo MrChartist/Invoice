@@ -54,12 +54,12 @@
 
 .periodSummary {
   font-size: var(--text-base);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 /* ── Statement tables ─────────────────────────────────────────── */
 .dayRow td {
-  background-color: var(--card-inner);
+  background-color: var(--bg-grouped-3);
   font-family: var(--font-display);
   font-weight: 600;
   font-size: var(--text-base);
@@ -68,23 +68,23 @@
 }
 
 .dayRow:hover td {
-  background-color: var(--card-inner);
+  background-color: var(--bg-grouped-3);
 }
 
 .totalRow td {
   font-weight: 600;
-  border-top: 2px solid var(--border);
-  background-color: var(--card-inner);
+  border-top: var(--hairline) solid var(--sep-opaque);
+  background-color: var(--bg-grouped-3);
 }
 
 .narration {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-base);
   max-width: 320px;
 }
 
 .link {
-  color: var(--brand-text);
+  color: var(--tint);
   font-weight: 600;
   text-decoration: none;
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
@@ -96,9 +96,9 @@
 }
 
 .link:focus-visible {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--tint);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: var(--r-4);
 }
 
 .vtype {
@@ -107,46 +107,44 @@
   font-size: var(--text-xs);
   font-weight: 600;
   padding: 0.1875rem 0.5rem;
-  border-radius: var(--radius-full);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  border-radius: var(--r-full);
   white-space: nowrap;
   background: var(--muted);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
-.vSales { background: var(--primary-glow); color: var(--brand-text); }
-.vReceipt { background: rgba(37, 160, 90, 0.14); color: var(--profit); }
-.vCredit { background: rgba(230, 154, 6, 0.14); color: var(--warning); }
-.vPurchase { background: rgba(99, 102, 241, 0.12); color: var(--muted-foreground); }
-.vExpense { background: rgba(217, 54, 54, 0.12); color: var(--loss); }
-.vPayment { background: var(--accent); color: var(--foreground); }
+.vSales { background: var(--tint-soft); color: var(--tint); }
+.vReceipt { background: var(--sys-green-soft); color: var(--sys-green-ink); }
+.vCredit { background: var(--sys-orange-soft); color: var(--sys-orange-ink); }
+.vPurchase { background: var(--sys-indigo-soft); color: var(--label-2); }
+.vExpense { background: var(--sys-red-soft); color: var(--sys-red-ink); }
+.vPayment { background: var(--accent); color: var(--label); }
 
-.pos { color: var(--profit); }
-.neg { color: var(--loss); }
+.pos { color: var(--sys-green-ink); }
+.neg { color: var(--sys-red-ink); }
 
 .notice {
   display: flex;
   align-items: flex-start;
   gap: 0.625rem;
   padding: 0.75rem 1rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: var(--card-inner);
+  border-radius: var(--r-12);
+  border: var(--hairline) solid var(--sep);
+  background: var(--bg-grouped-3);
   font-size: var(--text-base);
-  color: var(--muted-foreground);
+  color: var(--label-2);
   line-height: 1.5;
 }
 
 .noticeWarn {
   composes: notice;
-  border-color: var(--warning);
+  border-color: var(--sys-orange-ink);
 }
 
 .noticeIcon {
   flex-shrink: 0;
   margin-top: 2px;
-  color: var(--warning);
+  color: var(--sys-orange-ink);
 }
 
 .indicative {
@@ -155,12 +153,10 @@
   gap: 0.375rem;
   font-size: var(--text-xs);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   padding: 0.25rem 0.625rem;
-  border-radius: var(--radius-full);
-  background: rgba(230, 154, 6, 0.14);
-  color: var(--warning);
+  border-radius: var(--r-full);
+  background: var(--sys-orange-soft);
+  color: var(--sys-orange-ink);
 }
 
 /* ── Two-column statements (P&L, balance sheet) ───────────────── */
@@ -185,7 +181,7 @@
   align-items: baseline;
   gap: 1rem;
   padding: 0.625rem 1.25rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--sep);
   font-size: var(--text-md);
 }
 
@@ -196,23 +192,21 @@
 .stmtSub {
   composes: stmtRow;
   padding-left: 2rem;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .stmtTotal {
   composes: stmtRow;
   font-family: var(--font-display);
   font-weight: 600;
-  background: var(--card-inner);
+  background: var(--bg-grouped-3);
 }
 
 .stmtHead {
   composes: stmtRow;
   font-size: var(--text-xs);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .amt {
@@ -234,13 +228,13 @@
   height: auto;
 }
 
-.axis { stroke: var(--border); stroke-width: 1; }
-.gridLine { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 4; }
-.axisText { fill: var(--muted-foreground); font-size: var(--text-sm); font-family: var(--font-body); }
-.barIncome { fill: var(--primary); }
-.barExpense { fill: var(--muted-foreground); opacity: 0.55; }
-.profitLine { fill: none; stroke: var(--profit); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
-.profitDot { fill: var(--card); stroke: var(--profit); stroke-width: 2; }
+.axis { stroke: var(--sep); stroke-width: 1; }
+.gridLine { stroke: var(--sep); stroke-width: 1; stroke-dasharray: 3 4; }
+.axisText { fill: var(--label-2); font-size: var(--text-sm); font-family: var(--font-body); }
+.barIncome { fill: var(--tint); }
+.barExpense { fill: var(--label-2); opacity: 0.55; }
+.profitLine { fill: none; stroke: var(--sys-green-ink); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.profitDot { fill: var(--bg-grouped-2); stroke: var(--sys-green-ink); stroke-width: 2; }
 
 .legend {
   display: flex;
@@ -248,7 +242,7 @@
   gap: 1rem;
   padding: 0 1.25rem 0.5rem;
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .legendItem {
@@ -260,13 +254,13 @@
 .swatch {
   width: 10px;
   height: 10px;
-  border-radius: 3px;
+  border-radius: var(--r-4);
   display: inline-block;
 }
 
-.swatchIncome { background: var(--primary); }
-.swatchExpense { background: var(--muted-foreground); opacity: 0.55; }
-.swatchProfit { background: var(--profit); }
+.swatchIncome { background: var(--tint); }
+.swatchExpense { background: var(--label-2); opacity: 0.55; }
+.swatchProfit { background: var(--sys-green-ink); }
 
 /* ── Horizontal bars (expense mix) ────────────────────────────── */
 .barList {
@@ -293,25 +287,25 @@
 
 .barTrack {
   height: 8px;
-  border-radius: var(--radius-full);
+  border-radius: var(--r-full);
   background: var(--muted);
   overflow: hidden;
 }
 
 .barFill {
   height: 100%;
-  border-radius: var(--radius-full);
-  background: var(--primary);
+  border-radius: var(--r-full);
+  background: var(--tint);
   min-width: 2px;
 }
 
 .barFillDirect {
   composes: barFill;
-  background: var(--muted-foreground);
+  background: var(--label-2);
 }
 
 .muted {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-base);
 }
 
@@ -324,16 +318,16 @@
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 52.0625em) {
   .twoCol { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .stmtRow { padding: 0.625rem 1rem; }
   .stmtSub { padding-left: 1.5rem; }
   .dateField { max-width: none; }
 }
 
-@media (pointer: coarse), (max-width: 640px) {
+@media (pointer: coarse), (max-width: 37.4375em) {
   .link { display: inline-flex; align-items: center; min-height: 40px; }
 }

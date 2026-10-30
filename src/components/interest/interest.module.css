@@ -6,10 +6,10 @@
   align-items: center;
   gap: 0.375rem;
   padding: 0.25rem 0.625rem;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  border: var(--hairline) solid var(--sep);
   background: var(--brand-soft);
-  color: var(--brand-text);
+  color: var(--tint);
   font-size: var(--text-sm);
   font-weight: 600;
   line-height: 1.4;
@@ -23,7 +23,7 @@
 
 .chipWhen {
   font-weight: 500;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .panel {
@@ -35,17 +35,17 @@
 
 .details {
   font-size: var(--text-base);
-  color: var(--muted-foreground);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card-inner);
+  color: var(--label-2);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-3);
   padding: 0.5rem 0.75rem;
 }
 
 .details summary {
   cursor: pointer;
   font-weight: 600;
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .tableWrap {
@@ -62,9 +62,9 @@
 .table th {
   text-align: left;
   font-weight: 600;
-  color: var(--muted-foreground);
+  color: var(--label-2);
   padding: 0.25rem 0.375rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--sep);
 }
 
 .table th.num {
@@ -74,7 +74,7 @@
 .table td {
   white-space: nowrap;
   padding: 0.25rem 0.375rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--sep);
   font-variant-numeric: tabular-nums;
 }
 
@@ -87,14 +87,14 @@
   margin: 0.25rem 0 0;
   font-size: var(--text-sm);
   line-height: 1.5;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .warn {
   margin: 0.25rem 0 0;
   font-size: var(--text-sm);
   line-height: 1.5;
-  color: var(--warning);
+  color: var(--sys-orange-ink);
 }
 
 .actions {
@@ -127,17 +127,17 @@
 }
 
 .suffix > span {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-base);
   white-space: nowrap;
 }
 
 .example {
   font-size: var(--text-base);
-  color: var(--foreground);
-  background: var(--card-inner);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  color: var(--label);
+  background: var(--bg-grouped-3);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
   padding: 0.5rem 0.75rem;
   line-height: 1.5;
 }

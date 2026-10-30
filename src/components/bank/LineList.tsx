@@ -67,7 +67,7 @@ export function LineList(props: LineListProps) {
         ))}
       </ul>
       {items.length > shown && (
-        <div style={{ padding: '0.875rem 1.25rem', borderTop: '1px solid var(--border)' }}>
+        <div style={{ padding: '0.875rem 1.25rem', borderTop: '1px solid var(--sep)' }}>
           <button type="button" className={controls.btnOutline} onClick={() => setShown((n) => n + PAGE)}>
             {bankT('showMore', { n: Math.min(PAGE, items.length - shown), left: items.length - shown })}
           </button>

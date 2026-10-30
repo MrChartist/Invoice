@@ -11,7 +11,7 @@
   flex-direction: column;
   gap: 0.25rem;
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .checks {
@@ -32,16 +32,16 @@
   gap: 0.5rem;
   align-items: flex-start;
   padding: 0.625rem 0.75rem;
-  border-radius: var(--radius);
-  border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
-  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  border-radius: var(--r-12);
+  border: var(--hairline) solid color-mix(in srgb, var(--sys-orange-ink) 40%, transparent);
+  background: color-mix(in srgb, var(--sys-orange-ink) 8%, transparent);
   font-size: var(--text-sm);
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .info {
   composes: warn;
-  border-color: var(--border);
+  border-color: var(--sep);
   background: var(--muted);
 }
 
@@ -54,7 +54,7 @@
 .grid th,
 .grid td {
   padding: 0.375rem 0.5rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--sep);
   text-align: right;
   white-space: nowrap;
 }
@@ -65,7 +65,7 @@
 }
 
 .grid thead th {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-weight: 600;
 }
 
@@ -84,15 +84,15 @@
 }
 
 .ok {
-  color: var(--profit);
+  color: var(--sys-green-ink);
 }
 
 .bad {
-  color: var(--loss);
+  color: var(--sys-red-ink);
 }
 
 .muted {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-sm);
 }
 
@@ -106,10 +106,10 @@
   margin: 0;
   padding-left: 1rem;
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .cellInput {
     width: 5.5rem;
   }

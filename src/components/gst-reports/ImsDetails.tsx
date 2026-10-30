@@ -134,7 +134,7 @@ export function ImsCell({ line, actions, period, remarksOn, onEdit }: { line: Gs
   return (
     <span>
       {parts.length > 0 && <span className={styles.sub}>{parts.join(' · ')}</span>}
-      {missing && <span className={styles.sub} style={{ color: 'var(--warning)' }}>{imsT('needsRemark')}</span>}
+      {missing && <span className={styles.sub} style={{ color: 'var(--sys-orange-ink)' }}>{imsT('needsRemark')}</span>}
       <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={onEdit} aria-label={imsT('editAria', { number: line.number })} data-ims-edit={line.number}>
         {imsT('edit')}
       </button>

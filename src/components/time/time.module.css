@@ -9,9 +9,9 @@
 .formError {
   margin: 0;
   padding: 0.625rem 0.875rem;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--loss) 10%, transparent);
-  color: var(--loss);
+  border-radius: var(--r-8);
+  background: color-mix(in srgb, var(--sys-red-ink) 10%, transparent);
+  color: var(--sys-red-ink);
   font-size: var(--text-base);
   font-weight: 600;
 }
@@ -30,7 +30,7 @@
 .includeRow { gap: 1.25rem; }
 
 .muted {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-sm);
 }
 
@@ -99,6 +99,6 @@ p.muted { margin: 0; }
   padding: 1.25rem;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 52.0625em) {
   .timerForm { grid-template-columns: 1fr; }
 }

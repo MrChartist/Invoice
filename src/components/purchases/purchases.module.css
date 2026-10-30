@@ -9,9 +9,9 @@
 .formError {
   margin: 0;
   padding: 0.625rem 0.875rem;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--loss) 10%, transparent);
-  color: var(--loss);
+  border-radius: var(--r-8);
+  background: color-mix(in srgb, var(--sys-red-ink) 10%, transparent);
+  color: var(--sys-red-ink);
   font-size: var(--text-base);
   font-weight: 600;
 }
@@ -20,9 +20,7 @@
   margin: 0;
   font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 /* ── Vendor picker ───────────────────────────────────────────── */
@@ -42,9 +40,9 @@
   flex-direction: column;
   gap: 0.75rem;
   padding: 0.875rem;
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card-inner);
+  border: var(--hairline) dashed var(--sep);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-3);
 }
 
 .inlineActions {
@@ -56,8 +54,8 @@
 
 /* ── Line items ──────────────────────────────────────────────── */
 .linesWrap {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
   overflow-x: auto;
 }
 
@@ -73,17 +71,15 @@
   text-align: left;
   font-size: var(--text-2xs);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
-  background: var(--card-inner);
-  border-bottom: 1px solid var(--border);
+  color: var(--label-2);
+  background: var(--bg-grouped-3);
+  border-bottom: var(--hairline) solid var(--sep);
   white-space: nowrap;
 }
 
 .lines td {
   padding: 0.25rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--sep);
   vertical-align: middle;
 }
 
@@ -109,7 +105,7 @@
 
 /* Tracked stock lines (6.6 / 6.10 / 6.11): batch, dates, serials and godown under the line. */
 .lines tr.trackRow td {
-  background: var(--card-inner);
+  background: var(--bg-grouped-3);
   padding: 0.5rem 0.75rem 0.75rem;
 }
 .trackGrid {
@@ -133,35 +129,35 @@
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .totalRow span:last-child {
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-variant-numeric: tabular-nums;
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .totalGrand {
   composes: totalRow;
   padding-top: 0.5rem;
-  border-top: 1px solid var(--border);
+  border-top: var(--hairline) solid var(--sep);
   font-weight: 600;
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .note {
   margin: 0;
   font-size: var(--text-sm);
   line-height: 1.55;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 /* ── Advanced GST (bill form) ───────────────────────────────── */
 .advanced {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card-inner);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-3);
 }
 
 .advanced > summary {
@@ -169,7 +165,7 @@
   padding: 0.625rem 0.875rem;
   font-size: var(--text-base);
   font-weight: 600;
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .advancedBody {
@@ -186,16 +182,16 @@
   align-items: baseline;
   gap: 1rem;
   padding: 0.875rem 1rem;
-  border-radius: var(--radius-md);
-  background: var(--card-inner);
-  border: 1px solid var(--border);
+  border-radius: var(--r-12);
+  background: var(--bg-grouped-3);
+  border: var(--hairline) solid var(--sep);
 }
 
 .balanceValue {
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .history {
@@ -212,7 +208,7 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.625rem 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--sep);
   font-size: var(--text-base);
 }
 
@@ -221,7 +217,7 @@
 }
 
 .historyMeta {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: var(--text-sm);
 }
 
@@ -236,21 +232,19 @@
   display: inline-block;
   font-size: var(--text-2xs);
   font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   padding: 0.1rem 0.4rem;
-  border-radius: var(--radius-xs);
+  border-radius: var(--r-6);
   background: var(--muted);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .itcTag {
   composes: kindTag;
-  background: color-mix(in srgb, var(--profit) 14%, transparent);
-  color: var(--profit);
+  background: color-mix(in srgb, var(--sys-green-ink) 14%, transparent);
+  color: var(--sys-green-ink);
 }
 
-@media (max-width: 780px) {
+@media (max-width: 52.0625em) {
   .vendorRow {
     flex-direction: column;
   }
@@ -260,23 +254,23 @@
 }
 
 .overdue {
-  color: var(--loss);
+  color: var(--sys-red-ink);
   font-weight: 600;
 }
 
 /* Phones: stack each bill line into a card so Rate / GST / Amount are never
    hidden behind a horizontal scroll. */
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .linesWrap { overflow: visible; border: 0; }
   .lines { min-width: 0; }
   .lines thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .lines, .lines tbody, .lines tr, .lines td { display: block; width: 100%; }
   .lines tr {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    border: var(--hairline) solid var(--sep);
+    border-radius: var(--r-12);
     padding: 0.5rem 0.75rem;
     margin-bottom: 0.625rem;
-    background: var(--card);
+    background: var(--bg-grouped-2);
   }
   .lines td { border: 0; padding: 0.25rem 0; width: 100%; }
   .lines td[data-label]::before {
@@ -284,12 +278,10 @@
     display: block;
     font-size: var(--text-xs);
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--muted-foreground);
+    color: var(--label-2);
     margin-bottom: 0.125rem;
   }
-  .lines td :is(input, select) { border: 1px solid var(--border); min-height: 44px; width: 100%; text-align: left; }
+  .lines td :is(input, select) { border: var(--hairline) solid var(--sep); min-height: 44px; width: 100%; text-align: left; }
   .lines td button { min-height: 44px; width: 100%; }
   .lineAmount { text-align: right; }
 }
@@ -302,14 +294,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.875rem 1.25rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--sep);
 }
 
 .poNote {
   margin: 0;
   padding: 0.75rem 1.25rem 1rem;
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 /* WP-8: alternate unit under a bill line quantity ("BOX", "= 24 NOS"). */
@@ -320,14 +312,14 @@
 .lineUnitHint {
   display: block;
   font-size: var(--text-2xs);
-  color: var(--muted-foreground);
+  color: var(--label-2);
   white-space: nowrap;
 }
 
 /* WP-8: landed cost on a bill. */
 .landed {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
   padding: 0.75rem;
   display: flex;
   flex-direction: column;

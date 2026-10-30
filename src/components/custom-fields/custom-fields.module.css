@@ -1,6 +1,6 @@
 .group {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-12);
   padding: 0.75rem;
   margin: 0;
   min-width: 0;
@@ -9,9 +9,7 @@
 .legend {
   font-size: var(--text-xs);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted-foreground);
+  color: var(--label-2);
   padding: 0 0.25rem;
 }
 
@@ -24,7 +22,7 @@
 .printIcon {
   margin-left: 0.3rem;
   vertical-align: -1px;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 /* ── Settings panel ────────────────────────────────────────────── */
@@ -42,9 +40,9 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.6rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--card);
+  border: var(--hairline) solid var(--sep);
+  border-radius: var(--r-8);
+  background: var(--bg-grouped-2);
   flex-wrap: wrap;
 }
 
@@ -57,12 +55,12 @@
 
 .rowLabel {
   font-weight: 600;
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .rowMeta {
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .rowActions {
@@ -86,5 +84,5 @@
 .error {
   margin: 0;
   font-size: var(--text-xs);
-  color: var(--destructive);
+  color: var(--sys-red-ink);
 }

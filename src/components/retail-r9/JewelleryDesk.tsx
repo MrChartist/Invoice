@@ -196,7 +196,7 @@ function TagsView({ onDone }: { onDone: Done }) {
                   <tr key={t.id} data-tag-row={t.tag}>
                     <td className={surface.mono}>{t.tag}</td><td>{t.item_name}</td><td>{purityLabel(t.metal, t.purity)}</td>
                     <td className={surface.numeric}>{g3(t.gross_wt)}</td><td className={surface.numeric}>{g3(t.net_wt)}</td>
-                    <td>{t.huid ?? (t.metal === 'gold' ? <small style={{ color: 'var(--warning)' }}>{rteT('noHuid')}</small> : '-')}</td>
+                    <td>{t.huid ?? (t.metal === 'gold' ? <small style={{ color: 'var(--sys-orange-ink)' }}>{rteT('noHuid')}</small> : '-')}</td>
                     <td><button type="button" className={ghost} onClick={() => window.confirm(rteT('confirmDel', { tag: t.tag })) && run(() => (deleteTag(t.id, data.tr), `${t.tag} ✓`))}>{rteT('del')}</button></td>
                   </tr>
                 ))}
@@ -427,7 +427,7 @@ export function JewelLineRow({ item, date }: { item: InvoiceItem; date: string }
       <label className={controls.hint}><input type="checkbox" checked={!!jw.rate_locked} onChange={(e) => set({ rate_locked: e.target.checked || undefined })} /> {rteT('rateLocked')}</label>
       {(err || jw.override) && can('settings.manage') && <N l={rteT('typeRate')} v={typed} set={(n) => { setTyped(n); apply(jw, n); }} d="line-rate" />}
       <span className={controls.hint} data-jw-amount>{g3(jw.net_wt)} g × ₹{jw.rate}{jw.override ? ` (${rteT('typed')})` : ''} = {formatCurrency(a.metal)} + {formatCurrency(a.wastage)} + {formatCurrency(a.making)} → <strong>{formatCurrency(a.total)}</strong></span>
-      {(err || warn) && <span className={controls.hint} style={{ color: err ? 'var(--loss)' : 'var(--warning)' }} role="status" data-jw-error>{err || warn}</span>}
+      {(err || warn) && <span className={controls.hint} style={{ color: err ? 'var(--sys-red-ink)' : 'var(--sys-orange-ink)' }} role="status" data-jw-error>{err || warn}</span>}
     </div>
   );
 }
@@ -442,7 +442,7 @@ function KycFields({ kyc, set }: { kyc?: SaleKyc; set: (k: SaleKyc | undefined) 
     </span>
   );
 }
-const GuardList = ({ list }: { list: readonly (Guard | string)[] }) => <>{list.map((g, i) => { const x = typeof g === 'string' ? { level: 'warn', message: g } : g; return <p key={i} className={controls.hint} style={{ color: x.level === 'error' ? 'var(--loss)' : 'var(--warning)' }} role="status" data-guard={x.level}>{x.message}</p>; })}</>;
+const GuardList = ({ list }: { list: readonly (Guard | string)[] }) => <>{list.map((g, i) => { const x = typeof g === 'string' ? { level: 'warn', message: g } : g; return <p key={i} className={controls.hint} style={{ color: x.level === 'error' ? 'var(--sys-red-ink)' : 'var(--sys-orange-ink)' }} role="status" data-guard={x.level}>{x.message}</p>; })}</>;
 
 /** Editor: PAN / Form 60 / 97 on a big sale and the HUID warnings; while mounted, `kycGate` is an editor save gate. */
 export function EditorJewel() {
@@ -486,7 +486,7 @@ export function PosJewel({ record, cash, setItems, onChange }: { record: Invoice
         <F l={rteT('scanTag')} w={160}><input className={controls.input} value={tag} onChange={(e) => setTag(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), add())} data-pos-tag /></F>
         <button type="button" className={sm} onClick={add}>{rteT('addTag')}</button>
       </span>
-      {msg && <p role="status" style={{ color: 'var(--loss)' }}>{msg}</p>}
+      {msg && <p role="status" style={{ color: 'var(--sys-red-ink)' }}>{msg}</p>}
       {(kyc || guards.some((g) => /PAN/.test(g.message))) && <KycFields kyc={kyc} set={setKyc} />}
       <GuardList list={[...guards, ...huid]} />
     </div>

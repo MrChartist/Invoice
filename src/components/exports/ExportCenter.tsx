@@ -313,7 +313,7 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
                     aria-label={expT('includeInBundle', { title: dsTitle(d) })}
                     checked={on}
                     onChange={() => toggleDataset(d.id)}
-                    style={{ width: 16, height: 16, accentColor: 'var(--primary)' }}
+                    style={{ width: 16, height: 16, accentColor: 'var(--tint)' }}
                   />
                   <div className={styles.datasetMain}>
                     <h3 className={styles.datasetTitle}>{dsTitle(d)}</h3>
@@ -400,7 +400,7 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
 
             {tally.build.warnings.length > 0 && (
               <div className={styles.warn} role="alert">
-                <AlertTriangle size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: 2, color: 'var(--warning)' }} />
+                <AlertTriangle size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: 2, color: 'var(--sys-orange-ink)' }} />
                 <div>
                   <strong>{expT('needLook', { n: tally.build.warnings.length })}</strong>
                   <ul>

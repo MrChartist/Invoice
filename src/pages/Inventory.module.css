@@ -4,7 +4,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline) solid var(--sep);
 }
 
 .search {
@@ -17,7 +17,7 @@
   left: 0.75rem;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--muted-foreground);
+  color: var(--label-2);
   pointer-events: none;
 }
 .searchInput {
@@ -30,8 +30,8 @@
   align-items: center;
   gap: 1rem;
   padding: 0.75rem 1.25rem;
-  border-bottom: 1px solid var(--border);
-  background: var(--card-inner);
+  border-bottom: var(--hairline) solid var(--sep);
+  background: var(--bg-grouped-3);
   font-size: var(--text-base);
 }
 .settingsBar label.inline {
@@ -52,7 +52,7 @@
 }
 .itemMeta {
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 .nameBtn {
   background: none;
@@ -60,23 +60,23 @@
   padding: 0;
   font: inherit;
   font-weight: 600;
-  color: var(--foreground);
+  color: var(--label);
   text-align: left;
   cursor: pointer;
   overflow-wrap: anywhere;
 }
 .nameBtn:hover,
 .nameBtn:focus-visible {
-  color: var(--brand-text);
+  color: var(--tint);
   text-decoration: underline;
 }
 
 .negative {
-  color: var(--loss);
+  color: var(--sys-red-ink);
   font-weight: 600;
 }
 .positive {
-  color: var(--profit);
+  color: var(--sys-green-ink);
 }
 
 .dateRange {
@@ -94,8 +94,8 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.875rem 1.25rem;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  border-bottom: var(--hairline) solid var(--sep);
+  background: color-mix(in srgb, var(--sys-orange-ink) 10%, transparent);
   font-size: var(--text-base);
 }
 
@@ -103,7 +103,7 @@
   display: none;
 }
 
-@media (max-width: 780px) {
+@media (max-width: 52.0625em) {
   .toolbar,
   .settingsBar {
     padding: 0.875rem 1rem;
@@ -114,6 +114,6 @@
 }
 
 /* Touch targets: segmented controls reach 40px on phones / coarse pointers. */
-@media (pointer: coarse), (max-width: 640px) {
+@media (pointer: coarse), (max-width: 37.4375em) {
   .touchSeg > button { min-height: 40px; }
 }

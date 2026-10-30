@@ -193,7 +193,7 @@ export function EncryptedBackup({ notify }: { notify: Notify }) {
             {restoreError && <span className={controls.error} role="alert">{restoreError}</span>}
           </form>
         ) : (
-          <p style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--muted-foreground)', margin: 0 }}>
+          <p style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--label-2)', margin: 0 }}>
             {secT('contains', { invoices: summary?.summary.invoices ?? 0, clients: summary?.summary.clients ?? 0 })} {attachmentRestoreNote(summary?.summary)} {secT('replaceWarn')}
           </p>
         )}
