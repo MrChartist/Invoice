@@ -30,6 +30,7 @@ import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from '../components/settings/Settings.module.css';
 import tabs from '../styles/tabs.module.css';
+import page from '../styles/page.module.css';
 import { errText } from '../i18n/lib-msg';
 
 // The activity log is only needed on its own tab, so it stays out of the Settings chunk.
@@ -146,8 +147,8 @@ export function Settings() {
   const onTabKey = (e: React.KeyboardEvent) => {
     const i = TABS.findIndex((t) => t.id === tab);
     let next = -1;
-    if (e.key === 'ArrowRight') next = (i + 1) % TABS.length;
-    else if (e.key === 'ArrowLeft') next = (i - 1 + TABS.length) % TABS.length;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (i + 1) % TABS.length;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (i - 1 + TABS.length) % TABS.length;
     else if (e.key === 'Home') next = 0;
     else if (e.key === 'End') next = TABS.length - 1;
     if (next < 0) return;
@@ -203,7 +204,8 @@ export function Settings() {
     >
 
 
-      <div className={tabs.tabStrip} role="tablist" aria-label={setT('sections')} onKeyDown={onTabKey}>
+      <div className={page.sideNav}>
+      <div className={`${tabs.tabStrip} ${tabs.tabStripSide}`} role="tablist" aria-label={setT('sections')} onKeyDown={onTabKey}>
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -343,6 +345,7 @@ export function Settings() {
       {tab === 'security' && <SecurityPanel notify={notify} onLock={() => window.location.reload()} />}
       {tab === 'security' && <Suspense fallback={null}><DisplayPanel /></Suspense>}
 
+      </div>
       </div>
 
       {dirty && (

@@ -18,6 +18,7 @@ import { dispT } from '../../i18n/areas/display-r2';
 import controls from '../../styles/controls.module.css';
 import { Toggle } from '../ui/Toggle';
 import surface from '../../styles/surface.module.css';
+import groups from '../../styles/groups.module.css';
 
 export function DisplayPanel() {
   useT();
@@ -77,11 +78,11 @@ export function DisplayPanel() {
             ))}
           </div>
         </div>
-        <div className={surface.groupPlain}>
-          <Toggle rowClassName={surface.row} checked={prefs.high_contrast} onChange={(v) => update({ high_contrast: v })} label={dispT('contrast')} hint={dispT('contrastHint')} />
-          <Toggle rowClassName={surface.row} checked={prefs.underline_links} onChange={(v) => update({ underline_links: v })} label={dispT('underline')} />
-          <Toggle rowClassName={surface.row} checked={prefs.large_targets} onChange={(v) => update({ large_targets: v })} label={dispT('targets')} hint={dispT('targetsHint')} />
-          <Toggle rowClassName={surface.row} checked={prefs.focus_always} onChange={(v) => update({ focus_always: v })} label={dispT('focus')} />
+        <div className={groups.groupPlain}>
+          <Toggle rowClassName={groups.row} checked={prefs.high_contrast} onChange={(v) => update({ high_contrast: v })} label={dispT('contrast')} hint={dispT('contrastHint')} />
+          <Toggle rowClassName={groups.row} checked={prefs.underline_links} onChange={(v) => update({ underline_links: v })} label={dispT('underline')} />
+          <Toggle rowClassName={groups.row} checked={prefs.large_targets} onChange={(v) => update({ large_targets: v })} label={dispT('targets')} hint={dispT('targetsHint')} />
+          <Toggle rowClassName={groups.row} checked={prefs.focus_always} onChange={(v) => update({ focus_always: v })} label={dispT('focus')} />
         </div>
         <div>
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => update({ ...DEFAULT_DISPLAY_PREFS })}>

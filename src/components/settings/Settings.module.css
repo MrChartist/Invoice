@@ -28,7 +28,7 @@
 }
 
 .profileRow {
-  composes: row from '../../styles/surface.module.css';
+  composes: row from '../../styles/groups.module.css';
 }
 
 .profileText {

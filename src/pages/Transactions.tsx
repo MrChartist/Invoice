@@ -653,7 +653,6 @@ export function Transactions() {
                         <div className={cn(surface.foldP2, styles.docType, styles.nowrap, status === 'Overdue' && styles.overdueText)}>
                           {salesT(inv.doc_type === 'QUOTATION' ? 'tx.validUntil' : 'tx.due', { date: formatDate(inv.due_date) || '-' })}
                         </div>
-                        <div className={surface.foldP2}>{statusOf(inv)}</div>
                       </td>
                       <td className={styles.cClient}>
                         <div className={styles.client}>

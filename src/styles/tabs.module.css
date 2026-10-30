@@ -84,3 +84,21 @@
   outline: 2px solid var(--tint);
   outline-offset: -2px;
 }
+
+/* In PL's `.sideNav` (page.module.css) a wide frame turns the strip into a section list (iPad Settings). */
+@container page (min-width: 90em) {
+  .tabStripSide {
+    gap: var(--sp-0-5);
+  }
+  .tabStripSide .tabItem {
+    min-height: var(--row-h);
+    padding: 0 var(--sp-3);
+    border-radius: var(--r-8);
+  }
+  .tabStripSide .tabItem[aria-selected='true'] {
+    background-color: var(--tint-soft);
+  }
+  .tabStripSide .tabItem[aria-selected='true']::after {
+    display: none;
+  }
+}

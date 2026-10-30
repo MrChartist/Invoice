@@ -9,7 +9,7 @@ export interface ToggleProps extends Omit<InputHTMLAttributes<HTMLInputElement>,
   label?: ReactNode;
   /** A detail line under the label. */
   hint?: ReactNode;
-  /** Class of the row (with a label), e.g. `surface.row` inside a grouped list. */
+  /** Class of the row (with a label), e.g. `groups.row` (styles/groups.module.css) inside a grouped list. */
   rowClassName?: string;
 }
 
