@@ -19,6 +19,7 @@ import { useT } from '../../../i18n';
 import { EmptyState } from '../../ui/EmptyState';
 import { useDrillRows, useReportPrefs } from './drill-hooks';
 import { ReportOptions } from './ReportToolbar';
+import { ReportStrip } from '../../../lib/keys/report-keys';
 import { useOpenVoucher } from './report-env';
 import { money } from './format';
 import { PrintTitle, StatementToolbar } from './shared';
@@ -33,7 +34,27 @@ export function DayBookTab({ ledger, period }: { ledger: Ledger; period: Period 
   const openVoucher = useOpenVoucher();
   const all = useMemo(() => ledgerDayBook(ledger, period), [ledger, period]);
   const book = useMemo(() => (kinds.length ? ledgerDayBook(ledger, period, kinds) : all), [ledger, period, kinds, all]);
-  const nav = useDrillRows(book.entries.length, (i) => openVoucher(book.entries[i].voucher));
+  // R20-C: Shift+Enter shows one voucher's ledger lines; filter facts, Alt+I new entry on that day.
+  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+  const nav = useDrillRows(book.entries.length, (i) => openVoucher(book.entries[i].voucher), {
+    fact: (i) => {
+      const { voucher: v, amount, debitAccount, creditAccount } = book.entries[i];
+      return { text: [v.party, v.number, kindLabel(v.kind), debitAccount, creditAccount].join(' '), date: v.date, narr: v.narration, amt: amount };
+    },
+    voucher: (i) => book.entries[i]?.voucher,
+    expand: (i) => {
+      const id = book.entries[i]?.voucher.id ?? '';
+      setOpen((s) => new Set(s.has(id) ? [...s].filter((x) => x !== id) : [...s, id]));
+    },
+  });
+  const shown = book.entries.filter((_, i) => nav.shown(i));
+  // The date shows on the first shown row of each day.
+  const dayStart = new Set<number>();
+  for (let i = 0, last = ''; i < book.entries.length; i++) {
+    if (!nav.shown(i) || book.entries[i].voucher.date === last) continue;
+    dayStart.add(i);
+    last = book.entries[i].voucher.date;
+  }
   const toggle = (k: LedgerVoucherKind) => setKinds((cur) => (cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k]));
   const name = (id: string) => ledger.byId.get(id)?.name ?? id;
 
@@ -41,8 +62,9 @@ export function DayBookTab({ ledger, period }: { ledger: Ledger; period: Period 
     toCsv([
       ['Day Book', `${period.start} to ${period.end}`, 'Working paper: verify with your CA'],
       ['Date', 'Voucher type', 'Vch no.', 'Party', 'Debit ledger', 'Credit ledger', 'Narration', 'Amount'],
-      ...book.entries.map((e) => [e.voucher.date, e.voucher.kind, e.voucher.number, e.voucher.party, e.debitAccount, e.creditAccount, e.voucher.narration, e.amount / 100]),
-      ['', '', '', '', '', '', 'Total', book.totalDebit / 100],
+      // R20-C: rows hidden or filtered out on screen are left out (the total is of the rows exported).
+      ...shown.map((e) => [e.voucher.date, e.voucher.kind, e.voucher.number, e.voucher.party, e.debitAccount, e.creditAccount, e.voucher.narration, e.amount / 100]),
+      ['', '', '', '', '', '', 'Total', shown.reduce((t, e) => t + e.amount, 0) / 100],
     ]);
 
   return (
@@ -82,7 +104,7 @@ export function DayBookTab({ ledger, period }: { ledger: Ledger; period: Period 
               <tbody id={nav.bodyId}>
                 {book.entries.map((e, i) => {
                   const v = e.voucher;
-                  const showDate = i === 0 || book.entries[i - 1].voucher.date !== v.date;
+                  const showDate = dayStart.has(i);
                   const target = voucherTarget(v);
                   return (
                     <Fragment key={v.id}>
@@ -102,7 +124,7 @@ export function DayBookTab({ ledger, period }: { ledger: Ledger; period: Period 
                         </td>
                         <td className={surface.numeric} colSpan={2}>{money(e.amount)}</td>
                       </tr>
-                      {prefs.detailed &&
+                      {(prefs.detailed || open.has(v.id)) && nav.shown(i) &&
                         v.lines.map((l, k) => (
                           <tr key={`${v.id}-${k}`} className={styles.detail}>
                             <td />
@@ -130,6 +152,7 @@ export function DayBookTab({ ledger, period }: { ledger: Ledger; period: Period 
           </div>
         )}
       </div>
+      <ReportStrip />
       <p className={books.muted}>{reportsT('dayBookNote')}</p>
     </div>
   );
