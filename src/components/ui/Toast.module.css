@@ -1,0 +1,59 @@
+/* Toast (docs/theme/IOS-UI.md 2.6): one at a time, a thin material capsule. Tokens from src/styles/ios.css only. */
+.toast {
+  --toast-from: calc(-1 * var(--sp-2));
+  position: fixed;
+  top: calc(var(--safe-t) + var(--sp-3));
+  left: 0;
+  right: 0;
+  z-index: var(--z-toast);
+  width: fit-content;
+  max-width: min(420px, calc(100vw - 2 * var(--gutter)));
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-4);
+  min-height: 2.75rem;
+  border-radius: var(--r-full);
+  box-shadow: var(--elev-2);
+  color: var(--label);
+  opacity: 0;
+  transform: translateY(var(--toast-from));
+  transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-3) var(--spring-soft);
+}
+
+.toast[data-visible] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Beyond two lines a capsule turns into a rounded rectangle. */
+.long {
+  border-radius: var(--r-12);
+  align-items: flex-start;
+  padding-block: var(--sp-2);
+}
+
+.glyph { flex-shrink: 0; }
+.toast[data-tone='success'] .glyph { color: var(--sys-green-ink); }
+.toast[data-tone='error'] .glyph { color: var(--sys-red-ink); }
+.toast[data-tone='info'] .glyph { color: var(--sys-blue-ink); }
+.long .glyph { margin-top: var(--sp-0-5); }
+
+.message {
+  flex: 1;
+  min-width: 0;
+  padding-block: var(--sp-1);
+  font-size: var(--text-md);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* Phones: above the tab bar and any bottom bar, rising from below. */
+@media (max-width: 37.4375em) {
+  .toast {
+    --toast-from: var(--sp-2);
+    top: auto;
+    bottom: calc(var(--sp-3) + var(--safe-b) + var(--bottom-bar-h, 0px) + var(--tab-bar-h, 0px));
+  }
+}

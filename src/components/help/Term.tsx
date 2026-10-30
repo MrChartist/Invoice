@@ -63,7 +63,7 @@ export function Term({ id, children }: { id: GlossaryId; children: ReactNode }) 
         {children}
       </button>
       {open && (
-        <span className={styles.pop} id={popId} role="dialog" aria-label={entry?.term ?? String(id)} data-term-pop={id}>
+        <span className={`material ${styles.pop}`} data-mat="regular" id={popId} role="dialog" aria-label={entry?.term ?? String(id)} data-term-pop={id}>
           {!text ? (
             <span>{helpT('termLoading')}</span>
           ) : (

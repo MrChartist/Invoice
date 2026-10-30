@@ -1,10 +1,10 @@
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 9000;
+  z-index: var(--z-sheet);
   display: flex;
   flex-direction: column;
-  background-color: var(--background);
+  background-color: var(--bg-grouped-3);
 }
 
 .toolbar {
@@ -13,10 +13,9 @@
   justify-content: space-between;
   gap: 0.75rem;
   flex-wrap: wrap;
-  padding: 0.625rem 1rem;
-  background-color: var(--card);
-  border-bottom: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
+  padding: calc(0.625rem + var(--safe-t)) calc(1rem + var(--safe-r)) 0.625rem calc(1rem + var(--safe-l));
+  /* The chrome material (.material, ios.css) paints the bar. */
+  border-bottom: var(--hairline) solid var(--sep);
 }
 
 .title {
@@ -42,11 +41,11 @@
 
 .paperShadow {
   margin: 0 auto;
-  box-shadow: var(--shadow-xl);
+  box-shadow: var(--elev-3);
   flex-shrink: 0;
 }
 
-.spin { animation: spin 0.9s linear infinite; }
+.spin { animation: spin calc(var(--dur-4) * 2) linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 @media print {

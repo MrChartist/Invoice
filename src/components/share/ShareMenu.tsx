@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   BellRing,
   Camera,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { InvoiceRecord } from '../../types/invoice';
 import { useToast } from '../ui/useToast';
+import { Menu, type MenuItem } from '../ui/Menu';
 import { cn } from '../../lib/utils';
 import { emailText, invoiceSummaryText, invoiceUpiLink, mailtoLink, smsLink, whatsappLink } from '../../lib/share';
 import controls from '../../styles/controls.module.css';
@@ -43,41 +44,8 @@ export interface ShareMenuProps {
 
 export function ShareMenu({ invoice, onDownloadPdf, onSharePdf, onShareImage, onCopyImage, onClientCopy, hideReminder, className }: ShareMenuProps) {
   useT(); // re-render on a language switch (5.4)
-  const [open, setOpen] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const menuId = useId();
   const { notify, toastNode } = useToast();
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setOpen(false);
-        wrapRef.current?.querySelector<HTMLElement>('button')?.focus();
-      }
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        const items = Array.from(
-          wrapRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? [],
-        );
-        if (!items.length) return;
-        e.preventDefault();
-        const i = items.indexOf(document.activeElement as HTMLButtonElement);
-        const next = e.key === 'ArrowDown' ? (i + 1) % items.length : (i - 1 + items.length) % items.length;
-        items[next].focus();
-      }
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    wrapRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
 
   const summary = invoiceSummaryText(invoice);
   const payLink = invoiceUpiLink(invoice);
@@ -85,120 +53,41 @@ export function ShareMenu({ invoice, onDownloadPdf, onSharePdf, onShareImage, on
   const unpaid = receivableBalance(invoice) > 0 && invoice.status !== 'Paid' && invoice.status !== 'Cancelled';
   const subject = `${invoice.invoice_number} from ${invoice.sender?.companyName || 'us'}`;
 
-  const run = (fn: () => void) => () => {
-    setOpen(false);
-    fn();
-  };
-
   const copy = (text: string, done: string) => async () => {
-    setOpen(false);
     const ok = await copyText(text);
     notify(ok ? done : shareT('copyFailed'), ok ? 'success' : 'error');
   };
 
-  return (
-    <div className={cn(styles.menuWrap, className)} ref={wrapRef}>
-      <button
-        type="button"
-        className={controls.btnOutline}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <Share2 size={16} /> {shareT('share')} <ChevronDown size={14} aria-hidden="true" />
-      </button>
+  const items: MenuItem[] = [];
+  const add = (item: MenuItem | false | undefined | null) => item && items.push(item);
+  add(onSharePdf && { icon: <FileText size={16} />, label: shareT('sharePdf'), hint: shareT('sharePdfHint'), onSelect: onSharePdf });
+  add(onShareImage && { icon: <Camera size={16} />, label: rPosT('shareImage'), hint: rPosT('imageHint'), onSelect: onShareImage, attrs: { 'data-share-image': true } });
+  add(onShareImage && onCopyImage && { icon: <Copy size={16} />, label: rPosT('copyImage'), onSelect: onCopyImage });
+  const sendGroup = items.length > 0;
+  add({ icon: <MessageCircle size={16} />, label: 'WhatsApp', onSelect: () => openLink(whatsappLink(client?.phone, summary)), separator: sendGroup });
+  add({ icon: <Mail size={16} />, label: shareT('email'), onSelect: () => openLink(mailtoLink({ to: client?.email, subject, body: emailText(summary) })) });
+  add({ icon: <MessageSquare size={16} />, label: 'SMS', onSelect: () => openLink(smsLink(client?.phone, summary)) });
+  add({ icon: <Copy size={16} />, label: shareT('copyMessage'), onSelect: copy(summary, shareT('copied')), separator: true });
+  add({
+    icon: <Link2 size={16} />,
+    label: shareT('copyLink'),
+    hint: payLink ? undefined : shareT('noUpi'),
+    disabled: !payLink,
+    title: payLink ? undefined : shareT('noUpiTitle'),
+    onSelect: copy(payLink ?? '', shareT('linkCopied')),
+  });
+  add(onClientCopy && { icon: <Globe size={16} />, label: shareT('clientCopy'), hint: shareT('clientCopyHint'), onSelect: onClientCopy });
+  add(onDownloadPdf && { icon: <Download size={16} />, label: shareT('downloadPdf'), onSelect: onDownloadPdf });
+  add(!hideReminder && unpaid && { icon: <BellRing size={16} />, label: shareT('reminder'), onSelect: () => setReminderOpen(true), separator: true });
 
-      {open && (
-        <div className={styles.menu} role="menu" id={menuId} aria-label={shareT('menu')}>
-          {onSharePdf && (
-            <>
-              <button type="button" role="menuitem" className={styles.menuItem} onClick={run(onSharePdf)}>
-                <FileText size={16} className={styles.menuIcon} /> {shareT('sharePdf')}
-                <span className={styles.menuHint}>{shareT('sharePdfHint')}</span>
-              </button>
-              {!onShareImage && <div className={styles.menuSep} role="separator" />}
-            </>
-          )}
-          {onShareImage && (
-            <>
-              <button type="button" role="menuitem" className={styles.menuItem} onClick={run(onShareImage)} data-share-image>
-                <Camera size={16} className={styles.menuIcon} /> {rPosT('shareImage')}
-                <span className={styles.menuHint}>{rPosT('imageHint')}</span>
-              </button>
-              {onCopyImage && (
-                <button type="button" role="menuitem" className={styles.menuItem} onClick={run(onCopyImage)}>
-                  <Copy size={16} className={styles.menuIcon} /> {rPosT('copyImage')}
-                </button>
-              )}
-              <div className={styles.menuSep} role="separator" />
-            </>
-          )}
-          <button
-            type="button"
-            role="menuitem"
-            className={styles.menuItem}
-            onClick={run(() => openLink(whatsappLink(client?.phone, summary)))}
-          >
-            <MessageCircle size={16} className={styles.menuIcon} /> WhatsApp
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className={styles.menuItem}
-            onClick={run(() => openLink(mailtoLink({ to: client?.email, subject, body: emailText(summary) })))}
-          >
-            <Mail size={16} className={styles.menuIcon} /> {shareT('email')}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className={styles.menuItem}
-            onClick={run(() => openLink(smsLink(client?.phone, summary)))}
-          >
-            <MessageSquare size={16} className={styles.menuIcon} /> SMS
-          </button>
-          <div className={styles.menuSep} role="separator" />
-          <button type="button" role="menuitem" className={styles.menuItem} onClick={copy(summary, shareT('copied'))}>
-            <Copy size={16} className={styles.menuIcon} /> {shareT('copyMessage')}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            className={styles.menuItem}
-            disabled={!payLink}
-            title={payLink ? undefined : shareT('noUpiTitle')}
-            onClick={copy(payLink ?? '', shareT('linkCopied'))}
-          >
-            <Link2 size={16} className={styles.menuIcon} /> {shareT('copyLink')}
-            {!payLink && <span className={styles.menuHint}>{shareT('noUpi')}</span>}
-          </button>
-          {onClientCopy && (
-            <button type="button" role="menuitem" className={styles.menuItem} onClick={run(onClientCopy)}>
-              <Globe size={16} className={styles.menuIcon} /> {shareT('clientCopy')}
-              <span className={styles.menuHint}>{shareT('clientCopyHint')}</span>
-            </button>
-          )}
-          {onDownloadPdf && (
-            <button type="button" role="menuitem" className={styles.menuItem} onClick={run(onDownloadPdf)}>
-              <Download size={16} className={styles.menuIcon} /> {shareT('downloadPdf')}
-            </button>
-          )}
-          {!hideReminder && unpaid && (
-            <>
-              <div className={styles.menuSep} role="separator" />
-              <button
-                type="button"
-                role="menuitem"
-                className={styles.menuItem}
-                onClick={run(() => setReminderOpen(true))}
-              >
-                <BellRing size={16} className={styles.menuIcon} /> {shareT('reminder')}
-              </button>
-            </>
-          )}
-        </div>
-      )}
+  return (
+    <div className={cn(styles.menuWrap, className)}>
+      <Menu
+        label={shareT('menu')}
+        items={items}
+        triggerClassName={controls.btnOutline}
+        trigger={<><Share2 size={16} /> {shareT('share')} <ChevronDown size={14} aria-hidden="true" /></>}
+      />
 
       {reminderOpen && (
         <ReminderModal invoice={invoice} open onClose={() => setReminderOpen(false)} />
