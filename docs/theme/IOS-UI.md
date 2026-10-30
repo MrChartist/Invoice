@@ -40,6 +40,42 @@ Binding and older than this spec, so this spec never overrides them:
 | D7 | Tablet portrait (768 to 1023px) gets a collapsible icon sidebar instead of today's phone drawer and tab bar. | iPadOS pattern; today a 1024px-wide iPad in portrait gets the phone shell. | Raise `--bp-sidebar` back to 901px. |
 | D8 | Continuous corners use `corner-shape: squircle` where the browser has it (progressive), a plain radius elsewhere. | CSS has no other true continuous corner. | Remove the one `@supports` block in `ios.css`. |
 
+## Status (QA, 30 Oct 2026)
+
+Shipped in 3.2.0 ("New look" in What's new):
+
+| PR | Package | What it brought |
+|---|---|---|
+| #130 | spec | This document and the work plan (`docs/prd/ios-ui.md`). |
+| #131 | P0 | `src/styles/ios.css`: every token in four themes, aliases in `index.css`, the lock-in test `tests/ios-ui.test.ts`. |
+| #132 | P3 | One `Modal` (sheet / dialog / alert, phone bottom sheet with detents), `Menu` (popover, context menu, action sheet), toasts, the command palette, preview and share on tokens. |
+| #133 | PL | One page frame (`<Page>`, tiers `page` / `form` / `bleed`), `SplitView`, column priorities (`data-priority`), the shell in em with `dvh` and safe areas, density before paint. |
+| #134 | P4 | Meaning colours (`surface.sys*`), KPI cards with icon tiles, charts on `--chart-*`, badges with a dot, empty states, skeletons, avatars. |
+| #135 | P1 | iPadOS sidebar, material bars, phone tab bar, demo banner and company switcher as grouped rows. |
+| #136 | P5b | The feature-screen sweep, part B (Books, Reports, GST, Inventory, Receivables, Reconcile and every pack). |
+| #137 | P2 | Frameless cards, the table look, grouped lists, filled fields, `Toggle`, the underline tab strip (`styles/tabs.module.css`). |
+| #138 | P5a | POS, retail POS and returns, restaurant tables / KOT, the editor chrome, Gateway on tokens. |
+| this | QA | Ratchets at 0 with an explicit allow-list; tinted-button rule; laptop fit for Invoices and Clients; underline tabs on Payroll, Manufacturing, Recurring, Distribution, Time. |
+
+Decisions as shipped: D1 buttons keep the rulebook (no tinted buttons; `tests/button-system.test.ts` now also rejects
+`--tint` / `--tint-soft` / `--sys-*` fills on pressables, except a selected item's `--tint-soft` fill and the switch's
+green track); D2 one blue tint in both themes, gold only as a brand accent; D3 opaque labels; D4 frameless cards (HC puts
+an edge back); D5 sentence case everywhere outside printed paper and the logo; D6 one frame up to `--page-max`,
+leading-aligned (an open `SplitView` detail widens it by the inspector); D7 the tablet sidebar from 37.5em; D8 squircle
+corners where the browser has them.
+
+Ratchets (`tests/ios-ui.test.ts`): every package at 0 for all ten rules. The legitimate leftovers sit in `ALLOW` with
+their reason (a stale entry fails): printed paper (BRS and bank-document rules, job-card paper colours, cheque crossing
+lines, the preview's white paper, h1s of printed documents), the brand logo (tile and wordmark colours, tile radius,
+"INVOICE" lockup), full-screen gates (PIN lock, error boundary, vault unlock, the 404 empty state) and `.inputMono`
+capitals for GSTIN / PAN / IFSC values.
+
+Known gaps: the pack desks' inner view switchers (`.seg` with `role="tablist"`, about 25 components) still wrap on a
+phone; Books / Reports / Reconcile / Receivables keep their own copies of the tab-strip CSS instead of
+`styles/tabs.module.css`; no right-click row menus yet (the `Menu` `at` prop is ready); phone large-title collapse into
+the bar and collapsible sidebar groups not built; date inputs and selects are being replaced by native-feel pickers in a
+separate package.
+
 ## 1. Tokens
 
 All tokens live in ONE new first-paint stylesheet, `src/styles/ios.css`, imported in `src/main.tsx` right after

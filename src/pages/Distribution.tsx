@@ -6,6 +6,7 @@ import { useToast } from '../components/ui/useToast';
 import { useT } from '../i18n';
 import { distT } from '../i18n/areas/distribution';
 import surface from '../styles/surface.module.css';
+import tabs from '../styles/tabs.module.css';
 import controls from '../styles/controls.module.css';
 import own from '../components/distribution/dist.module.css';
 import { visiblePackTabs } from '../lib/industry-packs'; // R5-B, R8-C (alsoPacks)
@@ -61,9 +62,9 @@ export function Distribution() {
       data-distribution
     >
       <div className={own.stack}>
-        <div className={controls.segment} role="tablist" aria-label={distT('title')}>
+        <div className={tabs.tabStrip} role="tablist" aria-label={distT('title')}>
           {shown.map(({ id: t }) => (
-            <button key={t} type="button" role="tab" aria-selected={tab === t} className={tab === t ? controls.segmentBtnActive : controls.segmentBtn} onClick={() => setTab(t)}>
+            <button key={t} type="button" role="tab" aria-selected={tab === t} className={tabs.tabItem} onClick={() => setTab(t)}>
               {t === 'transport' ? trT('tab') : R8_TABS.has(t) ? r8T(`tab.${t}` as 'tab.agency') : distT(`tab_${t as 'masters'}`)}
             </button>
           ))}
@@ -75,7 +76,7 @@ export function Distribution() {
             title={discoverT('distTitle')}
             text={discoverT('distText')}
             action={
-              <div className={surface.pageActions} style={{ justifyContent: 'center' }} data-dist-empty>
+              <div className={surface.pageActions} style={{ justifyContent: 'center', flexWrap: 'wrap' }} data-dist-empty>
                 <button type="button" className={controls.btnPrimary} onClick={() => document.querySelector<HTMLElement>('[data-distribution] section input')?.focus()}>
                   {discoverT('distAdd')}
                 </button>

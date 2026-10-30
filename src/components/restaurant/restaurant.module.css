@@ -45,24 +45,16 @@
 .settling { background: var(--sys-cyan-soft); }
 .selected { outline: 2px solid var(--tint); outline-offset: 2px; }
 
-/* Status pill (spec 2.7): soft fill, ink text, a leading dot in the system colour. */
+/* Status pill (spec 2.7): P4's shared badge (soft fill, ink text, leading dot); the state only picks the colour. */
 .state {
-  --st: var(--sys-gray);
+  composes: badge badgeDot from '../../styles/surface.module.css';
   align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  font-size: var(--text-xs);
-  font-weight: 500;
-  padding: var(--sp-0-5) var(--sp-2);
-  border-radius: var(--r-full);
-  background: var(--bg-grouped-2);
-  color: var(--sys-gray-ink);
+  --tone: var(--sys-gray);
+  --tone-ink: var(--sys-gray-ink);
 }
-.state::before { content: ''; width: 0.375rem; height: 0.375rem; border-radius: 50%; background: var(--st); }
-.stateOccupied { --st: var(--sys-blue); color: var(--sys-blue-ink); }
-.statePrinted { --st: var(--sys-orange); color: var(--sys-orange-ink); }
-.stateSettling { --st: var(--sys-cyan); color: var(--sys-cyan-ink); }
+.stateOccupied { --tone: var(--sys-blue); --tone-ink: var(--sys-blue-ink); }
+.statePrinted { --tone: var(--sys-orange); --tone-ink: var(--sys-orange-ink); }
+.stateSettling { --tone: var(--sys-cyan); --tone-ink: var(--sys-cyan-ink); }
 
 .panel { display: flex; flex-direction: column; gap: var(--sp-3); }
 .panelHead { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-2); flex-wrap: wrap; }

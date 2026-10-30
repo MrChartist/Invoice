@@ -243,7 +243,7 @@ export function Books() {
           title={discoverT('booksTitle')}
           text={discoverT('booksText')}
           action={
-            <div className={surface.pageActions} style={{ justifyContent: 'center' }} data-books-empty>
+            <div className={surface.pageActions} style={{ justifyContent: 'center', flexWrap: 'wrap' }} data-books-empty>
               {can('books.edit') && <Link to="/books?tab=coa&m=opening-tb" className={controls.btnPrimary}>{discoverT('booksOpenings')}</Link>}
               {can('data.restore') && <button type="button" className={controls.btnOutline} onClick={() => setWizard('tally')}>{discoverT('booksTally')}</button>}
               <LearnMore topic="books" />

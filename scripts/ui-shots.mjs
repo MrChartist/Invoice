@@ -5,7 +5,7 @@
  * Signs up a fresh local account, opens the Demo company with sample data, silences one-time tips, then shoots.
  *
  *   node scripts/ui-shots.mjs --out <dir> [--screens dashboard,transactions] [--sizes 375x812,1280x900]
- *        [--themes light,dark,hc-light,hc-dark] [--extra dashboard@1920x1080] [--overlays] [--metrics] [--dist <dir>]
+ *        [--themes light,dark,hc-light,hc-dark] [--extra dashboard@1920x1080] [--overlays] [--metrics] [--dist <dir>] [--lang hi]
  *
  * Files: <out>/<screen>-<theme>-<w>x<h>.png (theme "light" / "dark" / "hc-light" / "hc-dark"),
  * overlays as overlay-<name>-<theme>-<w>.png, and with --metrics <out>/frame-metrics.json (frame width, title x / y /
@@ -26,7 +26,7 @@ const SCREENS = {
 const MAIN = ['dashboard', 'editor', 'transactions', 'clients', 'settings', 'books', 'gst', 'inventory', 'pos', 'receivables', 'empty-loans'];
 
 function args(argv) {
-  const o = { screens: MAIN, sizes: ['375x812', '1280x900'], themes: ['light', 'dark'], extra: [], overlays: false, metrics: false };
+  const o = { lang: 'en', screens: MAIN, sizes: ['375x812', '1280x900'], themes: ['light', 'dark'], extra: [], overlays: false, metrics: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -37,6 +37,7 @@ function args(argv) {
     else if (a === '--themes') o.themes = next().split(',').filter(Boolean);
     else if (a === '--extra') o.extra.push(...next().split(',').filter(Boolean));
     else if (a === '--overlays') o.overlays = true;
+    else if (a === '--lang') o.lang = next();
     else if (a === '--metrics') o.metrics = true;
     else if (a === '--help' || a === '-h') o.help = true;
     else throw new Error(`unknown argument ${a}`);
@@ -69,7 +70,12 @@ await page.getByRole('button', { name: /Create account/ }).click();
 await page.waitForFunction(() => !!localStorage.getItem('mrchartist_inv_auth'), null, { timeout: 15000 });
 await page.getByRole('button', { name: /sample data/i }).click();
 await page.waitForTimeout(6000);
-await page.evaluate(() => { try { localStorage.setItem('mrchartist_tips_off', '1'); } catch { /* ignore */ } });
+await page.evaluate((lang) => {
+  try {
+    localStorage.setItem('mrchartist_tips_off', '1');
+    if (lang !== 'en') localStorage.setItem('mrchartist_inv_lang', lang); // device-local interface language (5.4)
+  } catch { /* ignore */ }
+}, opt.lang);
 
 async function dismiss() {
   for (const n of ['Remind later', 'Got it']) {
@@ -120,7 +126,7 @@ async function shoot(name, theme, s) {
   await page.setViewportSize({ width: w, height: h });
   await page.goto(srv.origin + SCREENS[name]);
   await settle();
-  await page.screenshot({ path: `${OUT}/${name}-${theme}-${w}x${h}.png` });
+  await page.screenshot({ path: `${OUT}/${name}-${theme}${opt.lang === 'en' ? '' : `-${opt.lang}`}-${w}x${h}.png` });
   if (opt.metrics) await measure(name, theme, w, h);
 }
 
