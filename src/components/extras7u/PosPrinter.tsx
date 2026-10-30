@@ -12,6 +12,7 @@ import { useT } from '../../i18n';
 import { x7T } from '../../i18n/areas/extras-7u';
 import controls from '../../styles/controls.module.css';
 import own from './x7u.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /** Runs the raw print for a saved bill, then `onDone`; on failure `onFail` (the POS falls back to the browser print). */
 export function RawReceiptPrint({ invoice, onDone, onFail }: { invoice: InvoiceRecord; onDone: () => void; onFail: () => void }) {
@@ -72,10 +73,10 @@ export function PosPrinterButton() {
           {p.mode === 'browser' && <p className={own.muted}>{x7T('browserDrawer')}</p>}
           {p.mode !== 'browser' && (
             <label className={controls.field}><span className={controls.label}>{x7T('width')}</span>
-              <select className={controls.select} value={p.width} onChange={(e) => set({ ...p, width: e.target.value === '58' ? 58 : 80 })}>
+              <SelectField className={controls.select} value={p.width} onChange={(e) => set({ ...p, width: e.target.value === '58' ? 58 : 80 })}>
                 <option value={58}>58 mm</option>
                 <option value={80}>80 mm</option>
-              </select></label>
+              </SelectField></label>
           )}
           {p.mode === 'bluetooth' && (
             <>
@@ -87,9 +88,9 @@ export function PosPrinterButton() {
           {p.mode === 'serial' && (
             <>
               <label className={controls.field}><span className={controls.label}>{x7T('baud')}</span>
-                <select className={controls.select} value={p.baud} onChange={(e) => set({ ...p, baud: Number(e.target.value) })}>
+                <SelectField className={controls.select} value={p.baud} onChange={(e) => set({ ...p, baud: Number(e.target.value) })}>
                   {[9600, 19200, 38400, 57600, 115200].map((b) => <option key={b} value={b}>{b}</option>)}
-                </select></label>
+                </SelectField></label>
               <label className={controls.check}><input type="checkbox" checked={p.drawer} onChange={(e) => set({ ...p, drawer: e.target.checked })} /> {x7T('kickDrawer')}</label>
               <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => choosePort().then((ok) => setNote(ok ? x7T('portChosen') : x7T('noSerial'))).catch((err: Error) => setNote(err.message))}>{x7T('choosePort')}</button>
             </>

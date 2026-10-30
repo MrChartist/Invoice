@@ -15,6 +15,8 @@ import controls from '../../styles/controls.module.css';
 import styles from './StatementViewer.module.css';
 import { STATEMENT_STYLES, loadStatementPrefs, saveStatementPrefs, skipInBulk, type StatementStyle } from '../../lib/statement-styles';
 import { rcv2T as colT } from '../../i18n/areas/collections-rcv';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 interface Props {
   parties: PartyReceivable[];
@@ -131,11 +133,11 @@ export function BulkStatements({ parties, clients, sender, currency, defaultFrom
       <div className={controls.row3}>
         <label className={controls.field}>
           <span className={controls.label}>{printT('from')}</span>
-          <input type="date" className={controls.input} value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
+          <DateField className={controls.input} value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{printT('to')}</span>
-          <input type="date" className={controls.input} value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
+          <DateField className={controls.input} value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
         </label>
         <label className={controls.check} style={{ alignSelf: 'end' }}>
           <input type="checkbox" checked={onlyBalance} onChange={(e) => setOnlyBalance(e.target.checked)} />
@@ -145,9 +147,9 @@ export function BulkStatements({ parties, clients, sender, currency, defaultFrom
       <div className={controls.row}>
         <label className={controls.field}>
           <span className={controls.label}>{colT('stStyle')}</span>
-          <select className={controls.select} value={prefs.style} onChange={(e) => setStyle({ ...prefs, style: e.target.value as StatementStyle })} data-bulk-style>
+          <SelectField className={controls.select} value={prefs.style} onChange={(e) => setStyle({ ...prefs, style: e.target.value as StatementStyle })} data-bulk-style>
             {STATEMENT_STYLES.map((st) => <option key={st} value={st}>{colT(`st.${st}`)}</option>)}
-          </select>
+          </SelectField>
         </label>
         <label className={controls.check}>
           <input type="checkbox" checked={prefs.ageing} onChange={(e) => setStyle({ ...prefs, ageing: e.target.checked })} />

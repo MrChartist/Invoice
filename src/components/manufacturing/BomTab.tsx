@@ -14,6 +14,7 @@ import { qtyText, type MfgContext } from './context';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './manufacturing.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /** Bill of Materials master (Tally "Components (BoM)"): several per item, one default. */
 export function BomTab({ ctx }: { ctx: MfgContext }) {
@@ -123,10 +124,10 @@ function BomModal({ ctx, bom, boms, onClose }: { ctx: MfgContext; bom: Bom | nul
         <div className={controls.row3}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="bom-item">{mfgT('finished')}</label>
-            <select id="bom-item" className={controls.select} value={itemId} onChange={(e) => setItemId(e.target.value)} autoFocus>
+            <SelectField id="bom-item" className={controls.select} value={itemId} onChange={(e) => setItemId(e.target.value)} autoFocus>
               <option value="">{mfgT('choose')}</option>
               {tracked.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-            </select>
+            </SelectField>
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="bom-name">{mfgT('bomName')}</label>

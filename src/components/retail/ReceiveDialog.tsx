@@ -14,6 +14,7 @@ import { nameOfGodown, type TransferCtx } from './transfer-context';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import css from './retail-r4.module.css';
+import { DateField } from '../ui/DateField';
 
 /**
  * Receive against a transfer request (R4-B4): per item received / short / damaged. What arrived moves from transit to
@@ -54,7 +55,7 @@ export default function ReceiveDialog({ ctx, request, onClose, onDone }: { ctx: 
       footer={<><button type="button" className={controls.btnOutline} onClick={onClose}>{sT('cancel')}</button><button type="button" className={controls.btnPrimary} onClick={submit} data-trq-receive-save><PackageCheck size={16} aria-hidden="true" /> {sT('receive')}</button></>}>
       <div className={css.stack}>
         <div className={css.bar}>
-          <label className={controls.field}><span className={controls.label}>{sT('date')}</span><input type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
+          <label className={controls.field}><span className={controls.label}>{sT('date')}</span><DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
           <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={all} data-trq-receive-all>{sT('receiveAll')}</button>
         </div>
         <ScanField id="trq-scan" label={sT('scanToReceive')} onCode={onCode} placeholder={sT('scanPh')} />

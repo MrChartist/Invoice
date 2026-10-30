@@ -11,6 +11,7 @@ import { useT } from '../../i18n';
 import { retailT } from '../../i18n/areas/retail';
 import controls from '../../styles/controls.module.css';
 import styles from './retail.module.css';
+import { SelectField } from '../ui/SelectField';
 
 type Tab = 'keys' | 'scale';
 
@@ -149,24 +150,24 @@ export function RetailSettings({ open, onClose, keymap, scale, onSaved, initialT
               </label>
               <label className={controls.field}>
                 <span className={controls.label}>{retailT('scalePlu')}</span>
-                <select className={controls.select} value={profile.pluLength} onChange={(e) => setProfile({ ...profile, pluLength: Number(e.target.value) })}>
+                <SelectField className={controls.select} value={profile.pluLength} onChange={(e) => setProfile({ ...profile, pluLength: Number(e.target.value) })}>
                   {[4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
+                </SelectField>
               </label>
             </div>
             <div className={controls.row}>
               <label className={controls.field}>
                 <span className={controls.label}>{retailT('scaleValue')}</span>
-                <select className={controls.select} value={profile.value} onChange={(e) => setProfile({ ...profile, value: e.target.value === 'price' ? 'price' : 'weight', decimals: e.target.value === 'price' ? 2 : 3 })} data-scale-value>
+                <SelectField className={controls.select} value={profile.value} onChange={(e) => setProfile({ ...profile, value: e.target.value === 'price' ? 'price' : 'weight', decimals: e.target.value === 'price' ? 2 : 3 })} data-scale-value>
                   <option value="weight">{retailT('scaleWeight')}</option>
                   <option value="price">{retailT('scalePrice')}</option>
-                </select>
+                </SelectField>
               </label>
               <label className={controls.field}>
                 <span className={controls.label}>{retailT('scaleDecimals')}</span>
-                <select className={controls.select} value={profile.decimals} onChange={(e) => setProfile({ ...profile, decimals: Number(e.target.value) })}>
+                <SelectField className={controls.select} value={profile.decimals} onChange={(e) => setProfile({ ...profile, decimals: Number(e.target.value) })}>
                   {[0, 1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
+                </SelectField>
               </label>
             </div>
             <label className={controls.check}>
@@ -188,15 +189,15 @@ export function RetailSettings({ open, onClose, keymap, scale, onSaved, initialT
             <div className={controls.row}>
               <label className={controls.field}>
                 <span className={controls.label}>{retailT('scaleLink')}</span>
-                <select className={controls.select} value={profile.link ?? 'serial'} onChange={(e) => setProfile({ ...profile, link: e.target.value as ScaleProfile['link'] })} data-scale-link>
+                <SelectField className={controls.select} value={profile.link ?? 'serial'} onChange={(e) => setProfile({ ...profile, link: e.target.value as ScaleProfile['link'] })} data-scale-link>
                   {(['serial', 'hid', 'ble'] as const).map((k) => <option key={k} value={k}>{retailT(`link.${k}`)}</option>)}
-                </select>
+                </SelectField>
               </label>
               <label className={controls.field}>
                 <span className={controls.label}>{retailT('baud')}</span>
-                <select className={controls.select} value={profile.baud} disabled={!!profile.link && profile.link !== 'serial'} onChange={(e) => setProfile({ ...profile, baud: Number(e.target.value) })}>
+                <SelectField className={controls.select} value={profile.baud} disabled={!!profile.link && profile.link !== 'serial'} onChange={(e) => setProfile({ ...profile, baud: Number(e.target.value) })}>
                   {[1200, 2400, 4800, 9600, 19200, 38400].map((b) => <option key={b} value={b}>{b}</option>)}
-                </select>
+                </SelectField>
               </label>
               <div className={controls.field}>
                 <span className={controls.label}>&nbsp;</span>
@@ -211,10 +212,10 @@ export function RetailSettings({ open, onClose, keymap, scale, onSaved, initialT
                 <div className={controls.row}>
                   <label className={controls.field}>
                     <span className={controls.label}>{retailT('anFormat')}</span>
-                    <select className={controls.select} value={analyser.preset} onChange={(e) => setAnalyser({ ...analyser, preset: e.target.value === 'kv' ? 'kv' : 'csv' })} data-analyser-preset>
+                    <SelectField className={controls.select} value={analyser.preset} onChange={(e) => setAnalyser({ ...analyser, preset: e.target.value === 'kv' ? 'kv' : 'csv' })} data-analyser-preset>
                       <option value="csv">{retailT('anCsv')}</option>
                       <option value="kv">key=value</option>
-                    </select>
+                    </SelectField>
                   </label>
                   <label className={controls.field}>
                     <span className={controls.label}>{retailT('anOrder')}</span>
@@ -228,15 +229,15 @@ export function RetailSettings({ open, onClose, keymap, scale, onSaved, initialT
                 <div className={controls.row}>
                   <label className={controls.field}>
                     <span className={controls.label}>{retailT('anDivide')}</span>
-                    <select className={controls.select} value={analyser.div} onChange={(e) => setAnalyser({ ...analyser, div: Number(e.target.value) })}>
+                    <SelectField className={controls.select} value={analyser.div} onChange={(e) => setAnalyser({ ...analyser, div: Number(e.target.value) })}>
                       {[1, 10, 100].map((n) => <option key={n} value={n}>{n}</option>)}
-                    </select>
+                    </SelectField>
                   </label>
                   <label className={controls.field}>
                     <span className={controls.label}>{retailT('baud')}</span>
-                    <select className={controls.select} value={analyser.baud} onChange={(e) => setAnalyser({ ...analyser, baud: Number(e.target.value) })} data-analyser-baud>
+                    <SelectField className={controls.select} value={analyser.baud} onChange={(e) => setAnalyser({ ...analyser, baud: Number(e.target.value) })} data-analyser-baud>
                       {[2400, 4800, 9600, 19200].map((b) => <option key={b} value={b}>{b}</option>)}
-                    </select>
+                    </SelectField>
                   </label>
                 </div>
               </div>

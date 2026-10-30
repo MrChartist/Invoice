@@ -12,6 +12,7 @@ import { approvalsT } from '../../i18n/areas/extras';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import own from './approvals.module.css';
+import { SelectField } from '../ui/SelectField';
 
 // 8.44: bills, expenses and supplier payments sent for approval — own lazy chunk.
 const PurchaseApprovals = lazy(() => import('./PurchaseApprovals'));
@@ -97,10 +98,10 @@ export function ApprovalsPanel({ notify }: { notify?: (m: string, tone?: 'succes
             <div className={controls.row}>
               <label className={controls.field}>
                 <span className={controls.label}>{approvalsT('modeLabel')}</span>
-                <select className={controls.select} value={policy.mode} onChange={(e) => setPolicy({ ...policy, mode: e.target.value === 'all' ? 'all' : 'above' })}>
+                <SelectField className={controls.select} value={policy.mode} onChange={(e) => setPolicy({ ...policy, mode: e.target.value === 'all' ? 'all' : 'above' })}>
                   <option value="above">{approvalsT('modeAbove')}</option>
                   <option value="all">{approvalsT('modeAll')}</option>
-                </select>
+                </SelectField>
               </label>
               {policy.mode === 'above' && (
                 <label className={controls.field}>

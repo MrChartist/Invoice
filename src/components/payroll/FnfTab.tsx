@@ -16,6 +16,8 @@ import surface from '../../styles/surface.module.css';
 import styles from './Payroll.module.css';
 import { Out } from './Out';
 import { inr, parseAmount, runAction, type TabProps } from './shared';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const REASONS: FnfReason[] = ['resignation', 'retirement', 'termination', 'death'];
 const REASON_KEY = { resignation: 'fnf.r.resignation', retirement: 'fnf.r.retirement', termination: 'fnf.r.termination', death: 'fnf.r.death' } as const;
@@ -114,22 +116,22 @@ export function FnfTab({ month, version, refresh, notify }: TabProps) {
             <div className={styles.formGrid}>
               <label className={controls.field}>
                 <span className={controls.label}>{pT('rep.employee')}</span>
-                <select className={controls.select} value={draft.employee_id} disabled={!!draft.id} onChange={(e) => startFor(employees.find((x) => x.id === e.target.value))}>
+                <SelectField className={controls.select} value={draft.employee_id} disabled={!!draft.id} onChange={(e) => startFor(employees.find((x) => x.id === e.target.value))}>
                   {leavers.map((e) => <option key={e.id} value={e.id}>{e.code} · {e.name} ({formatDate(e.dol!)})</option>)}
-                </select>
+                </SelectField>
               </label>
               <label className={controls.field}>
                 <span className={controls.label}>{pT('fnf.reason')}</span>
-                <select className={controls.select} value={draft.reason} onChange={(e) => set('reason', e.target.value as FnfReason)}>
+                <SelectField className={controls.select} value={draft.reason} onChange={(e) => set('reason', e.target.value as FnfReason)}>
                   {REASONS.map((r) => <option key={r} value={r}>{pT(REASON_KEY[r])}</option>)}
-                </select>
+                </SelectField>
               </label>
-              <label className={controls.field}><span className={controls.label}>{pT('fnf.payMonth')}</span><input className={controls.input} type="month" value={draft.pay_month} onChange={(e) => set('pay_month', e.target.value)} /></label>
+              <label className={controls.field}><span className={controls.label}>{pT('fnf.payMonth')}</span><DateField className={controls.input} mode="month" value={draft.pay_month} onChange={(e) => set('pay_month', e.target.value)} /></label>
               <label className={controls.field}>
                 <span className={controls.label}>{pT('fnf.notice')}</span>
-                <select className={controls.select} value={draft.notice_mode} onChange={(e) => set('notice_mode', e.target.value as Draft['notice_mode'])}>
+                <SelectField className={controls.select} value={draft.notice_mode} onChange={(e) => set('notice_mode', e.target.value as Draft['notice_mode'])}>
                   {(['none', 'recover', 'pay'] as const).map((n) => <option key={n} value={n}>{pT(NOTICE_KEY[n])}</option>)}
-                </select>
+                </SelectField>
               </label>
               {draft.notice_mode !== 'none' && (
                 <>
@@ -158,10 +160,10 @@ export function FnfTab({ month, version, refresh, notify }: TabProps) {
               {draft.other.map((o, i) => (
                 <div key={i} className={styles.inline}>
                   <input className={controls.input} aria-label={pT('ext.desc')} value={o.name} onChange={(e) => set('other', draft.other.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
-                  <select className={controls.select} aria-label={pT('ext.kind')} value={o.kind} onChange={(e) => set('other', draft.other.map((x, j) => (j === i ? { ...x, kind: e.target.value as 'earning' | 'deduction' } : x)))}>
+                  <SelectField className={controls.select} aria-label={pT('ext.kind')} value={o.kind} onChange={(e) => set('other', draft.other.map((x, j) => (j === i ? { ...x, kind: e.target.value as 'earning' | 'deduction' } : x)))}>
                     <option value="earning">{pT('ext.earning')}</option>
                     <option value="deduction">{pT('ext.deduction')}</option>
-                  </select>
+                  </SelectField>
                   <input className={controls.inputNumeric} type="number" min="0" step="0.01" aria-label={pT('loan.amount')} value={o.amount || ''} onChange={(e) => set('other', draft.other.map((x, j) => (j === i ? { ...x, amount: parseAmount(e.target.value) ?? 0 } : x)))} />
                   <button type="button" className={controls.btnIcon} aria-label={pT('delete')} onClick={() => set('other', draft.other.filter((_, j) => j !== i))}><Trash2 size={14} /></button>
                 </div>
@@ -221,7 +223,7 @@ export function FnfTab({ month, version, refresh, notify }: TabProps) {
             <Out base={`gratuity-provision-${asOf}`} rows={() => grat.rows} sheet="Gratuity" />
           </div>
           <div className={styles.formGrid}>
-            <label className={controls.field}><span className={controls.label}>{pT('grat.asOf')}</span><input className={controls.input} type="date" value={asOf} onChange={(e) => e.target.value && setAsOf(e.target.value)} /></label>
+            <label className={controls.field}><span className={controls.label}>{pT('grat.asOf')}</span><DateField className={controls.input} value={asOf} onChange={(e) => e.target.value && setAsOf(e.target.value)} /></label>
           </div>
           <div className={surface.tableWrap}>
             <table className={surface.table}>

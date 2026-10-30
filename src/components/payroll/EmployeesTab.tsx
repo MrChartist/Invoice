@@ -22,6 +22,8 @@ import { payrollT as pT } from '../../i18n/areas/payroll';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Payroll.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 interface Props {
   version: number;
@@ -249,38 +251,38 @@ function EmployeeModal({
         {text('designation', pT('f.designation'))}
         <label className={controls.field}>
           <span className={controls.label}>{pT('f.department')}</span>
-          <select className={controls.select} value={f.cost_centre_id ?? ''} onChange={(e) => set('cost_centre_id', e.target.value || undefined)}>
+          <SelectField className={controls.select} value={f.cost_centre_id ?? ''} onChange={(e) => set('cost_centre_id', e.target.value || undefined)}>
             <option value="">-</option>
             {centres.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          </SelectField>
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{pT('f.group')}</span>
-          <select className={controls.select} value={f.group_id ?? ''} onChange={(e) => set('group_id', e.target.value || undefined)}>
+          <SelectField className={controls.select} value={f.group_id ?? ''} onChange={(e) => set('group_id', e.target.value || undefined)}>
             <option value="">-</option>
             {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
+          </SelectField>
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{pT('f.gender')}</span>
-          <select className={controls.select} value={f.gender ?? ''} onChange={(e) => set('gender', (e.target.value || undefined) as EmployeeInput['gender'])}>
+          <SelectField className={controls.select} value={f.gender ?? ''} onChange={(e) => set('gender', (e.target.value || undefined) as EmployeeInput['gender'])}>
             <option value="">-</option>
             <option value="M">{pT('gender.m')}</option>
             <option value="F">{pT('gender.f')}</option>
             <option value="O">{pT('gender.o')}</option>
-          </select>
+          </SelectField>
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{pT('f.doj')}</span>
-          <input className={controls.input} type="date" value={f.doj ?? ''} onChange={(e) => set('doj', e.target.value || undefined)} />
+          <DateField className={controls.input} value={f.doj ?? ''} onChange={(e) => set('doj', e.target.value || undefined)} />
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{pT('f.dol')}</span>
-          <input className={controls.input} type="date" value={f.dol ?? ''} onChange={(e) => set('dol', e.target.value || undefined)} />
+          <DateField className={controls.input} value={f.dol ?? ''} onChange={(e) => set('dol', e.target.value || undefined)} />
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{pT('f.dob')}</span>
-          <input className={controls.input} type="date" value={f.dob ?? ''} onChange={(e) => set('dob', e.target.value || undefined)} />
+          <DateField className={controls.input} value={f.dob ?? ''} onChange={(e) => set('dob', e.target.value || undefined)} />
           <span className={controls.hint}>{pT('f.dobHint')}</span>
         </label>
         <label className={controls.field}>
@@ -289,10 +291,10 @@ function EmployeeModal({
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{pT('f.state')}</span>
-          <select className={controls.select} value={f.state ?? ''} onChange={(e) => set('state', e.target.value || undefined)}>
+          <SelectField className={controls.select} value={f.state ?? ''} onChange={(e) => set('state', e.target.value || undefined)}>
             <option value="">-</option>
             {INDIAN_STATES.map((s) => <option key={s.code} value={s.code}>{s.name}{PT_STATES[s.code] ? ' · PT' : ''}</option>)}
-          </select>
+          </SelectField>
         </label>
         {text('pan', pT('f.pan'), { mono: true })}
         {text('uan', pT('f.uan'), { mono: true })}
@@ -314,10 +316,10 @@ function EmployeeModal({
       <div className={styles.formGrid}>
         <label className={controls.field}>
           <span className={controls.label}>{pT('f.regime')}</span>
-          <select className={controls.select} value={f.tax_regime} onChange={(e) => set('tax_regime', e.target.value === 'old' ? 'old' : 'new')}>
+          <SelectField className={controls.select} value={f.tax_regime} onChange={(e) => set('tax_regime', e.target.value === 'old' ? 'old' : 'new')}>
             <option value="new">{pT('regime.new')}</option>
             <option value="old">{pT('regime.old')}</option>
-          </select>
+          </SelectField>
         </label>
         {money('tax_deductions', pT('f.deductions'))}
         {money('hra_exemption', pT('f.hra'))}

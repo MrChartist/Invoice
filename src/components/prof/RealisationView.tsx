@@ -17,6 +17,7 @@ import surface from '../../styles/surface.module.css';
 import { Field } from './ps-ui';
 import { pct } from './ps-run';
 import { usePeriod } from './use-period';
+import { SelectField } from '../ui/SelectField';
 
 const DIMS: RealDim[] = ['staff', 'partner', 'client', 'matter', 'work_type'];
 
@@ -50,7 +51,7 @@ export default function RealisationView() {
       <div className={surface.cardBody}>
         <div className={controls.row3}>
           {inputs}
-          <Field label={pwT('by')}><select className={controls.select} value={by} onChange={(e) => setBy(e.target.value as RealDim)}>{DIMS.map((d) => <option key={d} value={d}>{pwT(`by.${d}`)}</option>)}</select></Field>
+          <Field label={pwT('by')}><SelectField className={controls.select} value={by} onChange={(e) => setBy(e.target.value as RealDim)}>{DIMS.map((d) => <option key={d} value={d}>{pwT(`by.${d}`)}</option>)}</SelectField></Field>
         </div>
         <button type="button" className={controls.btnGhost} onClick={() => downloadText('realisation.csv', toCsv([head, ...rows]), 'text/csv')}>{psT('csv')}</button>
         <div className={surface.tableWrap}>

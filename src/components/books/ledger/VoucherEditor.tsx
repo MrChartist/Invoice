@@ -32,6 +32,8 @@ import { BranchSelect } from '../../branches/BranchSelect';
 import { allocationsOf, openRefsFor, saveReceiptVoucher, validateAllocations, type ReceiptAllocation } from '../../../lib/bill-allocation';
 import { getTable } from '../../../lib/storage';
 import { VOUCHER_TYPES_TABLE, seriesTypeFor, typedNumber, type VoucherSeries } from '../../../lib/voucher-series';
+import { SelectField } from '../../ui/SelectField';
+import { DateField } from '../../ui/DateField';
 
 // P0-11 (WP-1): bill-wise details on a receipt against a Sundry Debtor, loaded when needed.
 const BillAllocation = lazy(() => import('../../masters/BillAllocation'));
@@ -182,15 +184,15 @@ export function VoucherEditor({ accounts: initialAccounts, voucher, defaultDate,
         <div className={styles.formGrid}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-type`}>{ledgerT('type')}</label>
-            <select id={`${uid}-type`} className={controls.select} value={type} onChange={(e) => setType(e.target.value as ManualVoucherType)}>
+            <SelectField id={`${uid}-type`} className={controls.select} value={type} onChange={(e) => setType(e.target.value as ManualVoucherType)}>
               {MANUAL_VOUCHER_TYPES.map((t) => (
                 <option key={t} value={t}>{ledgerT(`vt${t}`)}</option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-date`}>{ledgerT('date')}</label>
-            <input id={`${uid}-date`} type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField id={`${uid}-date`} className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-no`}>{ledgerT('number')}</label>
@@ -223,7 +225,7 @@ export function VoucherEditor({ accounts: initialAccounts, voucher, defaultDate,
             const needsParty = !!acc && PARTY_GROUPS.has(acc.group);
             return (
               <div key={r.key} className={styles.editorLine}>
-                <select
+                <SelectField
                   aria-label={ledgerT('lineAccount', { n: i + 1 })}
                   aria-keyshortcuts="Alt+C"
                   className={controls.select}
@@ -246,7 +248,7 @@ export function VoucherEditor({ accounts: initialAccounts, voucher, defaultDate,
                       </optgroup>
                     ) : null;
                   })}
-                </select>
+                </SelectField>
                 {!needsParty && centres.length > 0 && isPnl(r.account_id) ? (
                   <CostCentreSelect id={`${uid}-cc-${r.key}`} ariaLabel={ledgerT('lineCc', { n: i + 1 })} centres={centres} value={r.cc} onChange={(v) => patch(r.key, { cc: v })} />
                 ) : (

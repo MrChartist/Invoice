@@ -25,6 +25,8 @@ import local from './gst-reports.module.css';
 import styles from './gst-setoff.module.css';
 import { useT } from '../../i18n';
 import { soT } from '../../i18n/areas/gst-setoff';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 export interface HsnMasterPanelProps {
   notify: (msg: string, tone?: 'success' | 'error' | 'info') => void;
@@ -200,10 +202,10 @@ function HsnDialog({ draft, onClose, onSave }: { draft: HsnInput; onClose: () =>
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{soT('hsnKind')}</span>
-          <select className={controls.select} value={d.kind} onChange={(e) => setD({ ...d, kind: e.target.value === 'services' ? 'services' : 'goods' })}>
+          <SelectField className={controls.select} value={d.kind} onChange={(e) => setD({ ...d, kind: e.target.value === 'services' ? 'services' : 'goods' })}>
             <option value="goods">{soT('hsnGoods')}</option>
             <option value="services">{soT('hsnServices')}</option>
-          </select>
+          </SelectField>
         </label>
       </div>
       <h4 className={local.tbHeading}>{soT('hsnHistory')}</h4>
@@ -218,7 +220,7 @@ function HsnDialog({ draft, onClose, onSave }: { draft: HsnInput; onClose: () =>
         <tbody>
           {d.rates.map((r, i) => (
             <tr key={i}>
-              <td><input type="date" className={controls.input} aria-label={soT('hsnFrom')} value={r.from} onChange={(e) => setRate(i, { from: e.target.value })} /></td>
+              <td><DateField className={controls.input} aria-label={soT('hsnFrom')} value={r.from} onChange={(e) => setRate(i, { from: e.target.value })} /></td>
               <td><input type="number" min={0} max={100} step="0.01" className={`${controls.input} ${styles.cellInput}`} aria-label={soT('hsnRate')} value={r.rate} onChange={(e) => setRate(i, { rate: Number(e.target.value) })} /></td>
               <td><input type="number" min={0} step="0.01" className={`${controls.input} ${styles.cellInput}`} aria-label={soT('hsnCess')} value={r.cess_rate ?? ''} onChange={(e) => setRate(i, { cess_rate: Number(e.target.value) || undefined })} /></td>
             </tr>

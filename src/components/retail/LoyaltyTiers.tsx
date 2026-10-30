@@ -9,6 +9,7 @@ import { useT } from '../../i18n';
 import { sT } from '../../i18n/areas/stores-r4';
 import controls from '../../styles/controls.module.css';
 import css from './retail-r4.module.css';
+import { DateField } from '../ui/DateField';
 
 /**
  * Loyalty tiers and points expiry (R4-B2): up to five tiers on rolling 12-month spend (a changed list applies from the
@@ -49,7 +50,7 @@ export default function LoyaltyTiers({ onSaved, notify }: { onSaved: () => void;
         </button>
       )}
       <div className={controls.row}>
-        <label className={controls.field}><span className={controls.label}>{sT('lyFrom')}</span><input type="date" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+        <label className={controls.field}><span className={controls.label}>{sT('lyFrom')}</span><DateField className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
         <label className={controls.field}><span className={controls.label}>{sT('lyExpiryMonths')}</span><NumberInput className={cn(controls.input, controls.inputNumeric)} value={months} onChange={setMonths} /></label>
       </div>
       <p className={css.note}>{sT('lyTiersHint')}</p>

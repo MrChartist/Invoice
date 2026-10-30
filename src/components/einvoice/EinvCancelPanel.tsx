@@ -17,6 +17,7 @@ import { useT } from '../../i18n';
 import { ggT } from '../../i18n/areas/gst-guards';
 import controls from '../../styles/controls.module.css';
 import styles from '../gst-reports/gst-guards.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const REASONS: CancelReason[] = ['order_cancelled', 'data_entry', 'duplicate', 'other'];
 const REASON_KEY = { order_cancelled: 'rsnOrder', data_entry: 'rsnData', duplicate: 'rsnDup', other: 'rsnOther' } as const;
@@ -105,9 +106,9 @@ export function EinvCancelPanel({ invoice, afterCancel }: { invoice: InvoiceReco
           <div className={styles.row}>
             <label className={controls.field} style={{ flex: '1 1 12rem' }}>
               <span className={controls.label}>{ggT('cnlReason')}</span>
-              <select className={controls.select} value={reason} onChange={(e) => setReason(e.target.value as CancelReason)}>
+              <SelectField className={controls.select} value={reason} onChange={(e) => setReason(e.target.value as CancelReason)}>
                 {REASONS.map((r) => <option key={r} value={r}>{ggT(REASON_KEY[r])}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field} style={{ flex: '2 1 14rem' }}>
               <span className={controls.label}>{ggT('cnlRemark')}</span>

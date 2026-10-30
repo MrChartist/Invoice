@@ -14,6 +14,8 @@ import { F } from './Field';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './transport.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 export function TripsPanel({ notify, refresh, tick }: PanelProps) {
   const trips = useMemo(() => [...loadTrips()].sort((a, b) => b.start_date.localeCompare(a.start_date)), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -46,9 +48,9 @@ export function TripsPanel({ notify, refresh, tick }: PanelProps) {
         <div className={styles.box}>
           <div className={styles.grid}>
             <F l={twT('vehicle')}>
-              <select className={controls.select} value={f.vehicle} onChange={(e) => setF({ ...f, vehicle: e.target.value })}><option value="">-</option>{vehicles.map((v) => <option key={v.id} value={v.id}>{v.reg_no}{v.own ? '' : ` (${twT('hired')})`}</option>)}</select></F>
+              <SelectField className={controls.select} value={f.vehicle} onChange={(e) => setF({ ...f, vehicle: e.target.value })}><option value="">-</option>{vehicles.map((v) => <option key={v.id} value={v.id}>{v.reg_no}{v.own ? '' : ` (${twT('hired')})`}</option>)}</SelectField></F>
             <F l={twT('driver')}><input className={controls.input} value={f.driver} onChange={(e) => setF({ ...f, driver: e.target.value })} /></F>
-            <F l={twT('startDate')}><input className={controls.input} type="date" value={f.start} onChange={(e) => setF({ ...f, start: e.target.value })} /></F>
+            <F l={twT('startDate')}><DateField className={controls.input} value={f.start} onChange={(e) => setF({ ...f, start: e.target.value })} /></F>
             <F l={twT('startKm')}><input className={controls.input} type="number" value={f.km} onChange={(e) => setF({ ...f, km: e.target.value })} /></F>
             <F l={twT('route')}><input className={controls.input} value={f.route} onChange={(e) => setF({ ...f, route: e.target.value })} /></F>
           </div>

@@ -16,6 +16,7 @@ import surface from '../../styles/surface.module.css';
 import { Field } from './ps-ui';
 import { pct, runWith, type PsDeskProps } from './ps-run';
 import { usePeriod } from './use-period';
+import { TypedInput } from '../ui/TypedInput';
 
 interface Draft { id?: string; name: string; cap: string; std: string; cost: string; target: string; from: string }
 const draftOf = (s?: ServiceStaff): Draft => {
@@ -41,7 +42,7 @@ export default function UtilisationView({ notify }: Pick<PsDeskProps, 'notify'>)
   };
   const head = [psT('staff'), pwT('available'), pwT('billable'), pwT('nonBill'), pwT('util'), pwT('targetPct')];
   const csv = rows.map((r) => [r.name, r.available, r.billable, Object.entries(r.nonBillable).map(([k, h]) => `${wt.get(k) ?? '-'} ${h}`).join('; '), pct(r.pct), r.target ?? '']);
-  const num = (k: keyof Draft, label: string) => <Field label={label}><input type={k === 'from' ? 'date' : 'number'} min={0} className={controls.input} value={d?.[k] ?? ''} onChange={(e) => d && setD({ ...d, [k]: e.target.value })} data-staff-ps={k} /></Field>;
+  const num = (k: keyof Draft, label: string) => <Field label={label}><TypedInput type={k === 'from' ? 'date' : 'number'} min={0} className={controls.input} value={d?.[k] ?? ''} onChange={(e) => d && setD({ ...d, [k]: e.target.value })} data-staff-ps={k} /></Field>;
   return (
     <div className={surface.card}>
       <div className={surface.cardBody}>

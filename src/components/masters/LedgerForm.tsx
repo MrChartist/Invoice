@@ -32,6 +32,7 @@ import { DrCrAmount, GroupSelect, MasterFrame } from './shared';
 import { paiseText, parsePaise } from './masters-utils';
 import controls from '../../styles/controls.module.css';
 import styles from './masters.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export interface SavedLedger {
   id: string;
@@ -209,11 +210,11 @@ export function LedgerForm({ mode, ledgerId, initialName = '', initialGroup = 'I
             <label htmlFor={`${uid}-rate`}>{mastersT('interest')} : {mastersT('interestRate')}</label>
             <div className={styles.inline}>
               <input id={`${uid}-rate`} className={`${controls.input} ${styles.amount}`} inputMode="decimal" value={rate} readOnly={readOnly} placeholder="-" onChange={(e) => setRate(e.target.value)} />
-              <select className={controls.select} aria-label={mastersT('interestOn')} value={on} disabled={readOnly} onChange={(e) => setOn(e.target.value as LedgerInterestParams['on'])}>
+              <SelectField className={controls.select} aria-label={mastersT('interestOn')} value={on} disabled={readOnly} onChange={(e) => setOn(e.target.value as LedgerInterestParams['on'])}>
                 <option value="dr">{mastersT('interestOnDr')}</option>
                 <option value="cr">{mastersT('interestOnCr')}</option>
                 <option value="both">{mastersT('interestOnBoth')}</option>
-              </select>
+              </SelectField>
             </div>
           </>
         )}

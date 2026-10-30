@@ -13,6 +13,8 @@ import { loadStockStatementInput } from '../../lib/trade/tr-stock-live';
 import type { BankStatementTerms } from '../../types/trade-r8';
 import controls from '../../styles/controls.module.css';
 import own from '../distribution/dist.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 type W = Parameters<typeof trT>[0];
 
@@ -41,12 +43,12 @@ export default function StockStatementTab() {
       <h3>{trT('ssTitle')}</h3>
       <p className={own.muted}>{trT('ssIntro')}</p>
       <div className={own.row}>
-        <label className={controls.field}><span className={controls.label}>{trT('asOf')}</span><input type="date" className={controls.input} value={asOf} onChange={(e) => setAsOf(e.target.value)} /></label>
+        <label className={controls.field}><span className={controls.label}>{trT('asOf')}</span><DateField className={controls.input} value={asOf} onChange={(e) => setAsOf(e.target.value)} /></label>
         <label className={controls.field}>
           <span className={controls.label}>{trT('bank')}</span>
-          <select className={controls.select} value={account} onChange={(e) => pick(e.target.value)}>
+          <SelectField className={controls.select} value={account} onChange={(e) => pick(e.target.value)}>
             {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
+          </SelectField>
         </label>
         <label className={controls.field}><span className={controls.label}>{trT('stockMargin')}</span><input type="number" min={0} max={100} className={controls.input} value={terms.stock_margin ?? ''} onChange={num('stock_margin')} /></label>
         <label className={controls.field}><span className={controls.label}>{trT('debtorMargin')}</span><input type="number" min={0} max={100} className={controls.input} value={terms.debtor_margin ?? ''} onChange={num('debtor_margin')} /></label>

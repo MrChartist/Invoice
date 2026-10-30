@@ -9,6 +9,7 @@ import { useT } from '../../i18n';
 import { skT } from '../../i18n/areas/stock-depth';
 import controls from '../../styles/controls.module.css';
 import own from './dist.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const CLS: Record<MoveClass, 'clsFast' | 'clsSlow' | 'clsNon'> = { fast: 'clsFast', slow: 'clsSlow', non: 'clsNon' };
 
@@ -54,12 +55,12 @@ export default function StockAnalysisTab({ positions, from, to }: { positions: S
             <label className={controls.field}><span className={controls.label}>{skT('fastTurns')}</span>
               <input type="number" min={1} className={controls.input} value={fast} onChange={(e) => setFast(Math.max(Number(e.target.value) || 1, 1))} /></label>
             <label className={controls.field}><span className={controls.label}>{skT('show')}</span>
-              <select className={controls.select} value={only} onChange={(e) => setOnly(e.target.value as '' | MoveClass)}>
+              <SelectField className={controls.select} value={only} onChange={(e) => setOnly(e.target.value as '' | MoveClass)}>
                 <option value="">{skT('all')}</option>
                 <option value="fast">{skT('clsFast')}</option>
                 <option value="slow">{skT('clsSlow')}</option>
                 <option value="non">{skT('clsNon')}</option>
-              </select></label>
+              </SelectField></label>
           </>
         ) : (
           <>

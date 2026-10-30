@@ -16,6 +16,7 @@ import type { MfgContext } from '../manufacturing/context';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import css from './retail-r4.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /**
  * Store replenishment (R4-B5), under Reorder Status: each store godown with "Refill from" is filled from that godown's
@@ -83,10 +84,10 @@ export default function ReplenishTab({ ctx }: { ctx: MfgContext }) {
         {ctx.canBooks && (
           <span className={css.actions}>
             <button type="button" className={cn(controls.btnOutline, controls.btnSm)} disabled={!toTransfer.length} onClick={raiseRequests}><ArrowLeftRight size={14} aria-hidden="true" /> {sT('rpRaise', { n: toTransfer.length })}</button>
-            <select className={controls.select} aria-label={sT('vendor')} value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
+            <SelectField className={controls.select} aria-label={sT('vendor')} value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
               <option value="">{sT('vendor')}: {toBuy[0]?.vendor ?? '-'}</option>
               {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-            </select>
+            </SelectField>
             <button type="button" className={cn(controls.btnOutline, controls.btnSm)} disabled={!toBuy.length} onClick={raisePo}><ShoppingCart size={14} aria-hidden="true" /> {sT('rpPoBtn', { n: toBuy.length })}</button>
           </span>
         )}

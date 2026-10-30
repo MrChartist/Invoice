@@ -13,6 +13,8 @@ import { nameOfGodown, type TransferCtx } from './transfer-context';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import css from './retail-r4.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 /**
  * Dispatch against a transfer request (R4-B4): a stock transfer from the supplying godown into the receiving store's
@@ -44,9 +46,9 @@ export default function DispatchDialog({ ctx, request, onClose, onDone }: { ctx:
       footer={<><button type="button" className={controls.btnOutline} onClick={onClose}>{sT('cancel')}</button><button type="button" className={controls.btnPrimary} disabled={!lines.length} onClick={submit} data-trq-dispatch-save><Truck size={16} aria-hidden="true" /> {sT('dispatch')}</button></>}>
       <div className={css.stack}>
         <div className={controls.row}>
-          <label className={controls.field}><span className={controls.label}>{sT('date')}</span><input type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
+          <label className={controls.field}><span className={controls.label}>{sT('date')}</span><DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
           <label className={controls.field}><span className={controls.label}>{sT('fromGodown')}</span>
-            <select className={controls.select} value={from} onChange={(e) => setFrom(e.target.value)}>{sources.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</select>
+            <SelectField className={controls.select} value={from} onChange={(e) => setFrom(e.target.value)}>{sources.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}</SelectField>
           </label>
         </div>
         <div className={css.wrap}>

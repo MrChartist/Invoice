@@ -5,6 +5,7 @@ import controls from '../../styles/controls.module.css';
 import styles from './books.module.css';
 import { useT } from '../../i18n';
 import { booksT } from '../../i18n/areas/books';
+import { DateField } from '../ui/DateField';
 
 export interface OpeningBalanceModalProps {
   open: boolean;
@@ -78,10 +79,9 @@ function OpeningBalanceForm({ onClose, openings, onSave, defaultAsOf }: OpeningB
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor={`${uid}-${a}-date`}>{booksT('asOf')}</label>
-          <input
+          <DateField
             id={`${uid}-${a}-date`}
             className={controls.input}
-            type="date"
             value={form[a].as_of}
             onChange={(e) => set(a, { as_of: e.target.value })}
           />

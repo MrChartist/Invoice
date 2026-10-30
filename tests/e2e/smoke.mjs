@@ -3087,7 +3087,7 @@ try {
     await writeJson(page, 'invoices', [...(await readJson(page, 'invoices', [])).map((i) => (i.id === inv.id ? { ...i, status: 'Sent', issue_date: today } : i)), { ...inv, id: 'e2e-old-bill', invoice_number: 'INV/E2E/OLD', status: 'Sent', issue_date: old, due_date: old, items: [{ ...inv.items[0], name: 'E2E Old cable', disc_chain: undefined, discount_percent: 0 }] }]);
     await page.goto(srv.origin + '/distribution?tab=claims&view=pricedrop');
     await page.locator('[data-drop-items]').fill('E2E Havells MCB, 50', { timeout: 15000 });
-    await page.locator('input[type="date"]').first().fill(tomorrow);
+    await page.locator('input[data-date-field="date"]').first().fill(tomorrow);
     await page.locator('[data-drop-rows]').waitFor({ timeout: 15000 });
     await page.locator('[data-drop-issue]').click();
     const notes = (await readJson(page, 'invoices', [], (v) => v.some((i) => i.price_drop_id))).filter((i) => i.price_drop_id);
@@ -5956,7 +5956,7 @@ try {
     check(Number(await a101.getAttribute('data-hs-open')) === 13439.93, `A-101 dues before the receipt ₹13,439.93 (${await a101.getAttribute('data-hs-open')})`);
     await a101.locator('[data-hs-act="receipt"]').click();
     const form = dv.locator('[data-hs-form="receipt"]');
-    await form.locator('input[type="date"]').fill('2026-11-02');
+    await form.locator('input[data-date-field="date"]').fill('2026-11-02');
     await form.locator('[data-hs-amount]').fill('6000');
     const novSplit = form.locator(`[data-hs-split="${nov.invoice_number}"]`);
     await novSplit.waitFor({ timeout: 15000 });

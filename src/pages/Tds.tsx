@@ -31,6 +31,7 @@ import { helpT } from '../i18n/areas/help-r6';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from './Books.module.css';
+import { SelectField } from '../components/ui/SelectField';
 
 const TABS: readonly { id: string; key?: TdsKey; label?: () => string }[] = [
   { id: 'overview', key: 'tabOverview' },
@@ -91,16 +92,16 @@ export function Tds() {
       <div className={`${styles.tabs} no-print`}>
         <label className={controls.field}>
           <span className={controls.label}>{tdsT('fy')}</span>
-          <select className={controls.select} value={fy} onChange={(e) => setFy(Number(e.target.value))}>
+          <SelectField className={controls.select} value={fy} onChange={(e) => setFy(Number(e.target.value))}>
             {years.map((y) => <option key={y} value={y}>FY {y}-{String(y + 1).slice(2)}</option>)}
-          </select>
+          </SelectField>
         </label>
         {(tab === 'returns' || tab === 'f16a' || tab === '27q') && (
           <label className={controls.field}>
             <span className={controls.label}>{tdsT('quarter')}</span>
-            <select className={controls.select} value={quarter} onChange={(e) => setQuarter(Number(e.target.value) as TdsQuarter)}>
+            <SelectField className={controls.select} value={quarter} onChange={(e) => setQuarter(Number(e.target.value) as TdsQuarter)}>
               {[1, 2, 3, 4].map((q) => <option key={q} value={q}>Q{q}</option>)}
-            </select>
+            </SelectField>
           </label>
         )}
       </div>

@@ -14,6 +14,7 @@ import { useT } from '../../i18n';
 import { s2T } from '../../i18n/areas/sales-r2';
 import controls from '../../styles/controls.module.css';
 import styles from './sales-r2.module.css';
+import { DateField } from '../ui/DateField';
 
 /**
  * R2-B5: sales order → back-to-back purchase orders. Per pending line: quantity to order (pending less
@@ -124,7 +125,7 @@ export function SoToPoDialog({ order, onClose, onDone }: { order: InvoiceRecord;
         <div className={controls.row}>
           <label className={controls.field}>
             <span className={controls.label}>{s2T('po.expected')}</span>
-            <input className={controls.input} type="date" value={expected} onChange={(e) => setExpected(e.target.value)} />
+            <DateField className={controls.input} value={expected} onChange={(e) => setExpected(e.target.value)} />
           </label>
           <label className={controls.check}>
             <input type="checkbox" checked={dropShip} onChange={(e) => setDropShip(e.target.checked)} /> {s2T('po.dropShip')}

@@ -24,6 +24,8 @@ import surface from '../../styles/surface.module.css';
 import local from './gst-reports.module.css';
 import { useT } from '../../i18n';
 import { gstGapT } from '../../i18n/areas/gst-gaps';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 export interface Gstr4AnnualViewProps {
   invoices: InvoiceRecord[];
@@ -107,10 +109,10 @@ export default function Gstr4AnnualView({ invoices, purchases, fyStart, gstin, f
       />
       {(manual.tds_tcs ?? []).map((e) => (
         <div key={e.id} className={controls.row3} style={{ alignItems: 'end' }}>
-          <select className={controls.select} value={e.kind} aria-label={gstGapT('tdsOrTcs')} onChange={(ev) => setEntry(e.id, { kind: ev.target.value as 'TDS' | 'TCS' })}>
+          <SelectField className={controls.select} value={e.kind} aria-label={gstGapT('tdsOrTcs')} onChange={(ev) => setEntry(e.id, { kind: ev.target.value as 'TDS' | 'TCS' })}>
             <option value="TDS">TDS (Sec 51)</option>
             <option value="TCS">TCS (Sec 52)</option>
-          </select>
+          </SelectField>
           <input className={`${controls.input} ${controls.inputMono}`} maxLength={15} value={e.gstin} placeholder={gstGapT('deductorPh')} aria-label={gstGapT('deductorAria')}
             onChange={(ev) => setEntry(e.id, { gstin: ev.target.value.toUpperCase() })} />
           {num(e.gross, (v) => setEntry(e.id, { gross: v }), gstGapT('gross'))}
@@ -159,7 +161,7 @@ export default function Gstr4AnnualView({ invoices, purchases, fyStart, gstin, f
       </div>
       <label className={controls.field} style={{ maxWidth: 260 }}>
         <span className={controls.label}>{gstGapT('filedOn', { due: annual.lateFee.due })}</span>
-        <input className={controls.input} type="date" value={manual.filed_on ?? ''} onChange={(e) => setManual((m) => ({ ...m, filed_on: e.target.value || undefined }))} />
+        <DateField className={controls.input} value={manual.filed_on ?? ''} onChange={(e) => setManual((m) => ({ ...m, filed_on: e.target.value || undefined }))} />
       </label>
       <ul className={local.gapList}>
         {annual.interest.filter((q) => q.days > 0).map((q) => (

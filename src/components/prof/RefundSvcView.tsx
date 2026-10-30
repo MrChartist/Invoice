@@ -23,6 +23,7 @@ import { Field } from './ps-ui';
 import { runner, type Notify } from './pc-run';
 import controls from '../../styles/controls.module.css';
 import css from './exportsvc.module.css';
+import { DateField } from '../ui/DateField';
 
 const HEADS = ['igst', 'cgst', 'sgst', 'cess'] as const;
 /** The FY quarter of `day` (Apr–Jun, Jul–Sep, Oct–Dec, Jan–Mar), local days. */
@@ -52,8 +53,8 @@ export default function RefundSvcView({ notify }: { notify: Notify }) {
   return (
     <>
       <div className={css.bar}>
-        <Field label={pcT('from')}><input type="date" className={controls.input} value={p.from} onChange={(e) => setP({ ...p, from: e.target.value })} /></Field>
-        <Field label={pcT('to')}><input type="date" className={controls.input} value={p.to} onChange={(e) => setP({ ...p, to: e.target.value })} /></Field>
+        <Field label={pcT('from')}><DateField className={controls.input} value={p.from} onChange={(e) => setP({ ...p, from: e.target.value })} /></Field>
+        <Field label={pcT('to')}><DateField className={controls.input} value={p.to} onChange={(e) => setP({ ...p, to: e.target.value })} /></Field>
         <Field label={pcT('att')}><input type="number" className={controls.input} value={att} onChange={(e) => setAtt(e.target.value)} /></Field>
       </div>
       <p className={controls.label}>{pcT('netItc')}</p>

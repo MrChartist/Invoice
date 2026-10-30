@@ -11,6 +11,8 @@ import type { MfgContext } from '../manufacturing/context';
 import { Fld, Tbl } from './mfd-ui';
 import { row, rs, run, sm } from './mfd-util';
 import controls from '../../styles/controls.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 export default function InventoriesView({ ctx }: { ctx: MfgContext }) {
   const [date, setDate] = useState(todayInput());
@@ -20,7 +22,7 @@ export default function InventoriesView({ ctx }: { ctx: MfgContext }) {
   return (
     <>
       <div style={row}>
-        <Fld l={sdT('asOf')}><input type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} data-mfd="inv-date" /></Fld>
+        <Fld l={sdT('asOf')}><DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} data-mfd="inv-date" /></Fld>
         <button type="button" className={sm} onClick={() => downloadWipStatement(date)} data-mfd-b="wip-csv">{sdT('wipCsv')}</button>
       </div>
       <h3>{sdT('split')}</h3>
@@ -29,10 +31,10 @@ export default function InventoriesView({ ctx }: { ctx: MfgContext }) {
       {memo.unabsorbed > 0 && <p className={controls.hint}>{sdT('unabsorbed', { v: p(memo.unabsorbed) })}</p>}
       <h3>{sdT('cls')}</h3>
       <Tbl empty={sdT('none')} head={[sdT('head'), sdT('cls')]} rows={ctx.items.filter((i) => i.track_stock).map((i) => [i.name,
-        <select key="c" className={controls.select} value={i.mf_inv_class ?? ''} disabled={!ctx.canMasters} onChange={(e) => run(ctx, () => { stockDb.saveItem({ ...i, mf_inv_class: e.target.value || undefined }); return sdT('saved'); })} data-mfd="inv-class">
+        <SelectField key="c" className={controls.select} value={i.mf_inv_class ?? ''} disabled={!ctx.canMasters} onChange={(e) => run(ctx, () => { stockDb.saveItem({ ...i, mf_inv_class: e.target.value || undefined }); return sdT('saved'); })} data-mfd="inv-class">
           <option value="">{sdT('auto')}: {sdT(`c.${defaults.get(i.id) ?? 'traded'}` as SdKey)}</option>
           {INV_CLASSES.map((c) => <option key={c} value={c}>{sdT(`c.${c}` as SdKey)}</option>)}
-        </select>])} />
+        </SelectField>])} />
     </>
   );
 }

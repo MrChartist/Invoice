@@ -12,6 +12,7 @@ import { errText, fmtMoney, today, type PanelProps } from './file-read';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './marketplace.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /** Channel select shared by the sub-views. */
 export function ChannelPicker({ channels, channel, setChannelId }: Pick<PanelProps, 'channels' | 'channel' | 'setChannelId'>) {
@@ -19,9 +20,9 @@ export function ChannelPicker({ channels, channel, setChannelId }: Pick<PanelPro
   return (
     <label className={controls.field}>
       <span className={controls.label}>{mT('channel')}</span>
-      <select className={controls.select} value={channel?.id ?? ''} onChange={(e) => setChannelId(e.target.value)} data-mkt-channel>
+      <SelectField className={controls.select} value={channel?.id ?? ''} onChange={(e) => setChannelId(e.target.value)} data-mkt-channel>
         {channels.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-      </select>
+      </SelectField>
     </label>
   );
 }
@@ -106,23 +107,23 @@ export function ChannelsPanel({ channels, notify, refresh, tick }: PanelProps) {
         <label className={controls.field}><span className={controls.label}>{mT('chName')}</span>
           <input className={controls.input} value={f.name} onChange={(e) => set({ name: e.target.value })} data-mkt-ch-name /></label>
         <label className={controls.field}><span className={controls.label}>{mT('chPlatform')}</span>
-          <select className={controls.select} value={f.platform} onChange={(e) => { const p = e.target.value as ChannelPlatform; set({ platform: p, party: f.party && f.party !== OPERATOR_NAMES[f.platform] ? f.party : OPERATOR_NAMES[p] }); }}>
+          <SelectField className={controls.select} value={f.platform} onChange={(e) => { const p = e.target.value as ChannelPlatform; set({ platform: p, party: f.party && f.party !== OPERATOR_NAMES[f.platform] ? f.party : OPERATOR_NAMES[p] }); }}>
             {PLATFORMS.map((p) => <option key={p} value={p}>{mT(`platform.${p}`)}</option>)}
-          </select></label>
+          </SelectField></label>
         <label className={controls.field}><span className={controls.label}>{mT('chParty')}</span>
           <input className={controls.input} value={f.party} onChange={(e) => set({ party: e.target.value })} /></label>
         <label className={controls.field}><span className={controls.label}>{mT('chTan')}</span>
           <input className={controls.input} value={f.tan} onChange={(e) => set({ tan: e.target.value.toUpperCase() })} maxLength={10} /></label>
         <label className={controls.field}><span className={controls.label}>{mT('chGodown')}</span>
-          <select className={controls.select} value={f.godown} onChange={(e) => set({ godown: e.target.value })}>
+          <SelectField className={controls.select} value={f.godown} onChange={(e) => set({ godown: e.target.value })}>
             <option value="">{mT('defaultGodown')}</option>
             {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select></label>
+          </SelectField></label>
         <label className={controls.field}><span className={controls.label}>{mT('chDamaged')}</span>
-          <select className={controls.select} value={f.damaged} onChange={(e) => set({ damaged: e.target.value })}>
+          <SelectField className={controls.select} value={f.damaged} onChange={(e) => set({ damaged: e.target.value })}>
             <option value="">{mT('none')}</option>
             {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select></label>
+          </SelectField></label>
         <label className={controls.field}><span className={controls.label}>{mT('chCycle')}</span>
           <input className={controls.input} inputMode="numeric" value={f.cycle} onChange={(e) => set({ cycle: e.target.value })} /></label>
         <label className={controls.field}><span className={controls.label}>{mT('chFeePct')}</span>

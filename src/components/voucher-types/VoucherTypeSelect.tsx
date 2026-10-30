@@ -8,6 +8,7 @@ import { useT } from '../../i18n';
 import { vtT } from '../../i18n/areas/voucher-types';
 import { BUILT_IN_PREFIX, loadVoucherTypes, typesForBase, type VoucherBase, type VoucherType } from '../../lib/voucher-types';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export interface VoucherTypeSelectProps {
   id: string;
@@ -30,7 +31,7 @@ export function VoucherTypeSelect({ id, base, value, onChange, disabled, compact
   }, [base, value]);
   if (!types.length) return null;
   const select = (
-    <select
+    <SelectField
       id={id}
       className={controls.select}
       value={value ?? ''}
@@ -43,7 +44,7 @@ export function VoucherTypeSelect({ id, base, value, onChange, disabled, compact
       {types.map((t) => (
         <option key={t.id} value={t.id}>{t.name}</option>
       ))}
-    </select>
+    </SelectField>
   );
   if (compact) return select;
   return (

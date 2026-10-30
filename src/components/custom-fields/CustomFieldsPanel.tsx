@@ -14,6 +14,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import settings from '../settings/Settings.module.css';
 import styles from './custom-fields.module.css';
+import { SelectField } from '../ui/SelectField';
 
 interface Props {
   notify: (message: string, tone?: 'success' | 'error' | 'info') => void;
@@ -74,17 +75,17 @@ export function CustomFieldsPanel({ notify }: Props) {
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="cf-type">{fldT('type')}</label>
-              <select id="cf-type" className={controls.select} value={draft.type}
+              <SelectField id="cf-type" className={controls.select} value={draft.type}
                 onChange={(e) => setDraft((d) => ({ ...d, type: e.target.value as CustomFieldType }))}>
                 {TYPES.map((t) => <option key={t} value={t}>{fldT(`type.${t}`)}</option>)}
-              </select>
+              </SelectField>
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="cf-scope">{fldT('appliesTo')}</label>
-              <select id="cf-scope" className={controls.select} value={draft.applies_to}
+              <SelectField id="cf-scope" className={controls.select} value={draft.applies_to}
                 onChange={(e) => setDraft((d) => ({ ...d, applies_to: e.target.value as CustomFieldScope }))}>
                 {SCOPES.map((s) => <option key={s} value={s}>{fldT(`scope.${s}`)}</option>)}
-              </select>
+              </SelectField>
             </div>
             <label className={controls.check}>
               <input type="checkbox" checked={draft.print} onChange={(e) => setDraft((d) => ({ ...d, print: e.target.checked }))} />

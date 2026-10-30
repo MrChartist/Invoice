@@ -35,6 +35,8 @@ import { useInvoiceStore } from '../../store/useInvoiceStore';
 import { downloadTextFile } from '../receivables/exportUtils';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
+import { TypedInput } from '../ui/TypedInput';
+import { SelectField } from '../ui/SelectField';
 
 type Run = (fn: () => string | Promise<string>) => void;
 type Form = Record<string, string>;
@@ -57,7 +59,7 @@ function FormRow({ keys, init, onSave, run, types = {} }: { keys: readonly strin
       {keys.map((k) => (
         <label key={k} className={controls.field}>
           <span className={controls.label}>{rtdT(k as never)}</span>
-          <input className={controls.input} type={types[k]} value={f[k] ?? ''} onChange={(e) => setF({ ...f, [k]: e.target.value })} {...{ [`data-dev-${k.toLowerCase()}`]: '' }} />
+          <TypedInput className={controls.input} type={types[k]} value={f[k] ?? ''} onChange={(e) => setF({ ...f, [k]: e.target.value })} {...{ [`data-dev-${k.toLowerCase()}`]: '' }} />
         </label>
       ))}
       <button type="button" className={controls.btnPrimary} onClick={() => run(() => { const m = onSave(f); setF(init ?? {}); return m; })} data-dev-save>{rtdT('save')}</button>
@@ -205,7 +207,7 @@ function ServiceView({ run, day }: { run: Run; day: string }) {
   return (
     <>
       <p className={surface.sectionNote}>{rtdT('sacNote', { sac: r.sac, rate: r.rate })}</p>
-      <select className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as RepairKind)} aria-label={rtdT('kind')}>{KINDS.map((k) => <option key={k} value={k}>{rtdT(`k.${k}`)}</option>)}</select>
+      <SelectField className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as RepairKind)} aria-label={rtdT('kind')}>{KINDS.map((k) => <option key={k} value={k}>{rtdT(`k.${k}`)}</option>)}</SelectField>
       <FormRow keys={['customer', 'phone', 'model', 'imei', 'complaint', 'accessories', 'estimate', 'due', 'tech']} types={{ due: 'date' }} run={run} onSave={(f) => {
         const j = addJob({ date: day, kind, customer: f.customer ?? '', phone: f.phone, asset: { model: f.model ?? '', ...(f.imei?.trim() ? { serial: f.imei.trim() } : {}) }, complaint: f.complaint ?? '', accessories: f.accessories, estimate: num(f.estimate), due: f.due || undefined, technician: f.tech }, loadTracking());
         setOpen(j.id);

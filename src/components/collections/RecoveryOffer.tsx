@@ -7,6 +7,8 @@ import { colT } from '../../i18n/areas/collections';
 import { methodLabel } from '../../i18n/labels';
 import controls from '../../styles/controls.module.css';
 import styles from './collections.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 const METHODS = ['Bank transfer', 'UPI', 'Cash', 'Cheque'];
 
@@ -36,13 +38,13 @@ export function RecoveryForm({ invoice, max, onDone, onCancel }: { invoice: Pick
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{colT('recDate')}</span>
-          <input className={controls.input} type="date" value={date} max={todayInput()} onChange={(e) => setDate(e.target.value)} />
+          <DateField className={controls.input} value={date} max={todayInput()} onChange={(e) => setDate(e.target.value)} />
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{colT('recMethod')}</span>
-          <select className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)}>
+          <SelectField className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)}>
             {METHODS.map((m) => <option key={m} value={m}>{methodLabel(m)}</option>)}
-          </select>
+          </SelectField>
         </label>
         <label className={controls.field}>
           <span className={controls.label}>{colT('recRef')}</span>

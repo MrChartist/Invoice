@@ -13,6 +13,7 @@ import { airlineGst, deemedValue, validateTicket, type AirMethod } from '../../l
 import { readTravelSettings } from '../../lib/travel/tv-settings';
 import controls from '../../styles/controls.module.css';
 import { Field } from './tv-ui';
+import { SelectField } from '../ui/SelectField';
 
 type Row = Record<'pax' | 'airline' | 'ticket_no' | 'pnr' | 'sector' | 'basic' | 'taxes' | 'airline_gst', string> & { class: 'economy' | 'other'; intl: boolean };
 const CLS = ['economy', 'other'] as const;
@@ -50,7 +51,7 @@ export default function TicketRows({ booking, date, have = [], method0, onAdd }:
       {rows.map((r, k) => (
         <div key={k} style={flex}>
           {txt(k, 'pax', cvT('pax'))}{txt(k, 'airline', cvT('airline'))}{txt(k, 'ticket_no', cvT('tno'))}{txt(k, 'pnr', cvT('pnr'))}{txt(k, 'sector', cvT('sector'))}
-          <select className={controls.select} aria-label={cvT('cls')} value={r.class} onChange={(e) => set(k, { class: e.target.value as Row['class'] })}>{CLS.map((c) => <option key={c} value={c}>{cvList('cls', CLS, c)}</option>)}</select>
+          <SelectField className={controls.select} aria-label={cvT('cls')} value={r.class} onChange={(e) => set(k, { class: e.target.value as Row['class'] })}>{CLS.map((c) => <option key={c} value={c}>{cvList('cls', CLS, c)}</option>)}</SelectField>
           <label className={controls.check}><input type="checkbox" checked={r.intl} onChange={(e) => set(k, { intl: e.target.checked })} /> {cvT('intl')}</label>
           {txt(k, 'basic', cvT('basic'), true)}{txt(k, 'taxes', cvT('taxes'), true)}{txt(k, 'airline_gst', cvT('agst'), true, `${cvT('agst')} ${airlineGst(tickets[k], date)}`)}
         </div>
@@ -58,7 +59,7 @@ export default function TicketRows({ booking, date, have = [], method0, onAdd }:
       <div style={flex}>
         <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => setRows((x) => [...x, blank(booking)])}>{cvT('addTicket')}</button>
         <Field label={cvT('fee')}><input className={controls.input} inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value)} data-tv-tkt-fee /></Field>
-        <select className={controls.select} aria-label={cvT('value')} value={method} onChange={(e) => setMethod(e.target.value as AirMethod)} data-tv-tkt-method>{METHODS.map((m) => <option key={m} value={m}>{cvList('methods', METHODS, m)}</option>)}</select>
+        <SelectField className={controls.select} aria-label={cvT('value')} value={method} onChange={(e) => setMethod(e.target.value as AirMethod)} data-tv-tkt-method>{METHODS.map((m) => <option key={m} value={m}>{cvList('methods', METHODS, m)}</option>)}</SelectField>
         <span data-tv-tkt-value>{cvT('value')}: {formatCurrency(value)}</span>
         <button type="button" className={controls.btnPrimary} onClick={add} data-tv-tkt-add>{cvT('toInvoice')}</button>
       </div>

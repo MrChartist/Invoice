@@ -3,6 +3,7 @@ import { useT } from '../../i18n';
 import { psbT } from '../../i18n/areas/prof-r14b';
 import { DISB_KINDS, disbursementPatch, onBehalfByDefault, psOfPurchase, type DisbKind } from '../../lib/prof/ps-disb';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export interface DisbValue {
   ps?: Record<string, unknown>;
@@ -27,10 +28,10 @@ export default function DisbursementRow({ ps, date, itc, onChange }: { ps: unkno
     <div className={controls.row} data-ps-disb>
       <label className={controls.field}>
         <span className={controls.label}>{psbT('disb')}</span>
-        <select className={controls.select} value={cur.disb ?? ''} onChange={(e) => set(e.target.value as DisbKind | '')}>
+        <SelectField className={controls.select} value={cur.disb ?? ''} onChange={(e) => set(e.target.value as DisbKind | '')}>
           <option value="">{psbT('disb.none')}</option>
           {DISB_KINDS.map((k) => <option key={k} value={k}>{psbT(`k.${k}`)}</option>)}
-        </select>
+        </SelectField>
       </label>
       {cur.disb && (
         <label className={controls.check}>

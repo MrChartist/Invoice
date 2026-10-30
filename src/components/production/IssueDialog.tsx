@@ -9,6 +9,8 @@ import { pT } from '../../i18n/areas/production-r4';
 import { qtyText, type MfgContext } from '../manufacturing/context';
 import controls from '../../styles/controls.module.css';
 import mfg from '../manufacturing/manufacturing.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 /**
  * Issue materials to the shop floor (R4-A1): a normal stock transfer from a store to the WIP godown. Quantities are in
@@ -44,13 +46,13 @@ export function IssueDialog({ ctx, order, onClose }: { ctx: MfgContext; order: P
         <div className={controls.row}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="iss-date">{pT('date')}</label>
-            <input id="iss-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField id="iss-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="iss-from">{pT('fromGodown')}</label>
-            <select id="iss-from" className={controls.select} value={from} onChange={(e) => setFrom(e.target.value)}>
+            <SelectField id="iss-from" className={controls.select} value={from} onChange={(e) => setFrom(e.target.value)}>
               {stores.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
+            </SelectField>
           </div>
         </div>
         <div className={mfg.wrap}>

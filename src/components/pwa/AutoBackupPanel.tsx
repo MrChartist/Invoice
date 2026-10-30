@@ -29,6 +29,7 @@ import surface from '../../styles/surface.module.css';
 import styles from './Pwa.module.css';
 import { phoneT } from '../../i18n/areas/phone';
 import { libMsg } from '../../i18n/lib-msg';
+import { SelectField } from '../ui/SelectField';
 
 // 8.20: phones have no folder backups; they share an encrypted file instead.
 const ShareBackupDialog = lazy(() => import('./ShareBackupDialog').then((m) => ({ default: m.ShareBackupDialog })));
@@ -208,7 +209,7 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
                 <div className={controls.row}>
                   <div className={controls.field}>
                     <label className={controls.label} htmlFor="ab-freq">{syncT('howOften')}</label>
-                    <select
+                    <SelectField
                       id="ab-freq"
                       className={controls.select}
                       value={config.frequency}
@@ -218,11 +219,11 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
                       {FREQS.map((f) => (
                         <option key={f} value={f}>{syncT(`freq.${f}`)}</option>
                       ))}
-                    </select>
+                    </SelectField>
                   </div>
                   <div className={controls.field}>
                     <label className={controls.label} htmlFor="ab-keep">{syncT('keepNewest')}</label>
-                    <select
+                    <SelectField
                       id="ab-keep"
                       className={controls.select}
                       value={config.retention}
@@ -231,7 +232,7 @@ export function AutoBackupPanel({ onNotify }: AutoBackupPanelProps) {
                       {RETENTION_OPTIONS.map((n) => (
                         <option key={n} value={n}>{syncT('nBackups', { n })}</option>
                       ))}
-                    </select>
+                    </SelectField>
                   </div>
                 </div>
                 <p className={controls.hint}>

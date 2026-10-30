@@ -29,6 +29,8 @@ import { ggT } from '../../i18n/areas/gst-guards';
 import { computeValidity, effectiveValidity, parseLocal } from '../../lib/eway-validity'; // R3-C5
 import type { EwayCargo } from '../../types/docs-r3';
 import { dkT } from '../../i18n/areas/desks-r3';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 export interface EInvoiceModalProps {
   invoice: InvoiceRecord;
@@ -253,7 +255,7 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
                 <h3 className={styles.sectionTitle}>{einvT('options')}</h3>
                 <div className={styles.grid2}>
                   <Field label={einvT('supplyType')}>
-                    <select
+                    <SelectField
                       className={controls.select}
                       value={supplyType}
                       onChange={(e) => setSupplyType(e.target.value as '' | EInvoiceSupplyType)}
@@ -263,7 +265,7 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
                           {s.label()}
                         </option>
                       ))}
-                    </select>
+                    </SelectField>
                   </Field>
                   {isExport && (
                     <Field label={einvT('countryCode')} hint={einvT('countryHint')}>
@@ -282,7 +284,7 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
                       <input className={controls.input} value={precNo} onChange={(e) => setPrecNo(e.target.value)} placeholder="INV/FY25-26/0001" />
                     </Field>
                     <Field label={einvT('origDate')}>
-                      <input className={controls.input} type="date" value={precDate} onChange={(e) => setPrecDate(e.target.value)} />
+                      <DateField className={controls.input} value={precDate} onChange={(e) => setPrecDate(e.target.value)} />
                     </Field>
                   </div>
                 )}
@@ -320,7 +322,7 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
                 </h3>
                 <div className={styles.grid3}>
                   <Field label={einvT('mode')}>
-                    <select
+                    <SelectField
                       className={controls.select}
                       value={meta.transport ?? 'ROAD'}
                       onChange={(e) => patch({ transport: e.target.value as EInvoiceMeta['transport'] })}
@@ -329,20 +331,20 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
                       <option value="RAIL">{einvT('rail')}</option>
                       <option value="AIR">{einvT('air')}</option>
                       <option value="SHIP">{einvT('ship')}</option>
-                    </select>
+                    </SelectField>
                   </Field>
                   <Field label={einvT('vehicleNo')}>
                     <input {...inputProps('vehicle')} className={`${controls.input} ${controls.inputMono}`} placeholder="MH12AB1234" />
                   </Field>
                   <Field label={einvT('vehicleType')}>
-                    <select
+                    <SelectField
                       className={controls.select}
                       value={meta.vehicle_type ?? 'R'}
                       onChange={(e) => patch({ vehicle_type: e.target.value as 'R' | 'O' })}
                     >
                       <option value="R">{einvT('regular')}</option>
                       <option value="O">{einvT('odc')}</option>
-                    </select>
+                    </SelectField>
                   </Field>
                 </div>
                 <div className={styles.grid3}>
@@ -369,7 +371,7 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
                     <input {...inputProps('transport_doc_no')} />
                   </Field>
                   <Field label={einvT('transportDocDate')}>
-                    <input className={controls.input} type="date" value={meta.transport_doc_date ?? ''} onChange={(e) => patch({ transport_doc_date: e.target.value })} />
+                    <DateField className={controls.input} value={meta.transport_doc_date ?? ''} onChange={(e) => patch({ transport_doc_date: e.target.value })} />
                   </Field>
                 </div>
               </div>
@@ -434,10 +436,10 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
                     <input {...inputProps('eway_no')} inputMode="numeric" maxLength={12} />
                   </Field>
                   <Field label={einvT('generatedOn')}>
-                    <input className={controls.input} type="date" value={meta.eway_date ?? ''} onChange={(e) => patch({ eway_date: e.target.value })} />
+                    <DateField className={controls.input} value={meta.eway_date ?? ''} onChange={(e) => patch({ eway_date: e.target.value })} />
                   </Field>
                   <Field label={einvT('validUntil')}>
-                    <input className={controls.input} type="date" value={meta.eway_valid_upto ?? ''} onChange={(e) => patch({ eway_valid_upto: e.target.value })} />
+                    <DateField className={controls.input} value={meta.eway_valid_upto ?? ''} onChange={(e) => patch({ eway_valid_upto: e.target.value })} />
                   </Field>
                 </div>
                 {/* R3-C5: generation time, cargo and distance → Rule 138(10) validity beside the typed value. */}
@@ -446,11 +448,11 @@ function EInvoiceModalBody({ invoice, onClose }: { invoice: InvoiceRecord; onClo
                     <input className={controls.input} type="datetime-local" value={(meta.eway_generated_at ?? '').slice(0, 16)} onChange={(e) => patch({ eway_generated_at: e.target.value || undefined })} data-eway-generated />
                   </Field>
                   <Field label={dkT('ev.cargo')}>
-                    <select className={controls.select} value={meta.eway_cargo ?? 'normal'} onChange={(e) => patch({ eway_cargo: e.target.value === 'normal' ? undefined : (e.target.value as EwayCargo) })}>
+                    <SelectField className={controls.select} value={meta.eway_cargo ?? 'normal'} onChange={(e) => patch({ eway_cargo: e.target.value === 'normal' ? undefined : (e.target.value as EwayCargo) })}>
                       <option value="normal">{dkT('ev.cargo.normal')}</option>
                       <option value="odc">{dkT('ev.cargo.odc')}</option>
                       <option value="multimodal_ship">{dkT('ev.cargo.ship')}</option>
-                    </select>
+                    </SelectField>
                   </Field>
                   <Field label={dkT('ev.distance')}>
                     <input className={controls.input} type="number" min={0} inputMode="numeric" value={meta.eway_distance_km ?? meta.distance ?? ''} onChange={(e) => patch({ eway_distance_km: e.target.value === '' ? undefined : Math.max(0, Number(e.target.value) || 0) })} />

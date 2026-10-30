@@ -9,6 +9,8 @@ import { useT } from '../../i18n';
 import { colT } from '../../i18n/areas/collections';
 import controls from '../../styles/controls.module.css';
 import styles from './collections.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 export interface FollowUpBill {
   id: string;
@@ -129,7 +131,7 @@ export function FollowUpDialog({ partyKey, partyName, bills = [], onClose, onSav
               </label>
               <label className={controls.field}>
                 <span className={controls.label}>{colT('fuPromiseDate')}</span>
-                <input className={controls.input} type="date" min={today} value={promiseDate} onChange={(e) => setPromiseDate(e.target.value)} data-followup-date />
+                <DateField className={controls.input} min={today} value={promiseDate} onChange={(e) => setPromiseDate(e.target.value)} data-followup-date />
               </label>
             </div>
             {bills.length > 0 && (
@@ -156,15 +158,15 @@ export function FollowUpDialog({ partyKey, partyName, bills = [], onClose, onSav
           <div className={styles.grid2}>
             <label className={controls.field}>
               <span className={controls.label}>{colT('fuNextDate')}</span>
-              <input className={controls.input} type="date" min={today} value={nextDate} onChange={(e) => setNextDate(e.target.value)} />
+              <DateField className={controls.input} min={today} value={nextDate} onChange={(e) => setNextDate(e.target.value)} />
             </label>
             {users.length > 0 && (
               <label className={controls.field}>
                 <span className={controls.label}>{colT('fuAssignee')}</span>
-                <select className={controls.select} value={assignee} onChange={(e) => setAssignee(e.target.value)}>
+                <SelectField className={controls.select} value={assignee} onChange={(e) => setAssignee(e.target.value)}>
                   <option value="">{colT('fuMe')}</option>
                   {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                </select>
+                </SelectField>
               </label>
             )}
           </div>

@@ -8,6 +8,7 @@ import { validateFssai } from '../../lib/mfg/mf-print';
 import { useT } from '../../i18n';
 import { defineArea } from '../../i18n/area';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 type Cat = 'MICRO' | 'SMALL' | 'MEDIUM';
 
@@ -44,10 +45,10 @@ export default function MfProfileRow({ notify }: { notify: (m: string, tone?: 's
     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }} data-mf-profile>
       <label className={controls.field}>
         <span className={controls.label}>{mfPickT('category')}</span>
-        <select className={controls.select} value={cat} onChange={(e) => setCat(e.target.value)} data-mf-category>
+        <SelectField className={controls.select} value={cat} onChange={(e) => setCat(e.target.value)} data-mf-category>
           <option value="">-</option>
           {(['MICRO', 'SMALL', 'MEDIUM'] as const).map((c) => <option key={c} value={c}>{mfPickT(`cat.${c}`)}</option>)}
-        </select>
+        </SelectField>
       </label>
       <label className={controls.check}><input type="checkbox" checked={print} onChange={(e) => setPrint(e.target.checked)} /> {mfPickT('printUdyam')}</label>
       <label className={controls.field}>

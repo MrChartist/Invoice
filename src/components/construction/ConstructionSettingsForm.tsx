@@ -10,6 +10,7 @@ import { cnSetT } from '../../i18n/areas/construction-r11-settings';
 import { constructionFormPatch, readConstructionSettings, saveConstructionSettings, type ConstructionForm } from '../../lib/construction/cn-settings';
 import type { RaPaperStyle } from '../../types/construction-r11';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const toForm = (): ConstructionForm => {
   const s = readConstructionSettings();
@@ -45,9 +46,9 @@ export default function ConstructionSettingsForm({ disabled, onSaved }: { disabl
       <p className={controls.hint}>{cnSetT('hint')}</p>
       <label className={controls.field}>
         <span className={controls.label}>{cnSetT('paper')}</span>
-        <select className={controls.select} value={f.ra_paper} disabled={disabled} onChange={(e) => set({ ra_paper: e.target.value as RaPaperStyle })} data-cn-setting="ra_paper">
+        <SelectField className={controls.select} value={f.ra_paper} disabled={disabled} onChange={(e) => set({ ra_paper: e.target.value as RaPaperStyle })} data-cn-setting="ra_paper">
           {(['standard', 'pwd', 'summary'] as const).map((p) => <option key={p} value={p}>{cnSetT(`paper.${p}`)}</option>)}
-        </select>
+        </SelectField>
       </label>
       {check('mb_column', cnSetT('mb'))}
       {check('government', cnSetT('government'))}

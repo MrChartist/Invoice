@@ -27,6 +27,7 @@ import { useT } from '../../i18n';
 import { gvT } from '../../i18n/areas/gst-views';
 import { r7T } from '../../i18n/areas/gst-tds-7r';
 import { printWhenReady } from '../../lib/print-fonts';
+import { SelectField } from '../ui/SelectField';
 
 export interface Gstr9ModalProps {
   open: boolean;
@@ -222,9 +223,9 @@ function Gstr9Body({ onClose, fyStart, fyOptions, gstin, filerStateCode, filerNa
 
         <div className={styles.controls}>
           <Field label={gvT('financialYear')}>
-            <select className={controls.select} value={fy} onChange={(e) => pickFy(Number(e.target.value))}>
+            <SelectField className={controls.select} value={fy} onChange={(e) => pickFy(Number(e.target.value))}>
               {options.map((y) => <option key={y} value={y}>{fyText(y)}</option>)}
-            </select>
+            </SelectField>
           </Field>
           <Field label={gvT('aggTurnover')}>
             <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={turnover} placeholder={String(report.turnover.computed)}

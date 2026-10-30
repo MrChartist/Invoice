@@ -26,6 +26,8 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field, Pick, type LgViewProps } from './lg-ui';
 import { numIn, row } from './lg-form';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 const STATES = ['unbilled', 'part', 'billed'] as const;
 
@@ -61,8 +63,8 @@ export default function BillingView({ notify }: LgViewProps) {
   return (
     <section data-lg-billing>
       <div style={row}>
-        <Field label={lgbT('billDate')}><input type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} data-lg-bill-date /></Field>
-        <Field label={lgbT('month')}><input type="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} /></Field>
+        <Field label={lgbT('billDate')}><DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} data-lg-bill-date /></Field>
+        <Field label={lgbT('month')}><DateField mode="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} /></Field>
         <button type="button" className={controls.btnOutline} onClick={() => act(() => report(billMonth(month, { date, fx })))} data-lg-bill-month>{lgbT('billMonth')}</button>
         <Pick label={lgT('status')} value={show} ids={STATES} name={(x) => lgbT('states').split(',')[STATES.indexOf(x as 'part')]} blank={lgT('all')} onChange={setShow} />
       </div>
@@ -78,7 +80,7 @@ export default function BillingView({ notify }: LgViewProps) {
                   const g = h && ctx ? lgRegime(h, job, ctx) : null;
                   return (
                     <tr key={i} data-lg-line={h?.kind ?? ''}>
-                      <td><select className={controls.select} aria-label={lgbT('head')} value={l.head_id} onChange={(e) => { const x = heads.find((y) => y.id === e.target.value); setL(i, { head_id: e.target.value, rate: x?.rate ?? l.rate, currency: x?.currency || 'INR' }); }}>{heads.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></td>
+                      <td><SelectField className={controls.select} aria-label={lgbT('head')} value={l.head_id} onChange={(e) => { const x = heads.find((y) => y.id === e.target.value); setL(i, { head_id: e.target.value, rate: x?.rate ?? l.rate, currency: x?.currency || 'INR' }); }}>{heads.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</SelectField></td>
                       {(['qty', 'rate'] as const).map((k) => <td key={k}><input type="number" min={0} step="any" className={controls.input} style={{ width: '6rem' }} aria-label={lgbT(k)} value={l[k] || ''} onChange={(e) => setL(i, { [k]: numIn(e.target.value) ?? 0 })} data-lg-charge={`${i}${k}`} /></td>)}
                       <td><input className={controls.input} style={{ width: '4rem' }} aria-label={lgbT('currency')} value={l.currency} onChange={(e) => setL(i, { currency: e.target.value.toUpperCase().slice(0, 3) })} /></td>
                       <td>{formatCurrency(l.qty * l.rate, l.currency || 'INR')}</td>

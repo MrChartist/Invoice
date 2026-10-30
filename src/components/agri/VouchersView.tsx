@@ -24,6 +24,7 @@ import type { AgVoucherCharge } from '../../types/agri-r12';
 import controls from '../../styles/controls.module.css';
 import { F, Grid, In } from './agri-ui';
 import { money, useRun, wrap, type Done } from './agri-util';
+import { SelectField } from '../ui/SelectField';
 
 const n = (s: string) => Number(s) || 0;
 
@@ -76,12 +77,12 @@ export default function VouchersView({ onDone }: { onDone: Done }) {
   return (
     <div data-ag-vouchers>
       <div style={wrap}>
-        <F label={agT('farmer')}><select className={controls.select} value={fid} onChange={(e) => setFid(e.target.value)} data-ag-v-farmer><option value="">-</option>{farmers.map((x) => <option key={x.id} value={x.id}>{x.ag.code} · {x.name}</option>)}</select></F>
+        <F label={agT('farmer')}><SelectField className={controls.select} value={fid} onChange={(e) => setFid(e.target.value)} data-ag-v-farmer><option value="">-</option>{farmers.map((x) => <option key={x.id} value={x.id}>{x.ag.code} · {x.name}</option>)}</SelectField></F>
         <F label={agT('date')}><In v={date} set={setDate} type="date" /></F>
-        <F label={agT('commodity')}><select className={controls.select} value={table} onChange={(e) => setTable(e.target.value)} data-ag-v-table><option value="">-</option>{tables.map((t) => <option key={t.id} value={t.id}>{t.commodity}</option>)}</select></F>
+        <F label={agT('commodity')}><SelectField className={controls.select} value={table} onChange={(e) => setTable(e.target.value)} data-ag-v-table><option value="">-</option>{tables.map((t) => <option key={t.id} value={t.id}>{t.commodity}</option>)}</SelectField></F>
         <F label={agT('produce')}><In v={item} set={setItem} data-ag-v-item /></F>
         <F label="HSN"><In v={hsn} set={setHsn} w={90} /></F>
-        <F label={agT('unit')}><select className={controls.select} value={unit} onChange={(e) => setUnit(e.target.value)}><option>QTL</option><option>KG</option></select></F>
+        <F label={agT('unit')}><SelectField className={controls.select} value={unit} onChange={(e) => setUnit(e.target.value)}><option>QTL</option><option>KG</option></SelectField></F>
         <F label={agT('bags')}><In v={bags} set={setBags} type="number" w={80} data-ag-v-bags /></F>
         <F label={agT('grossKg')}><In v={gross} set={setGross} type="number" w={100} data-ag-v-gross /></F>
         <F label={agT('tareBag')}><In v={tare} set={setTare} type="number" w={80} data-ag-v-tare /></F>
@@ -90,7 +91,7 @@ export default function VouchersView({ onDone }: { onDone: Done }) {
         {qt?.params.map((p) => <F key={p.key + (p.label ?? '')} label={`${p.label ?? agT(`q.${p.key}`)} %`}><In v={read[p.label ?? p.key] ?? ''} set={(v) => setRead({ ...read, [p.label ?? p.key]: v })} type="number" w={80} data-ag-v-reading={p.key} /></F>)}
       </div>
       {heads.length > 0 && (
-        <div style={wrap}>{heads.map((h) => <F key={h.id} label={h.name}><select className={controls.select} value={by[h.id] ?? ''} onChange={(e) => setBy({ ...by, [h.id]: e.target.value as 'us' })}><option value="">-</option><option value="us">{agT('paidByUs')}</option><option value="farmer">{agT('recovered')}</option></select></F>)}</div>
+        <div style={wrap}>{heads.map((h) => <F key={h.id} label={h.name}><SelectField className={controls.select} value={by[h.id] ?? ''} onChange={(e) => setBy({ ...by, [h.id]: e.target.value as 'us' })}><option value="">-</option><option value="us">{agT('paidByUs')}</option><option value="farmer">{agT('recovered')}</option></SelectField></F>)}</div>
       )}
       {w && (
         <div data-ag-v-working>
@@ -112,7 +113,7 @@ export default function VouchersView({ onDone }: { onDone: Done }) {
       {pay && payBill && (
         <div style={wrap} data-ag-pay-form>
           <F label={agT('amount')}><In v={pay.amount} set={(v) => setPay({ ...pay, amount: v })} type="number" w={110} data-ag-pay-amount /></F>
-          <F label={agT('method')}><select className={controls.select} value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })}><option>Cash</option><option>Bank transfer</option><option>UPI</option></select></F>
+          <F label={agT('method')}><SelectField className={controls.select} value={pay.method} onChange={(e) => setPay({ ...pay, method: e.target.value })}><option>Cash</option><option>Bank transfer</option><option>UPI</option></SelectField></F>
           <button type="button" className={controls.btnPrimary} onClick={() => run(() => { paymentsDb.record(pay.id, { amount: n(pay.amount), date: todayInput(), method: pay.method }); setPay(null); return agT('paidOk'); })} data-ag-pay-save>{agT('pay')}</button>
           {cashNote && <p className={controls.hint} role="note" data-ag-cash-note>{cashNote}</p>}
         </div>

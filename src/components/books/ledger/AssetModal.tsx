@@ -7,6 +7,8 @@ import books from '../books.module.css';
 import styles from './ledger.module.css';
 import { useT } from '../../../i18n';
 import { ledgerT } from '../../../i18n/areas/books-ledger';
+import { SelectField } from '../../ui/SelectField';
+import { DateField } from '../../ui/DateField';
 
 interface Props {
   accounts: Account[];
@@ -70,7 +72,7 @@ export function AssetModal({ accounts, asset, defaultDate, onClose, onSaved }: P
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-block`}>{ledgerT('blockRate')}</label>
-            <select
+            <SelectField
               id={`${uid}-block`}
               className={controls.select}
               value={form.block}
@@ -82,15 +84,15 @@ export function AssetModal({ accounts, asset, defaultDate, onClose, onSaved }: P
               {BLOCKS.map((b) => (
                 <option key={b} value={b}>{DEPRECIATION_BLOCK_LABELS[b]} : {depreciationRate(b, form.put_to_use)}%</option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-acct`}>{ledgerT('assetAccount')}</label>
-            <select id={`${uid}-acct`} className={controls.select} value={form.account_id} onChange={(e) => set({ account_id: e.target.value })}>
+            <SelectField id={`${uid}-acct`} className={controls.select} value={form.account_id} onChange={(e) => set({ account_id: e.target.value })}>
               {fixedAccounts.map((a) => (
                 <option key={a.id} value={a.id}>{a.code} · {a.name}</option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-cost`}>{ledgerT('costExcl')}</label>
@@ -98,20 +100,20 @@ export function AssetModal({ accounts, asset, defaultDate, onClose, onSaved }: P
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-bought`}>{ledgerT('boughtOn')}</label>
-            <input id={`${uid}-bought`} type="date" className={controls.input} value={form.acquired_on} onChange={(e) => set({ acquired_on: e.target.value })} />
+            <DateField id={`${uid}-bought`} className={controls.input} value={form.acquired_on} onChange={(e) => set({ acquired_on: e.target.value })} />
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-use`}>{ledgerT('putToUseOn')}</label>
-            <input id={`${uid}-use`} type="date" className={controls.input} value={form.put_to_use} onChange={(e) => set({ put_to_use: e.target.value })} />
+            <DateField id={`${uid}-use`} className={controls.input} value={form.put_to_use} onChange={(e) => set({ put_to_use: e.target.value })} />
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-paid`}>{ledgerT('paidFrom')}</label>
-            <select id={`${uid}-paid`} className={controls.select} value={form.paid_from} onChange={(e) => set({ paid_from: e.target.value })}>
+            <SelectField id={`${uid}-paid`} className={controls.select} value={form.paid_from} onChange={(e) => set({ paid_from: e.target.value })}>
               <option value="">{ledgerT('alreadyInBooks')}</option>
               {payAccounts.map((a) => (
                 <option key={a.id} value={a.id}>{a.code} · {a.name}</option>
               ))}
-            </select>
+            </SelectField>
           </div>
           {form.paid_from === 'creditors' && (
             <div className={controls.field}>

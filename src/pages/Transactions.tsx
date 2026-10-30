@@ -66,7 +66,9 @@ import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Transactions.module.css';
 import { receivableBalance, receivableTotal } from '../lib/rcm';
-import { useListKeys } from '../lib/keys/use-list-keys'; // R20-D5
+import { useListKeys } from '../lib/keys/use-list-keys'; import { SelectField } from '../components/ui/SelectField';
+import { DateField } from '../components/ui/DateField';
+// R20-D5
 
 // QA10: release a retail bill's exchange receipts / finance DO on delete or cancel, even before any retail screen opened.
 ensureRetailHooks();
@@ -505,27 +507,27 @@ export function Transactions() {
         </div>
 
         <div className={styles.filters}>
-          <select className={controls.select} aria-label={salesT('tx.docType')} value={docType} onChange={(e) => setDocType(e.target.value as DocumentType | '')}>
+          <SelectField className={controls.select} aria-label={salesT('tx.docType')} value={docType} onChange={(e) => setDocType(e.target.value as DocumentType | '')}>
             <option value="">{salesT('tx.allTypes')}</option>
             {docTypes.map((t) => (
               <option key={t} value={t}>{t in DOCUMENT_LABELS ? docLabel(t) : t}</option>
             ))}
-          </select>
+          </SelectField>
           {docType === 'SALES_ORDER' && (
-            <select className={controls.select} aria-label={salesT('tx.orderStatus')} value={orderState} onChange={(e) => setOrderState(e.target.value as OrderState | '')}>
+            <SelectField className={controls.select} aria-label={salesT('tx.orderStatus')} value={orderState} onChange={(e) => setOrderState(e.target.value as OrderState | '')}>
               <option value="">{salesT('tx.allOrders')}</option>
               {ORDER_STATES.map((s) => (
                 <option key={s} value={s}>{stateLabel(s)}</option>
               ))}
-            </select>
+            </SelectField>
           )}
           <label className={styles.range}>
             <span>{salesT('tx.from')}</span>
-            <input type="date" className={controls.input} value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} aria-label={salesT('tx.fromDate')} />
+            <DateField className={controls.input} value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} range={{ from, to, edge: 'from', onRange: (f, t) => { setFrom(f); setTo(t); } }} aria-label={salesT('tx.fromDate')} />
           </label>
           <label className={styles.range}>
             <span>{salesT('tx.to')}</span>
-            <input type="date" className={controls.input} value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} aria-label={salesT('tx.toDate')} />
+            <DateField className={controls.input} value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} range={{ from, to, edge: 'to', onRange: (f, t) => { setFrom(f); setTo(t); } }} aria-label={salesT('tx.toDate')} />
           </label>
           <BranchFilter value={branch} onChange={setBranch} testId="tx-branch" />
           {superseded.size > 0 && (
@@ -764,13 +766,13 @@ export function Transactions() {
           <div className={controls.row}>
             <label className={controls.field}>
               <span className={controls.label}>{salesT('tx.receivedOn')}</span>
-              <input type="date" className={controls.input} value={bulkPay.date} onChange={(e) => setBulkPay({ ...bulkPay, date: e.target.value })} />
+              <DateField className={controls.input} value={bulkPay.date} onChange={(e) => setBulkPay({ ...bulkPay, date: e.target.value })} />
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{salesT('tx.method')}</span>
-              <select className={controls.select} value={bulkPay.method} onChange={(e) => setBulkPay({ ...bulkPay, method: e.target.value })}>
+              <SelectField className={controls.select} value={bulkPay.method} onChange={(e) => setBulkPay({ ...bulkPay, method: e.target.value })}>
                 {['Bank Transfer', 'UPI', 'Cash', 'Cheque', 'Card'].map((m) => <option key={m} value={m}>{m === 'Bank Transfer' && lang === 'en' ? m : methodLabel(m === 'Bank Transfer' ? 'Bank transfer' : m)}</option>)}
-              </select>
+              </SelectField>
             </label>
           </div>
         )}

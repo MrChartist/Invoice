@@ -17,6 +17,8 @@ import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import mfg from '../manufacturing/manufacturing.module.css';
 import styles from './production.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 /** /manufacturing?tab=landed — landed-cost voucher `LCV/FY…` spread over earlier bills / GRNs (R4-A5). */
 export function LandedVoucherTab({ ctx }: { ctx: MfgContext }) {
@@ -93,13 +95,13 @@ export function LandedVoucherTab({ ctx }: { ctx: MfgContext }) {
           <div className={styles.inline}>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="lcv-date">{pT('date')}{editing ? ` · ${editing.number}` : ` · ${landedVouchersDb.nextNumber(date)}`}</label>
-              <input id="lcv-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+              <DateField id="lcv-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="lcv-method">{pT('method')}</label>
-              <select id="lcv-method" className={controls.select} value={method} onChange={(e) => setMethod(e.target.value as LandedMethod)}>
+              <SelectField id="lcv-method" className={controls.select} value={method} onChange={(e) => setMethod(e.target.value as LandedMethod)}>
                 {LANDED_METHODS.map((m) => <option key={m} value={m}>{pT(`method_${m}` as 'method_value')}</option>)}
-              </select>
+              </SelectField>
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="lcv-narr">{pT('narration')}</label>
@@ -122,19 +124,19 @@ export function LandedVoucherTab({ ctx }: { ctx: MfgContext }) {
             </table>
           </div>
           <div className={styles.inline}>
-            <select className={controls.select} aria-label={pT('pickCharge')} value={pick} onChange={(e) => setPick(e.target.value)}>
+            <SelectField className={controls.select} aria-label={pT('pickCharge')} value={pick} onChange={(e) => setPick(e.target.value)}>
               <option value="">{pT('memoCharge')}</option>
               {candidates.filter((c) => !c.usedBy).map((c) => <option key={`${c.source.id}|${c.source.line_id ?? ''}`} value={`${c.source.id}|${c.source.line_id ?? ''}`}>{c.label} · {money(c.amount)} · {formatDate(c.date)}</option>)}
-            </select>
+            </SelectField>
             <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={addCharge}><Plus size={14} aria-hidden="true" /> {pT('addCharge')}</button>
           </div>
           <p className={mfg.section}>{pT('targets')}</p>
           {targets.length > 0 && <ul className={styles.log}>{targets.map((t) => <li key={`${t.kind}:${t.id}`}>{docLabel(t)} <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => setTargets((ts) => ts.filter((x) => x !== t))}>{pT('remove')}</button></li>)}</ul>}
           <div className={styles.inline}>
-            <select className={controls.select} aria-label={pT('pickTarget')} value={target} onChange={(e) => setTarget(e.target.value)}>
+            <SelectField className={controls.select} aria-label={pT('pickTarget')} value={target} onChange={(e) => setTarget(e.target.value)}>
               <option value="">{pT('choose')}</option>
               {goodsDocs.filter((d) => !targets.some((t) => `${t.kind}:${t.id}` === d.key)).map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
-            </select>
+            </SelectField>
             <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={addTarget} disabled={!target}><Plus size={14} aria-hidden="true" /> {pT('addTarget')}</button>
           </div>
           {preview.length > 0 && total > 0 && (

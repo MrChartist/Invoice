@@ -16,6 +16,7 @@ import controls from '../../styles/controls.module.css';
 import styles from './khata.module.css';
 import type { SettleValue } from '../collections/SettleRestFields';
 import { colT } from '../../i18n/areas/collections';
+import { DateField } from '../ui/DateField';
 
 // R2-A2: "Settle the rest" of a partly paid bill, loaded only when a bill is left partly open.
 const SettleRestFields = lazy(() => import('../collections/SettleRestFields'));
@@ -196,7 +197,7 @@ export function QuickEntrySheet({ mode, client, party, onClose, onSaved }: Quick
             <div className={styles.grid2}>
               <label className={controls.field}>
                 <span className={controls.label}>{khataT('date')}</span>
-                <input className={controls.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                <DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
               </label>
               {mode === 'received' && method !== 'Cash' ? (
                 <label className={controls.field}>

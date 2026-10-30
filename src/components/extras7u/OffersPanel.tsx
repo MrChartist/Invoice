@@ -13,6 +13,8 @@ import { x7T } from '../../i18n/areas/extras-7u';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import own from './x7u.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Notify = (m: string, tone?: 'success' | 'error' | 'info') => void;
 type Kind = 'bill_value' | 'buy_get' | 'combo';
@@ -88,10 +90,10 @@ export function OffersPanel({ notify, icon }: { notify: Notify; icon?: ReactNode
                 {form.combo.items.map((x, i) => (
                   <div key={i} className={own.row}>
                     <label className={controls.field}><span className={controls.label}>{x7T('comboItem')}</span>
-                      <select className={controls.select} value={x.item_id} onChange={(e) => setComboItem(i, { id: e.target.value })}>
+                      <SelectField className={controls.select} value={x.item_id} onChange={(e) => setComboItem(i, { id: e.target.value })}>
                         <option value="">-</option>
                         {catalog.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select></label>
+                      </SelectField></label>
                     <label className={controls.field}><span className={controls.label}>{x7T('buyQty')}</span>
                       <input className={cn(controls.input, controls.inputNumeric)} inputMode="numeric" value={String(x.qty)} onChange={(e) => setComboItem(i, { qty: n(e.target.value) })} /></label>
                     <button type="button" className={controls.btnGhost} onClick={() => form.combo && setForm({ ...form, combo: { ...form.combo, items: form.combo.items.filter((_, k) => k !== i) } })}>{x7T('remove')}</button>
@@ -123,17 +125,17 @@ export function OffersPanel({ notify, icon }: { notify: Notify; icon?: ReactNode
             ) : (
               <div className={own.row}>
                 <label className={controls.field}><span className={controls.label}>{x7T('buyItem')}</span>
-                  <select className={controls.select} value={form.item_id} onChange={(e) => pickItem(e.target.value, 'paid')}>
+                  <SelectField className={controls.select} value={form.item_id} onChange={(e) => pickItem(e.target.value, 'paid')}>
                     <option value="">-</option>
                     {catalog.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select></label>
+                  </SelectField></label>
                 <label className={controls.field}><span className={controls.label}>{x7T('buyQty')}</span>
                   <input className={cn(controls.input, controls.inputNumeric)} inputMode="numeric" value={String(form.buy_qty)} onChange={(e) => setForm({ ...form, buy_qty: n(e.target.value) })} /></label>
                 <label className={controls.field}><span className={controls.label}>{x7T('freeItem')}</span>
-                  <select className={controls.select} value={form.free_item_id ?? ''} onChange={(e) => pickItem(e.target.value, 'free')}>
+                  <SelectField className={controls.select} value={form.free_item_id ?? ''} onChange={(e) => pickItem(e.target.value, 'free')}>
                     <option value="">-</option>
                     {catalog.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select></label>
+                  </SelectField></label>
                 <label className={controls.field}><span className={controls.label}>{x7T('freeQty')}</span>
                   <input className={cn(controls.input, controls.inputNumeric)} inputMode="numeric" value={String(form.free_qty)} onChange={(e) => setForm({ ...form, free_qty: n(e.target.value) })} /></label>
               </div>
@@ -147,9 +149,9 @@ export function OffersPanel({ notify, icon }: { notify: Notify; icon?: ReactNode
             <div className={own.row}>
               <label className={controls.field}><span className={controls.label}>{x7T('validFrom')}</span>
 
-                <input className={controls.input} type="date" value={form.valid_from ?? ''} onChange={(e) => setForm({ ...form, valid_from: e.target.value || undefined })} /></label>
+                <DateField className={controls.input} value={form.valid_from ?? ''} onChange={(e) => setForm({ ...form, valid_from: e.target.value || undefined })} /></label>
               <label className={controls.field}><span className={controls.label}>{x7T('validTo')}</span>
-                <input className={controls.input} type="date" value={form.valid_to ?? ''} onChange={(e) => setForm({ ...form, valid_to: e.target.value || undefined })} /></label>
+                <DateField className={controls.input} value={form.valid_to ?? ''} onChange={(e) => setForm({ ...form, valid_to: e.target.value || undefined })} /></label>
             </div>
             <div className={own.tools}>
               <button type="button" className={cn(controls.btnPrimary, controls.btnSm)} onClick={() => run(() => { schemesDb.save(form); setForm(null); }, x7T('offerSaved'))}><Save size={14} /> {x7T('save')}</button>

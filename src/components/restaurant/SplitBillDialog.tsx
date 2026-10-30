@@ -10,6 +10,7 @@ import { useT } from '../../i18n';
 import { rT } from '../../i18n/areas/restaurant';
 import controls from '../../styles/controls.module.css';
 import styles from './restaurant.module.css';
+import { SelectField } from '../ui/SelectField';
 
 type Mode = 'equal' | 'custom' | 'item' | 'seat';
 const METHODS: TenderMethod[] = ['Cash', 'UPI', 'Card'];
@@ -151,10 +152,10 @@ export function SplitBillDialog({ order, onClose, onDone }: SplitBillDialogProps
                 <div key={l.id} className={styles.partRow}>
                   <span>{l.quantity} × {l.name}{l.seat ? ` · ${rT('seat')} ${l.seat}` : ''}</span>
                   {mode === 'item' ? (
-                    <select className={controls.select} value={assign[l.id] ?? 1} onChange={(e) => setAssign((a) => ({ ...a, [l.id]: Number(e.target.value) }))} aria-label={l.name} data-split-line={l.name}>
+                    <SelectField className={controls.select} value={assign[l.id] ?? 1} onChange={(e) => setAssign((a) => ({ ...a, [l.id]: Number(e.target.value) }))} aria-label={l.name} data-split-line={l.name}>
                       {Array.from({ length: itemParts }, (_, i) => <option key={i} value={i + 1}>{rT('partN', { n: i + 1 })}</option>)}
                       <option value={SHARE}>{rT('shareAll')}</option>
-                    </select>
+                    </SelectField>
                   ) : (
                     <span className={styles.chip}>{rT('partN', { n: seats.picks.find((p) => p.line_id === l.id)?.part ?? 1 })}</span>
                   )}
@@ -167,9 +168,9 @@ export function SplitBillDialog({ order, onClose, onDone }: SplitBillDialogProps
                   {preview.records.map((r) => (
                     <div key={r.split_of?.part} className={styles.partRow}>
                       <span>{rT('partOf', { n: r.split_of?.part ?? 0, m: preview.records.length })} · {formatCurrency(r.total)}</span>
-                      <select className={controls.select} value={methods[(r.split_of?.part ?? 1) - 1]} onChange={(e) => setMethods((m) => m.map((x, j) => (j === (r.split_of?.part ?? 1) - 1 ? (e.target.value as TenderMethod) : x)))} aria-label={rT('method')}>
+                      <SelectField className={controls.select} value={methods[(r.split_of?.part ?? 1) - 1]} onChange={(e) => setMethods((m) => m.map((x, j) => (j === (r.split_of?.part ?? 1) - 1 ? (e.target.value as TenderMethod) : x)))} aria-label={rT('method')}>
                         {METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
-                      </select>
+                      </SelectField>
                     </div>
                   ))}
                 </div>

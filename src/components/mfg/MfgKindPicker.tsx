@@ -7,6 +7,7 @@ import { useT } from '../../i18n';
 import { mfPickT } from '../../i18n/areas/mfg-r13a-pick';
 import { MFG_KINDS, MFG_SUBS, type MfgKindId } from '../../lib/shop-presets';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export interface UdyamValue { no: string; category: string }
 
@@ -42,9 +43,9 @@ export function MfgKindPicker({ value, onPick, sub, onSub, udyam, onUdyam, custo
       {subs && onSub && (
         <label className={controls.field} data-mfg-sub>
           <span className={controls.label}>{mfPickT('sub')}</span>
-          <select className={controls.select} value={sub && subs.includes(sub) ? sub : subs[0]} disabled={disabled} onChange={(e) => onSub(e.target.value)}>
+          <SelectField className={controls.select} value={sub && subs.includes(sub) ? sub : subs[0]} disabled={disabled} onChange={(e) => onSub(e.target.value)}>
             {subs.map((s) => <option key={s} value={s}>{mfPickT(`sub.${s}` as Parameters<typeof mfPickT>[0])}</option>)}
-          </select>
+          </SelectField>
         </label>
       )}
       {value && udyam && onUdyam && (
@@ -55,9 +56,9 @@ export function MfgKindPicker({ value, onPick, sub, onSub, udyam, onUdyam, custo
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{mfPickT('category')}</span>
-            <select className={controls.select} value={udyam.category} onChange={(e) => onUdyam({ ...udyam, category: e.target.value })} data-mfg-udyam-cat>
+            <SelectField className={controls.select} value={udyam.category} onChange={(e) => onUdyam({ ...udyam, category: e.target.value })} data-mfg-udyam-cat>
               {(['MICRO', 'SMALL', 'MEDIUM'] as const).map((c) => <option key={c} value={c}>{mfPickT(`cat.${c}`)}</option>)}
-            </select>
+            </SelectField>
           </label>
         </div>
       )}

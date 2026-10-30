@@ -14,6 +14,7 @@ import type { AgCentre, FarmerCycle } from '../../types/agri-r12';
 import controls from '../../styles/controls.module.css';
 import { F, Grid, In } from './agri-ui';
 import { money, useRun, wrap, type Done } from './agri-util';
+import { SelectField } from '../ui/SelectField';
 
 const FarmerCard = lazy(() => import('./FarmerCard'));
 type Form = { id?: string; name: string; code: string; village: string; centre_id: string; member_no: string; member: boolean; phone: string; account: string; ifsc: string; upi: string; aadhaar_last4: string; language: string };
@@ -56,7 +57,7 @@ export default function FarmersView({ onDone }: { onDone: Done }) {
             <F label={agT('name')}><In v={f.name} set={(v) => set({ name: v })} data-ag-farmer-name /></F>
             <F label={agT('code')}><In v={f.code} set={(v) => set({ code: v })} w={90} /></F>
             <F label={agT('village')}><In v={f.village} set={(v) => set({ village: v })} /></F>
-            <F label={agT('centre')}><select className={controls.select} value={f.centre_id} onChange={(e) => set({ centre_id: e.target.value })}><option value="">-</option>{centres.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></F>
+            <F label={agT('centre')}><SelectField className={controls.select} value={f.centre_id} onChange={(e) => set({ centre_id: e.target.value })}><option value="">-</option>{centres.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</SelectField></F>
             <F label={agT('memberNo')}><In v={f.member_no} set={(v) => set({ member_no: v })} w={90} /></F>
             <label className={controls.check}><input type="checkbox" checked={f.member} onChange={(e) => set({ member: e.target.checked })} /> {agT('member')}</label>
             <F label={agT('phone')}><In v={f.phone} set={(v) => set({ phone: v })} type="tel" /></F>
@@ -64,7 +65,7 @@ export default function FarmersView({ onDone }: { onDone: Done }) {
             <F label="IFSC"><In v={f.ifsc} set={(v) => set({ ifsc: v.toUpperCase() })} w={120} /></F>
             <F label="UPI"><In v={f.upi} set={(v) => set({ upi: v })} /></F>
             <F label={agT('aadhaar4')}><In v={f.aadhaar_last4} set={(v) => set({ aadhaar_last4: v })} inputMode="numeric" w={80} data-ag-aadhaar /></F>
-            <F label={agT('language')}><select className={controls.select} value={f.language} onChange={(e) => set({ language: e.target.value })}><option value="en">English</option><option value="hi">हिन्दी</option></select></F>
+            <F label={agT('language')}><SelectField className={controls.select} value={f.language} onChange={(e) => set({ language: e.target.value })}><option value="en">English</option><option value="hi">हिन्दी</option></SelectField></F>
           </div>
           {warn.map((w) => <p key={w} className={controls.hint} role="alert" data-ag-warn>{w}</p>)}
           <div style={wrap}>

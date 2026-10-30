@@ -15,6 +15,8 @@ import { distT } from '../../i18n/areas/distribution';
 import controls from '../../styles/controls.module.css';
 import own from './dist.module.css';
 import { printWhenReady } from '../../lib/print-fonts';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const blank = (): StockTransferLine => ({ id: generateId(), item_id: '', qty: 0 });
 
@@ -79,24 +81,24 @@ export default function DistVan({ onDone }: { onDone: (msg: string, error?: bool
         <>
           <div className={own.row}>
             <label className={controls.field}><span className={controls.label}>{distT('van')}</span>
-              <select className={controls.select} value={van?.id ?? ''} onChange={(e) => { setVanId(e.target.value); setReturns(null); }}>
+              <SelectField className={controls.select} value={van?.id ?? ''} onChange={(e) => { setVanId(e.target.value); setReturns(null); }}>
                 {vans.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-              </select></label>
+              </SelectField></label>
             <label className={controls.field}><span className={controls.label}>{distT('day')}</span>
-              <input type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
+              <DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
           </div>
 
           <h4>{distT('vanLoad')}</h4>
           <label className={controls.field}><span className={controls.label}>{distT('fromGodown')}</span>
-            <select className={controls.select} value={from || stores[0]?.id || ''} onChange={(e) => setFrom(e.target.value)}>
+            <SelectField className={controls.select} value={from || stores[0]?.id || ''} onChange={(e) => setFrom(e.target.value)}>
               {stores.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select></label>
+            </SelectField></label>
           {load.map((l, i) => (
             <div key={l.id} className={own.row}>
-              <select className={controls.select} aria-label={distT('item')} value={l.item_id} onChange={(e) => setLoad(load.map((x, j) => (j === i ? { ...x, item_id: e.target.value } : x)))} data-load-item>
+              <SelectField className={controls.select} aria-label={distT('item')} value={l.item_id} onChange={(e) => setLoad(load.map((x, j) => (j === i ? { ...x, item_id: e.target.value } : x)))} data-load-item>
                 <option value="">{distT('item')}</option>
                 {items.map((it) => <option key={it.id} value={it.id}>{it.name}</option>)}
-              </select>
+              </SelectField>
               <input className={controls.input} aria-label={distT('batch')} placeholder={distT('batch')} value={l.batch_no ?? ''} onChange={(e) => setLoad(load.map((x, j) => (j === i ? { ...x, batch_no: e.target.value || undefined } : x)))} />
               <input type="number" min={0} className={controls.input} aria-label={distT('qty')} placeholder={distT('qty')} value={l.qty || ''} onChange={(e) => setLoad(load.map((x, j) => (j === i ? { ...x, qty: Number(e.target.value) || 0 } : x)))} data-load-qty />
               <button type="button" className={controls.btnIcon} aria-label={distT('removeLine')} onClick={() => setLoad(load.length > 1 ? load.filter((_, j) => j !== i) : [blank()])}><Trash2 size={14} /></button>

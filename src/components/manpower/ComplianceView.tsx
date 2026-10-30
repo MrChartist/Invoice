@@ -28,6 +28,9 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field, type MpViewProps } from './mp-ui';
 import { PRINT_FONT, PRINT_FONT_FACE } from '../../lib/print-fonts';
+import { TypedInput } from '../ui/TypedInput';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const bar = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.5rem 0' } as const;
 const STS = ['pending', 'proved', 'waived'] as const;
@@ -54,7 +57,7 @@ function Revisions({ notify, onSaved }: MpViewProps & { onSaved: () => void }) {
       {rows.map((r) => <p key={r.id} className={controls.hint} data-mp-rev={r.id}>{r.from} · {[r.post_name, r.zone, r.skill].filter(Boolean).join(' / ') || '*'} · ₹{r.wage_day ?? r.wage_month ?? 0}{r.delta_day ? ` (+₹${r.delta_day})` : ''} · {r.ref}</p>)}
       {can('settings.manage') && (
         <div style={bar}>
-          {REV.map((k, i) => <Field key={k} label={mcList('rev', i)}><input className={controls.input} style={{ width: i ? '7rem' : undefined }} type={i === 0 ? 'date' : i === 4 || i === 5 ? 'number' : 'text'} value={d[k] ?? ''} onChange={(e) => setD({ ...d, [k]: e.target.value })} data-mp-rev-field={k} /></Field>)}
+          {REV.map((k, i) => <Field key={k} label={mcList('rev', i)}><TypedInput className={controls.input} style={{ width: i ? '7rem' : undefined }} type={i === 0 ? 'date' : i === 4 || i === 5 ? 'number' : 'text'} value={d[k] ?? ''} onChange={(e) => setD({ ...d, [k]: e.target.value })} data-mp-rev-field={k} /></Field>)}
           <button type="button" className={controls.btnOutline} onClick={add} data-mp-rev-add>{mcT('add')}</button>
         </div>
       )}
@@ -104,8 +107,8 @@ export default function ComplianceView({ notify }: MpViewProps) {
   return (
     <section data-mp-compliance={data.comp?.status ?? 'none'}>
       <div style={bar}>
-        <Field label={mpT('site')}><select className={controls.select} value={site.id} onChange={(e) => go({ site: e.target.value })} data-mp-comp-site>{sites.map((s) => <option key={s.id} value={s.id}>{siteLabel(s)}</option>)}</select></Field>
-        <Field label={mpT('month')}><input type="month" className={controls.input} value={month} onChange={(e) => e.target.value && go({ month: e.target.value })} /></Field>
+        <Field label={mpT('site')}><SelectField className={controls.select} value={site.id} onChange={(e) => go({ site: e.target.value })} data-mp-comp-site>{sites.map((s) => <option key={s.id} value={s.id}>{siteLabel(s)}</option>)}</SelectField></Field>
+        <Field label={mpT('month')}><DateField mode="month" className={controls.input} value={month} onChange={(e) => e.target.value && go({ month: e.target.value })} /></Field>
       </div>
       {!data.run ? <p className={controls.hint} role="note">{mcT('noRun', { m: month })}</p> : !m ? <p className={controls.hint}>{mcT('noMuster')}</p> : (
         <div className={surface.tableWrap}>
@@ -120,10 +123,10 @@ export default function ComplianceView({ notify }: MpViewProps) {
       )}
       <div style={bar}>
         <Field label={mcT('trrn')}><input className={controls.input} value={cur.pf?.trrn ?? ''} onChange={(e) => set({ pf: { ...cur.pf, trrn: e.target.value } })} data-mp-comp-trrn /></Field>
-        <Field label={mcT('paid')}><input type="date" className={controls.input} value={cur.pf?.paid_on ?? ''} onChange={(e) => set({ pf: { ...cur.pf, paid_on: e.target.value || undefined } })} /></Field>
+        <Field label={mcT('paid')}><DateField className={controls.input} value={cur.pf?.paid_on ?? ''} onChange={(e) => set({ pf: { ...cur.pf, paid_on: e.target.value || undefined } })} /></Field>
         <Field label={mcT('chal')}><input className={controls.input} value={cur.esi?.challan ?? ''} onChange={(e) => set({ esi: { ...cur.esi, challan: e.target.value } })} data-mp-comp-challan /></Field>
-        <Field label={mcT('paid')}><input type="date" className={controls.input} value={cur.esi?.paid_on ?? ''} onChange={(e) => set({ esi: { ...cur.esi, paid_on: e.target.value || undefined } })} /></Field>
-        <Field label={mpT('status')}><select className={controls.select} value={cur.status} onChange={(e) => set({ status: e.target.value as CompPatch['status'] })} data-mp-comp-status>{STS.map((s, i) => <option key={s} value={s}>{mcList('sts', i)}</option>)}</select></Field>
+        <Field label={mcT('paid')}><DateField className={controls.input} value={cur.esi?.paid_on ?? ''} onChange={(e) => set({ esi: { ...cur.esi, paid_on: e.target.value || undefined } })} /></Field>
+        <Field label={mpT('status')}><SelectField className={controls.select} value={cur.status} onChange={(e) => set({ status: e.target.value as CompPatch['status'] })} data-mp-comp-status>{STS.map((s, i) => <option key={s} value={s}>{mcList('sts', i)}</option>)}</SelectField></Field>
         <Field label={mcT('holdPct')}><input type="number" min={0} max={100} className={controls.input} style={{ width: '5rem' }} value={cur.hold?.pct ?? ''} onChange={(e) => set({ hold: { ...cur.hold, pct: n2(e.target.value) } })} data-mp-comp-hold /></Field>
         <Field label={mcT('holdAmt')}><input type="number" min={0} className={controls.input} style={{ width: '7rem' }} value={cur.hold?.amount ?? ''} onChange={(e) => set({ hold: { ...cur.hold, amount: n2(e.target.value) } })} /></Field>
         <button type="button" className={controls.btnPrimary} onClick={save} data-mp-comp-save>{mpT('save')}</button>

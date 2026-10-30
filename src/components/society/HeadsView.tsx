@@ -23,6 +23,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field as F, type HsViewProps } from './hs-ui';
 import { numIn, row } from './hs-form';
+import { SelectField } from '../ui/SelectField';
 
 const PREVIEW = 50;
 
@@ -51,20 +52,20 @@ export default function HeadsView({ notify }: HsViewProps) {
     <section data-hs-heads>
       <div style={row}>
         <F label={hsT('state')}>
-          <select className={controls.select} value={s.state ?? ''} onChange={(e) => set({ state: e.target.value || undefined })}>
+          <SelectField className={controls.select} value={s.state ?? ''} onChange={(e) => set({ state: e.target.value || undefined })}>
             <option value="">-</option>
             {INDIAN_STATES.map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}
-          </select>
+          </SelectField>
         </F>
         <F label={hsT('cycle')}>
-          <select className={controls.select} value={s.cycle ?? 'monthly'} onChange={(e) => set({ cycle: e.target.value as HsCycle })}>
+          <SelectField className={controls.select} value={s.cycle ?? 'monthly'} onChange={(e) => set({ cycle: e.target.value as HsCycle })}>
             {CYCLES.map((c) => <option key={c} value={c}>{hsList('cycles', CYCLES, c)}</option>)}
-          </select>
+          </SelectField>
         </F>
         <F label={hsbT('test')}>
-          <select className={controls.select} value={s.gst?.valuation ?? 'whole'} onChange={(e) => set({ gst: { ...s.gst, valuation: e.target.value as 'whole' | 'excess' } })} data-hs-valuation>
+          <SelectField className={controls.select} value={s.gst?.valuation ?? 'whole'} onChange={(e) => set({ gst: { ...s.gst, valuation: e.target.value as 'whole' | 'excess' } })} data-hs-valuation>
             {(['whole', 'excess'] as const).map((v, k) => <option key={v} value={v}>{hsbT('regimes').split(',')[3 + k]}</option>)}
-          </select>
+          </SelectField>
         </F>
         <F label={hsT('dueDays')}><input type="number" min={0} max={120} className={controls.input} value={s.due_days ?? 15} onChange={(e) => set({ due_days: numIn(e.target.value) })} /></F>
         <label className={controls.check}><input type="checkbox" checked={s.explain !== false} onChange={(e) => set({ explain: e.target.checked })} data-hs-explain /> {hsT('explain')}</label>
@@ -83,14 +84,14 @@ export default function HeadsView({ notify }: HsViewProps) {
               <tr key={h.id} data-hs-head={h.kind}>
                 <td><input className={controls.input} aria-label={hsT('head')} value={h.name} onChange={(e) => head(i, { name: e.target.value })} /></td>
                 <td>
-                  <select className={controls.select} aria-label={hsT('kind')} value={h.kind} onChange={(e) => head(i, { kind: e.target.value as HsHeadKind, sac: sacFor(e.target.value as HsHeadKind, today) })}>
+                  <SelectField className={controls.select} aria-label={hsT('kind')} value={h.kind} onChange={(e) => head(i, { kind: e.target.value as HsHeadKind, sac: sacFor(e.target.value as HsHeadKind, today) })}>
                     {HEAD_KINDS.map((k) => <option key={k} value={k}>{hsList('kinds', HEAD_KINDS, k)}</option>)}
-                  </select>
+                  </SelectField>
                 </td>
                 <td>
-                  <select className={controls.select} aria-label={hsT('basis')} value={h.basis} onChange={(e) => head(i, { basis: e.target.value as HsBasis })}>
+                  <SelectField className={controls.select} aria-label={hsT('basis')} value={h.basis} onChange={(e) => head(i, { basis: e.target.value as HsBasis })}>
                     {BASES.map((b) => <option key={b} value={b}>{hsList('bases', BASES, b)}</option>)}
-                  </select>
+                  </SelectField>
                 </td>
                 <td><input type="number" min={0} step="any" className={controls.input} aria-label={hsT('rate')} value={h.rate} onChange={(e) => head(i, { rate: numIn(e.target.value) ?? 0 })} data-hs-head-rate /></td>
                 <td><input type="checkbox" aria-label={hsT('active')} checked={h.active !== false} onChange={(e) => head(i, { active: e.target.checked })} /></td>

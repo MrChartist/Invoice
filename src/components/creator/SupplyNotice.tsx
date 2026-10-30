@@ -16,6 +16,7 @@ import controls from '../../styles/controls.module.css';
 import { useT } from '../../i18n';
 import { edT } from '../../i18n/areas/editor';
 import styles from './SupplyNotice.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /**
  * Composition / Bill of Supply notices for the editor (roadmap 5.9): the scheme in force, non-blocking
@@ -46,7 +47,7 @@ export function SupplyNotice() {
       {!composition && bos && (
         <label className={styles.kind}>
           <span>{edT('snBosFor')}</span>
-          <select
+          <SelectField
             className={controls.select}
             value={s.exempt_kind ?? 'EXEMPT'}
             onChange={(e) => s.patch({ exempt_kind: e.target.value as ExemptKind })}
@@ -55,7 +56,7 @@ export function SupplyNotice() {
             {(Object.keys(EXEMPT_KIND_LABELS) as ExemptKind[]).map((k) => (
               <option key={k} value={k}>{edT(`exempt.${k}`)}</option>
             ))}
-          </select>
+          </SelectField>
           <span className={styles.muted}>{edT('snReported')}</span>
         </label>
       )}

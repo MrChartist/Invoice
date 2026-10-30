@@ -12,6 +12,7 @@ import type { FarmBatch, FarmBatchEvent } from '../../types/agri-r12';
 import controls from '../../styles/controls.module.css';
 import { F, Grid, In } from './agri-ui';
 import { useRun, wrap, type Done } from './agri-util';
+import { SelectField } from '../ui/SelectField';
 
 const KINDS: FarmBatch['kind'][] = ['flock', 'pond', 'herd', 'crop'];
 const EVENTS: FarmBatchEvent['kind'][] = ['mortality', 'feed', 'weight', 'harvest', 'medicine'];
@@ -31,7 +32,7 @@ export default function BatchesView({ onDone }: { onDone: Done }) {
   return (
     <div data-ag-batches>
       <div style={wrap}>
-        <F label={agT('kind')}><select className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as FarmBatch['kind'])}>{KINDS.map((k) => <option key={k} value={k}>{agT(`b.${k}`)}</option>)}</select></F>
+        <F label={agT('kind')}><SelectField className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as FarmBatch['kind'])}>{KINDS.map((k) => <option key={k} value={k}>{agT(`b.${k}`)}</option>)}</SelectField></F>
         <F label={agT('name')}><In v={name} set={setName} data-ag-b-name /></F>
         <F label={agT('start')}><In v={start} set={setStart} type="date" /></F>
         <F label={agT('placed')}><In v={placed} set={setPlaced} type="number" w={90} data-ag-b-placed /></F>
@@ -40,8 +41,8 @@ export default function BatchesView({ onDone }: { onDone: Done }) {
         <button type="button" className={controls.btnPrimary} onClick={() => run(() => { saveBatch({ kind, name, start, placed: Number(placed), unit, ...(Number(sw) > 0 ? { start_weight_kg: Number(sw) } : {}) }); setName(''); return agT('saved'); })} data-ag-b-save>{agT('addBatch')}</button>
       </div>
       <div style={wrap}>
-        <F label={agT('batch')}><select className={controls.select} value={ev.id} onChange={(e) => setEv({ ...ev, id: e.target.value })}><option value="">-</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></F>
-        <F label={agT('event')}><select className={controls.select} value={ev.kind} onChange={(e) => setEv({ ...ev, kind: e.target.value as FarmBatchEvent['kind'] })}>{EVENTS.map((k) => <option key={k} value={k}>{agT(`e.${k}`)}</option>)}</select></F>
+        <F label={agT('batch')}><SelectField className={controls.select} value={ev.id} onChange={(e) => setEv({ ...ev, id: e.target.value })}><option value="">-</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</SelectField></F>
+        <F label={agT('event')}><SelectField className={controls.select} value={ev.kind} onChange={(e) => setEv({ ...ev, kind: e.target.value as FarmBatchEvent['kind'] })}>{EVENTS.map((k) => <option key={k} value={k}>{agT(`e.${k}`)}</option>)}</SelectField></F>
         <F label={agT('date')}><In v={ev.date} set={(v) => setEv({ ...ev, date: v })} type="date" /></F>
         <F label={agT('qtyKg')}><In v={ev.qty} set={(v) => setEv({ ...ev, qty: v })} type="number" w={90} /></F>
         <button type="button" className={controls.btnOutline} disabled={!ev.id} onClick={() => run(() => { addBatchEvent(ev.id, { date: ev.date, kind: ev.kind, qty: Number(ev.qty), unit: ev.kind === 'mortality' ? 'NOS' : 'KG' }); setEv({ ...ev, qty: '' }); return agT('saved'); })}>{agT('addEvent')}</button>

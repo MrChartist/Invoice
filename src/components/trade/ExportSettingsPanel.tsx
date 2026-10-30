@@ -15,6 +15,8 @@ import { trErr, trT } from '../../i18n/areas/trade-trust-r4';
 import controls from '../../styles/controls.module.css';
 import settings from '../settings/Settings.module.css';
 import styles from './trade.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 interface Props {
   profile: SenderProfile;
@@ -101,9 +103,9 @@ export default function ExportSettingsPanel({ profile, onChange }: Props) {
         <div className={styles.inline}>
           <label className={`${controls.field} ${styles.narrow}`}>
             <span className={controls.label}>{trT('lutFy')}</span>
-            <select className={controls.select} value={draft.fy ?? ''} onChange={(e) => setDraft({ ...draft, fy: e.target.value })}>
+            <SelectField className={controls.select} value={draft.fy ?? ''} onChange={(e) => setDraft({ ...draft, fy: e.target.value })}>
               {fyChoices().map((f) => <option key={f} value={f}>{f}</option>)}
-            </select>
+            </SelectField>
           </label>
           <label className={`${controls.field} ${styles.grow}`}>
             <span className={controls.label}>{trT('lutGstin')}</span>
@@ -115,7 +117,7 @@ export default function ExportSettingsPanel({ profile, onChange }: Props) {
           </label>
           <label className={`${controls.field} ${styles.narrow}`}>
             <span className={controls.label}>{trT('lutFiled')}</span>
-            <input className={controls.input} type="date" value={draft.filed_on ?? ''} onChange={(e) => setDraft({ ...draft, filed_on: e.target.value })} />
+            <DateField className={controls.input} value={draft.filed_on ?? ''} onChange={(e) => setDraft({ ...draft, filed_on: e.target.value })} />
           </label>
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={save}>{trT('lutAdd')}</button>
         </div>

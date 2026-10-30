@@ -26,6 +26,7 @@ import { TEMPLATES } from '../templates/registry';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './VoucherTypes.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const baseLabel = (b: VoucherBase) => vtT(`b${b}` as VtKey);
 const blank = (): VoucherTypeInput => ({ name: '', base: 'SALES', prefix: '', restart: 'yearly' });
@@ -96,9 +97,9 @@ export default function VoucherTypesScreen({ onBack, notify, startCreate }: Vouc
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{vtT('base')}</span>
-              <select className={controls.select} value={draft.base} disabled={!!draft.id} onChange={(e) => set({ base: e.target.value as VoucherBase, bank_account_id: undefined, godown_id: undefined, use_for_pos: undefined })} data-testid="vt-base">
+              <SelectField className={controls.select} value={draft.base} disabled={!!draft.id} onChange={(e) => set({ base: e.target.value as VoucherBase, bank_account_id: undefined, godown_id: undefined, use_for_pos: undefined })} data-testid="vt-base">
                 {VOUCHER_BASES.map((b) => <option key={b} value={b}>{baseLabel(b)}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{vtT('prefix')}</span>
@@ -118,10 +119,10 @@ export default function VoucherTypesScreen({ onBack, notify, startCreate }: Vouc
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{vtT('restart')}</span>
-              <select className={controls.select} value={draft.restart ?? 'yearly'} onChange={(e) => set({ restart: e.target.value === 'monthly' ? 'monthly' : 'yearly' })}>
+              <SelectField className={controls.select} value={draft.restart ?? 'yearly'} onChange={(e) => set({ restart: e.target.value === 'monthly' ? 'monthly' : 'yearly' })}>
                 <option value="yearly">{vtT('yearly')}</option>
                 <option value="monthly">{vtT('monthly')}</option>
-              </select>
+              </SelectField>
             </label>
             <p className={`${controls.hint} ${styles.wide}`} aria-live="polite">
               {vtT('example', { number: '' })}<span className={styles.example}>{example}</span>
@@ -135,27 +136,27 @@ export default function VoucherTypesScreen({ onBack, notify, startCreate }: Vouc
                 </label>
                 <label className={controls.field}>
                   <span className={controls.label}>{vtT('template')}</span>
-                  <select className={controls.select} value={draft.template_id ?? ''} onChange={(e) => set({ template_id: e.target.value || undefined })}>
+                  <SelectField className={controls.select} value={draft.template_id ?? ''} onChange={(e) => set({ template_id: e.target.value || undefined })}>
                     <option value="">{vtT('keep')}</option>
                     {TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
+                  </SelectField>
                 </label>
                 <label className={controls.field}>
                   <span className={controls.label}>{vtT('defaultGodown')}</span>
-                  <select className={controls.select} value={draft.godown_id ?? ''} onChange={(e) => set({ godown_id: e.target.value || undefined })}>
+                  <SelectField className={controls.select} value={draft.godown_id ?? ''} onChange={(e) => set({ godown_id: e.target.value || undefined })}>
                     <option value="">{vtT('keep')}</option>
                     {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                  </select>
+                  </SelectField>
                 </label>
               </>
             )}
             {BANK_BASES.has(draft.base) && (
               <label className={controls.field}>
                 <span className={controls.label}>{vtT('defaultBank')}</span>
-                <select className={controls.select} value={draft.bank_account_id ?? ''} onChange={(e) => set({ bank_account_id: e.target.value || undefined })}>
+                <SelectField className={controls.select} value={draft.bank_account_id ?? ''} onChange={(e) => set({ bank_account_id: e.target.value || undefined })}>
                   <option value="">{vtT('keep')}</option>
                   {banks.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
+                </SelectField>
               </label>
             )}
             {draft.base === 'SALES' && (

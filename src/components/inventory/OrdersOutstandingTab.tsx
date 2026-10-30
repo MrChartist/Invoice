@@ -10,6 +10,7 @@ import { imT } from '../../i18n/areas/inventory-masters';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './masters.module.css';
+import { DateField } from '../ui/DateField';
 
 const BUCKET: Record<string, () => string> = {
   overdue: () => imT('bucketOverdue'), week: () => imT('bucketWeek'), later: () => imT('bucketLater'), none: () => imT('bucketNone'),
@@ -61,7 +62,7 @@ function Outstanding({ version, today }: { version: number; today: string }) {
       <div className={styles.toolbar}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="so-asof">{imT('asOf')}</label>
-          <input id="so-asof" type="date" className={controls.input} value={asOf} onChange={(e) => setAsOf(e.target.value || today)} />
+          <DateField id="so-asof" className={controls.input} value={asOf} onChange={(e) => setAsOf(e.target.value || today)} />
         </div>
         <div className={controls.segment} role="tablist" aria-label={imT('groupBy')}>
           {([['party', imT('byParty')], ['item', imT('byItem')], ['due', imT('byDue')]] as [OutstandingGroupBy, string][]).map(([k, label]) => (

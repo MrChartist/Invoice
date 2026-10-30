@@ -25,6 +25,8 @@ import type { ManpowerSettings, MpLicence } from '../../types/manpower-r17';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field, type MpViewProps } from './mp-ui';
+import { TypedInput } from '../ui/TypedInput';
+import { SelectField } from '../ui/SelectField';
 
 const ChasePanel = lazy(() => import('../prof/TdsChasePanel')); // R14 Form 16A / 131 chase list and letter
 const bar = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', margin: '0.5rem 0' } as const;
@@ -53,7 +55,7 @@ export default function StatutoryView({ notify }: MpViewProps) {
   const rev = d.plan.rev;
   const save = (patch: Partial<ManpowerSettings>) => { try { setS(saveManpowerSettings(patch)); setTick((t) => t + 1); } catch (e) { notify((e as Error).message, 'error'); } };
   const run = (fn: () => void) => { try { fn(); setTick((t) => t + 1); } catch (e) { notify((e as Error).message, 'error'); } };
-  const fld = (k: string, label: string, type = 'text') => <Field label={label}><input type={type} className={controls.input} value={f[k] ?? ''} onChange={(e) => setF({ ...f, [k]: e.target.value })} data-mp-st={k} /></Field>;
+  const fld = (k: string, label: string, type = 'text') => <Field label={label}><TypedInput type={type} className={controls.input} value={f[k] ?? ''} onChange={(e) => setF({ ...f, [k]: e.target.value })} data-mp-st={k} /></Field>;
   const owed = rev ? staffArrears(rev, revs, d.sites, d.musters, d.staff) : [];
   const note = rcmOnlyNote(d.invoices, today);
   const due = mpAlerts({ today, settings: s, packs: (localDb.settings.get() as { industry_packs?: string[] }).industry_packs ?? [], sites: d.sites, guards: d.staff });
@@ -62,7 +64,7 @@ export default function StatutoryView({ notify }: MpViewProps) {
       {note && <p className={controls.hint} role="note" data-mp-rcm-only>{mdT('rcmOnly')}</p>}
       <h4 className={controls.label}>{mdT('arrears')}</h4>
       <div style={bar}>
-        <Field label={mdT('rev')}><select className={controls.select} value={revId} onChange={(e) => setRevId(e.target.value)} data-mp-arr-rev>{revs.map((r) => <option key={r.id} value={r.id}>{r.from} · {r.ref}{r.delta_day ? ` · +₹${r.delta_day}` : ''}</option>)}</select></Field>
+        <Field label={mdT('rev')}><SelectField className={controls.select} value={revId} onChange={(e) => setRevId(e.target.value)} data-mp-arr-rev>{revs.map((r) => <option key={r.id} value={r.id}>{r.from} · {r.ref}{r.delta_day ? ` · +₹${r.delta_day}` : ''}</option>)}</SelectField></Field>
         {fld('from', mpT('from'), 'date')}{fld('delta', mdT('delta'), 'number')}{fld('ref', mdT('ref'))}
         <button type="button" className={controls.btnOutline} disabled={!(Number(f.delta) > 0) || !f.ref?.trim() || !f.from} onClick={() => { const id = generateId(); save({ wage_revisions: [...revs, { id, from: f.from, delta_day: Number(f.delta), ref: f.ref.trim() }] }); setRevId(id); }} data-mp-arr-add>{mdT('add')}</button>
       </div>
@@ -84,12 +86,12 @@ export default function StatutoryView({ notify }: MpViewProps) {
       {due.length ? due.map((a) => <p key={a.id} className={controls.hint} role="note" data-mp-due={a.severity}>{a.title} · {a.detail}</p>) : <p className={controls.hint}>{mdT('due')}</p>}
       <Tbl data-mp-lic="" head={[mdT('kind'), mdT('state'), mdT('no'), mdT('till'), '']} rows={(s.licences ?? []).map((l) => [list('kinds')[KINDS.indexOf(l.kind)], l.state ?? '', l.no, l.valid_till, <button key="x" type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => save({ licences: (s.licences ?? []).filter((x) => x.id !== l.id) })}>{mpT('remove')}</button>])} />
       <div style={bar}>
-        <Field label={mdT('kind')}><select className={controls.select} value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })} data-mp-st="kind">{KINDS.map((k, i) => <option key={k} value={k}>{list('kinds')[i]}</option>)}</select></Field>
+        <Field label={mdT('kind')}><SelectField className={controls.select} value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })} data-mp-st="kind">{KINDS.map((k, i) => <option key={k} value={k}>{list('kinds')[i]}</option>)}</SelectField></Field>
         {fld('state', mdT('state'))}{fld('no', mdT('no'))}{fld('till', mdT('till'), 'date')}
         <button type="button" className={controls.btnOutline} disabled={!f.no?.trim() || !f.till} onClick={() => save({ licences: [...(s.licences ?? []), { id: generateId(), kind: f.kind as MpLicence['kind'], no: f.no.trim(), valid_till: f.till, ...(f.state?.trim() ? { state: f.state.trim() } : {}) }] })} data-mp-lic-add>{mdT('add')}</button>
       </div>
       <div style={bar}>
-        <Field label={mdT('guard')}><select className={controls.select} value={f.emp ?? ''} onChange={(e) => setF({ ...f, emp: e.target.value })}><option value="">-</option>{d.staff.map((e) => <option key={e.id} value={e.id}>{e.code} {e.name}</option>)}</select></Field>
+        <Field label={mdT('guard')}><SelectField className={controls.select} value={f.emp ?? ''} onChange={(e) => setF({ ...f, emp: e.target.value })}><option value="">-</option>{d.staff.map((e) => <option key={e.id} value={e.id}>{e.code} {e.name}</option>)}</SelectField></Field>
         {fld('gno', mdT('no'))}{fld('gtill', mdT('till'), 'date')}
         <button type="button" className={controls.btnOutline} disabled={!f.emp} onClick={() => run(() => setGuardLicence(f.emp, f.gno?.trim() ? { no: f.gno, valid_till: f.gtill ?? '' } : null))}>{mpT('save')}</button>
       </div>

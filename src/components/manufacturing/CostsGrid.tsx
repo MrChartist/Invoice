@@ -5,6 +5,7 @@ import type { AdditionalCost } from '../../types/manufacturing';
 import { mfgT } from '../../i18n/areas/manufacturing';
 import controls from '../../styles/controls.module.css';
 import styles from './manufacturing.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /** Labour / power / overhead lines: a ₹ amount or a % of component cost. */
 export function CostsGrid({ costs, onChange }: { costs: AdditionalCost[]; onChange: (c: AdditionalCost[]) => void }) {
@@ -19,10 +20,10 @@ export function CostsGrid({ costs, onChange }: { costs: AdditionalCost[]; onChan
               <tr key={c.id}>
                 <td><input className={controls.input} aria-label={`${mfgT('costLabel')} ${i + 1}`} value={c.label} onChange={(e) => patch(c.id, { label: e.target.value })} /></td>
                 <td>
-                  <select className={controls.select} aria-label={`${mfgT('mode')} ${i + 1}`} value={c.mode} onChange={(e) => patch(c.id, { mode: e.target.value as AdditionalCost['mode'] })}>
+                  <SelectField className={controls.select} aria-label={`${mfgT('mode')} ${i + 1}`} value={c.mode} onChange={(e) => patch(c.id, { mode: e.target.value as AdditionalCost['mode'] })}>
                     <option value="amount">{mfgT('amountMode')}</option>
                     <option value="pct">{mfgT('pctMode')}</option>
-                  </select>
+                  </SelectField>
                 </td>
                 <td><input className={cn(controls.input, controls.inputNumeric)} inputMode="decimal" aria-label={`${mfgT('value')} ${i + 1}`} value={c.value ? String(c.value) : ''} onChange={(e) => patch(c.id, { value: Number(e.target.value) || 0 })} /></td>
                 <td><button type="button" className={controls.btnIcon} aria-label={mfgT('removeLine', { n: i + 1 })} onClick={() => onChange(costs.filter((x) => x.id !== c.id))}><Trash2 size={15} aria-hidden="true" /></button></td>

@@ -17,6 +17,7 @@ import { B, errText, fmtMoney, printHtml, today, type Notify } from '../transpor
 import { Num, Sel, Table, Txt } from './site-ui';
 import { T, monthOf, n, opt, row, useRun } from './site-kit';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 type Files = { pf?: AttachmentRef; esi?: AttachmentRef; reg?: AttachmentRef };
 
@@ -117,7 +118,7 @@ function Muster({ d, run }: { d: D; run: (fn: () => string | void) => void }) {
         <button type="button" className={B.o} onClick={() => run(() => { saveLabour({ name: w.name, trade: w.trade, daily_rate: n(w.rate), ot_rate: n(w.ot), ...(n(w.min) ? { min_wage: n(w.min) } : {}), phone: w.phone || undefined, id_ref: w.idr || undefined, site_id: s.id }); setW({ ...w, name: '', phone: '', idr: '' }); })} data-sd-add-worker>{T('add')}</button>
       </div>
       <Txt l={T('date')} v={day} set={(x) => { setDay(x); setAtt({}); }} type="date" n={160} />
-      <Table d="attendance" head={[T('name'), T('trade'), T('present'), T('otHours')]} rows={crew.map((l) => [l.name, l.trade, <select key="p" className={controls.select} value={val(l.id).p} onChange={(e) => setAtt({ ...att, [l.id]: { ...val(l.id), p: e.target.value } })} aria-label={T('present')}><option value="1">1</option><option value="0.5">½</option><option value="0">0</option></select>,
+      <Table d="attendance" head={[T('name'), T('trade'), T('present'), T('otHours')]} rows={crew.map((l) => [l.name, l.trade, <SelectField key="p" className={controls.select} value={val(l.id).p} onChange={(e) => setAtt({ ...att, [l.id]: { ...val(l.id), p: e.target.value } })} aria-label={T('present')}><option value="1">1</option><option value="0.5">½</option><option value="0">0</option></SelectField>,
         <input key="o" className={controls.input} type="number" value={val(l.id).ot} onChange={(e) => setAtt({ ...att, [l.id]: { ...val(l.id), ot: e.target.value } })} aria-label={T('otHours')} />])} />
       {crew.length > 0 && <button type="button" className={B.p} disabled={!!marked?.mus_no} onClick={() => run(() => { markDay(s.id, day, crew.map((l) => ({ labour_id: l.id, present: n(val(l.id).p) as 0 | 0.5 | 1, ot_hours: n(val(l.id).ot) }))); setAtt({}); })} data-sd-mark>{marked?.mus_no ? T('settledIn', { n: marked.mus_no }) : T('saveDay')}</button>}
       <h4>{T('week')}</h4>

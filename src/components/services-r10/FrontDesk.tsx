@@ -31,6 +31,9 @@ import { CommissionDesk } from './CommissionDesk';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './services.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
+import { TimeField } from '../ui/TimeField';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 const VIEWS = ['day', 'week', 'queue', 'birthdays'] as const;
@@ -145,13 +148,13 @@ function Appointments({ view, notify }: { view: View; notify: Notify }) {
         <div className={controls.segment} role="tablist">{VIEWS.map(viewBtn)}</div>
         <div className={styles.bar}>
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => setDay(shiftDay(day, view === 'week' ? -7 : -1))} aria-label={svT('prev')}>‹</button>
-          <input className={controls.input} type="date" value={day} onChange={(e) => e.target.value && setDay(e.target.value)} aria-label={svT('date')} style={{ maxWidth: '11rem' }} />
+          <DateField className={controls.input} value={day} onChange={(e) => e.target.value && setDay(e.target.value)} aria-label={svT('date')} style={{ maxWidth: '11rem' }} />
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => setDay(shiftDay(day, view === 'week' ? 7 : 1))} aria-label={svT('next')}>›</button>
           <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => setDay(today)}>{svT('today')}</button>
-          <select className={controls.select} value={filter} onChange={(e) => setFilter(e.target.value)} aria-label={svT('staff')} style={{ maxWidth: '12rem' }}>
+          <SelectField className={controls.select} value={filter} onChange={(e) => setFilter(e.target.value)} aria-label={svT('staff')} style={{ maxWidth: '12rem' }}>
             <option value="">{svT('allStaff')}</option>
             {staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+          </SelectField>
           <button type="button" className={`${controls.btnPrimary} ${controls.btnSm}`} onClick={() => setDialog({ preset: { date: day, staff_id: filter || undefined } })} data-appt-new>+ {svT('new')}</button>
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => setDialog({ preset: { date: today, source: 'walk-in', start: fromMin(Math.ceil((new Date().getHours() * 60 + new Date().getMinutes()) / step) * step) } })}>+ {svT('walkIn')}</button>
           <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => setSetup(true)}>{svT('settings')}</button>
@@ -300,9 +303,9 @@ function DeskSettings({ settings, onClose, onSaved, notify }: { settings: Servic
   return (
     <Modal open onClose={onClose} size="lg" title={svT('settings')} footer={<><button type="button" className={controls.btnOutline} onClick={onClose}>{svT('close')}</button><button type="button" className={controls.btnPrimary} onClick={save}>{svT('save')}</button></>}>
       <div className={styles.form}>
-        <label className={controls.field}><span className={controls.label}>{svT('open')}</span><input className={controls.input} type="time" value={s.open} onChange={(e) => set({ open: e.target.value })} /></label>
-        <label className={controls.field}><span className={controls.label}>{svT('closeAt')}</span><input className={controls.input} type="time" value={s.close} onChange={(e) => set({ close: e.target.value })} /></label>
-        <label className={controls.field}><span className={controls.label}>{svT('step')}</span><select className={controls.select} value={s.step} onChange={(e) => set({ step: Number(e.target.value) })}>{[5, 10, 15, 30].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
+        <label className={controls.field}><span className={controls.label}>{svT('open')}</span><TimeField className={controls.input} value={s.open} onChange={(e) => set({ open: e.target.value })} /></label>
+        <label className={controls.field}><span className={controls.label}>{svT('closeAt')}</span><TimeField className={controls.input} value={s.close} onChange={(e) => set({ close: e.target.value })} /></label>
+        <label className={controls.field}><span className={controls.label}>{svT('step')}</span><SelectField className={controls.select} value={s.step} onChange={(e) => set({ step: Number(e.target.value) })}>{[5, 10, 15, 30].map((n) => <option key={n} value={n}>{n}</option>)}</SelectField></label>
       </div>
       <p className={controls.label}>{svT('closedDays')}</p>
       <div className={styles.actions}>{DAYS.map((d) => <label key={d} className={controls.check}><input type="checkbox" checked={s.closed.includes(d)} onChange={(e) => set({ closed: e.target.checked ? [...s.closed, d] : s.closed.filter((x) => x !== d) })} /> {dayLabel(d)}</label>)}</div>

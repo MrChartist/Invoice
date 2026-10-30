@@ -8,6 +8,7 @@ import { crT } from '../../i18n/areas/credit';
 import { distT } from '../../i18n/areas/distribution';
 import controls from '../../styles/controls.module.css';
 import own from './dist.module.css';
+import { SelectField } from '../ui/SelectField';
 
 interface AgentRow { id: string; name: string; active?: boolean }
 
@@ -30,10 +31,10 @@ export default function PosDistExtras({ client, record, unpaid, agentId, onAgent
       {agents.length > 0 && (
         <label className={controls.field}>
           <span className={controls.label}>{distT('salesman')}</span>
-          <select className={controls.select} value={agentId} onChange={(e) => onAgent(e.target.value)} data-pos-agent>
+          <SelectField className={controls.select} value={agentId} onChange={(e) => onAgent(e.target.value)} data-pos-agent>
             <option value="">{distT('noSalesman')}</option>
             {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
+          </SelectField>
         </label>
       )}
       {status && status.check.warnings.length > 0 && (

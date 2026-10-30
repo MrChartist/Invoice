@@ -22,6 +22,8 @@ import { CostSummary, VoucherList } from './shared';
 import { qtyText, type MfgContext } from './context';
 import controls from '../../styles/controls.module.css';
 import styles from './manufacturing.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 /**
  * Stock Journal (Tally Alt+F7): source → destination for conversions and repacking. Godown
@@ -164,21 +166,21 @@ function SjModal({ ctx, journal, onClose }: { ctx: MfgContext; journal: StockJou
         <div className={controls.row3}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="sj-date">{mfgT('date')}</label>
-            <input id="sj-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField id="sj-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           {mode === 'transfer' && multi && (
             <>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="sj-from">{mfgT('fromGodown')}</label>
-                <select id="sj-from" className={controls.select} value={from} onChange={(e) => setFrom(e.target.value)}>
+                <SelectField id="sj-from" className={controls.select} value={from} onChange={(e) => setFrom(e.target.value)}>
                   {ctx.godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                </select>
+                </SelectField>
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="sj-to">{mfgT('toGodown')}</label>
-                <select id="sj-to" className={controls.select} value={to} onChange={(e) => setTo(e.target.value)}>
+                <SelectField id="sj-to" className={controls.select} value={to} onChange={(e) => setTo(e.target.value)}>
                   {ctx.godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                </select>
+                </SelectField>
               </div>
             </>
           )}

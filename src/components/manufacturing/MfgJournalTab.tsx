@@ -24,6 +24,8 @@ import { CostSummary, VoucherList } from './shared';
 import { qtyText, type MfgContext } from './context';
 import controls from '../../styles/controls.module.css';
 import styles from './manufacturing.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 /** Manufacturing Journal (Tally Alt+F7): finished item + BOM + quantity → components, costs, value. */
 export function MfgJournalTab({ ctx }: { ctx: MfgContext }) {
@@ -180,21 +182,21 @@ function MfgModal({ ctx, voucher, prefill, onClose }: { ctx: MfgContext; voucher
         <div className={controls.row3}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="mfg-date">{mfgT('date')}</label>
-            <input id="mfg-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField id="mfg-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="mfg-item">{mfgT('finished')}</label>
-            <select id="mfg-item" className={controls.select} value={itemId} onChange={(e) => pickItem(e.target.value)} autoFocus>
+            <SelectField id="mfg-item" className={controls.select} value={itemId} onChange={(e) => pickItem(e.target.value)} autoFocus>
               <option value="">{mfgT('choose')}</option>
               {tracked.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-            </select>
+            </SelectField>
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="mfg-bom">{mfgT('bom')}</label>
-            <select id="mfg-bom" className={controls.select} value={bomId} onChange={(e) => { setBomId(e.target.value); fill(itemId, e.target.value, qty); }}>
+            <SelectField id="mfg-bom" className={controls.select} value={bomId} onChange={(e) => { setBomId(e.target.value); fill(itemId, e.target.value, qty); }}>
               <option value="">{mfgT('none')}</option>
               {itemBoms.map((b) => <option key={b.id} value={b.id}>{b.name}{b.is_default ? ` (${mfgT('defaultTag')})` : ''}</option>)}
-            </select>
+            </SelectField>
           </div>
         </div>
         <div className={controls.row3}>
@@ -206,10 +208,10 @@ function MfgModal({ ctx, voucher, prefill, onClose }: { ctx: MfgContext; voucher
           {multi && (
             <div className={controls.field}>
               <label className={controls.label} htmlFor="mfg-gd">{mfgT('godown')}</label>
-              <select id="mfg-gd" className={controls.select} value={godown} onChange={(e) => setGodown(e.target.value)}>
+              <SelectField id="mfg-gd" className={controls.select} value={godown} onChange={(e) => setGodown(e.target.value)}>
                 <option value="">-</option>
                 {ctx.godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
+              </SelectField>
             </div>
           )}
           {item?.track_batches && (
@@ -220,7 +222,7 @@ function MfgModal({ ctx, voucher, prefill, onClose }: { ctx: MfgContext; voucher
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="mfg-exp">{mfgT('expiry')}</label>
-                <input id="mfg-exp" type="date" className={controls.input} value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+                <DateField id="mfg-exp" className={controls.input} value={expiry} onChange={(e) => setExpiry(e.target.value)} />
               </div>
             </>
           )}

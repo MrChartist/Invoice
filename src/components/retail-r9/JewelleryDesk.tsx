@@ -36,6 +36,8 @@ import { downloadTextFile } from '../receivables/exportUtils';
 import { NumberInput } from '../ui/NumberInput';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Done = (msg: string, error?: boolean) => void;
 const VIEWS = [['rates', Scale], ['tags', Tags], ['oldgold', Landmark], ['karigar', Calculator]] as const;
@@ -47,15 +49,15 @@ const g3 = (x: number) => num(x).toFixed(3);
 const F = ({ l, w, children }: { l: string; w?: number; children: ReactNode }) => <label className={controls.field} style={w ? { maxWidth: w } : undefined}><span className={controls.label}>{l}</span>{children}</label>;
 const N = ({ l, v, set, w = 110, d }: { l: string; v: number; set: (n: number) => void; w?: number; d?: string }) => <F l={l} w={w}><NumberInput className={controls.input} value={v} onChange={set} data-jw={d} /></F>;
 const PuritySelect = ({ metal, value, set }: { metal: Metal; value: string; set: (p: string) => void }) => (
-  <F l={rteT('purity')} w={120}><select className={controls.select} value={value} onChange={(e) => set(e.target.value)} data-jw="purity">{PURITIES[metal].map(([k]) => <option key={k} value={k}>{purityLabel(metal, k)}</option>)}</select></F>
+  <F l={rteT('purity')} w={120}><SelectField className={controls.select} value={value} onChange={(e) => set(e.target.value)} data-jw="purity">{PURITIES[metal].map(([k]) => <option key={k} value={k}>{purityLabel(metal, k)}</option>)}</SelectField></F>
 );
 const MetalSelect = ({ value, set }: { value: Metal; set: (m: Metal) => void }) => (
-  <F l={rteT('metal')} w={110}><select className={controls.select} value={value} onChange={(e) => set(e.target.value as Metal)}>{METALS.map((m) => <option key={m} value={m}>{rteT(`m.${m}`)}</option>)}</select></F>
+  <F l={rteT('metal')} w={110}><SelectField className={controls.select} value={value} onChange={(e) => set(e.target.value as Metal)}>{METALS.map((m) => <option key={m} value={m}>{rteT(`m.${m}`)}</option>)}</SelectField></F>
 );
 const Making = ({ v, set }: { v: { basis: MakingBasis; value: number }; set: (m: { basis: MakingBasis; value: number }) => void }) => (
   <F l={rteT('making')} w={190}><span className={controls.row}>
     <NumberInput className={controls.input} value={v.value} onChange={(value) => set({ ...v, value })} data-jw="making" />
-    <select className={controls.select} value={v.basis} onChange={(e) => set({ ...v, basis: e.target.value as MakingBasis })}>{(['per_gram', 'percent', 'fixed'] as const).map((b) => <option key={b} value={b}>{rteT(`mk.${b}`)}</option>)}</select>
+    <SelectField className={controls.select} value={v.basis} onChange={(e) => set({ ...v, basis: e.target.value as MakingBasis })}>{(['per_gram', 'percent', 'fixed'] as const).map((b) => <option key={b} value={b}>{rteT(`mk.${b}`)}</option>)}</SelectField>
   </span></F>
 );
 const useRun = (onDone: Done) => {
@@ -109,7 +111,7 @@ function RatesView({ onDone }: { onDone: Done }) {
       <h3 className={surface.cardHeadIcon}><Scale size={16} aria-hidden="true" /> {rteT('ratesTitle')}</h3>
       <p className={surface.sectionNote}>{rteT('ratesHint')}</p>
       <div className={controls.row} style={row}>
-        <F l={rteT('date')} w={170}><input type="date" className={controls.input} value={day} onChange={(e) => setDay(e.target.value)} /></F>
+        <F l={rteT('date')} w={170}><DateField className={controls.input} value={day} onChange={(e) => setDay(e.target.value)} /></F>
         <button type="button" className={sm} onClick={() => setGrid(board(lastBoard(rates, day)))}>{rteT('copyYesterday')}</button>
         <button type="button" className={controls.btnPrimary} onClick={save} data-rates-save>{rteT('save')}</button>
       </div>
@@ -264,7 +266,7 @@ function OldGoldView({ onDone }: { onDone: Done }) {
         <N l={rteT('touch')} v={f.purity_pct} set={s('purity_pct')} w={90} d="og-touch" />
         <N l={rteT('melt')} v={f.melt_pct} set={s('melt_pct')} w={90} d="og-melt" />
         <N l={rteT('buyRate')} v={rate} set={s('rate')} d="og-rate" />
-        <F l={rteT('basis')} w={150}><select className={controls.select} value={f.basis} onChange={(e) => s('basis')(e.target.value as 'fine' | 'purity')}><option value="fine">{rteT('basisFine')}</option><option value="purity">{rteT('basisPurity')}</option></select></F>
+        <F l={rteT('basis')} w={150}><SelectField className={controls.select} value={f.basis} onChange={(e) => s('basis')(e.target.value as 'fine' | 'purity')}><option value="fine">{rteT('basisFine')}</option><option value="purity">{rteT('basisPurity')}</option></SelectField></F>
         <F l={rteT('test')} w={130}><input className={controls.input} value={f.test} placeholder={rteT('testPh')} onChange={(e) => s('test')(e.target.value)} /></F>
         <F l="PAN" w={130}><input className={controls.input} value={f.pan} maxLength={10} onChange={(e) => s('pan')(e.target.value.toUpperCase())} /></F>
         <label className={controls.hint}><input type="checkbox" checked={f.form60} onChange={(e) => s('form60')(e.target.checked)} /> {rteT('form60')}</label>
@@ -329,8 +331,8 @@ function KarigarView({ onDone }: { onDone: Done }) {
       <h3 className={surface.cardHeadIcon}><Calculator size={16} aria-hidden="true" /> {rteT('kTitle')}</h3>
       <p className={surface.sectionNote}>{rteT('kHint')}</p>
       <div className={controls.row} style={row} data-k-form>
-        <F l={rteT('karigar')}><select className={controls.select} value={f.karigar} onChange={(e) => s('karigar')(e.target.value)} data-k="karigar"><option value="">-</option>{[...d.vendors].sort((a, b) => Number(!!b.karigar) - Number(!!a.karigar)).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></F>
-        <F l={rteT('kind')} w={150}><select className={controls.select} value={f.kind} onChange={(e) => s('kind')(e.target.value as typeof f.kind)} data-k="kind">{(['issue', 'receipt', 'return_metal'] as const).map((k) => <option key={k} value={k}>{rteT(`k.${k}`)}</option>)}</select></F>
+        <F l={rteT('karigar')}><SelectField className={controls.select} value={f.karigar} onChange={(e) => s('karigar')(e.target.value)} data-k="karigar"><option value="">-</option>{[...d.vendors].sort((a, b) => Number(!!b.karigar) - Number(!!a.karigar)).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</SelectField></F>
+        <F l={rteT('kind')} w={150}><SelectField className={controls.select} value={f.kind} onChange={(e) => s('kind')(e.target.value as typeof f.kind)} data-k="kind">{(['issue', 'receipt', 'return_metal'] as const).map((k) => <option key={k} value={k}>{rteT(`k.${k}`)}</option>)}</SelectField></F>
         <F l={rteT('item')}><input className={controls.input} list="jw-k-items" value={f.item} onChange={(e) => s('item')(e.target.value)} data-k="item" /></F>
         <datalist id="jw-k-items">{d.items.map((i) => <option key={i.id} value={i.name} />)}</datalist>
         <MetalSelect value={f.metal} set={s('metal')} />
@@ -342,8 +344,8 @@ function KarigarView({ onDone }: { onDone: Done }) {
           <N l={rteT('pieces')} v={f.pieces} set={s('pieces')} w={80} />
           <N l={rteT('wastageAllowed')} v={f.wastage} set={s('wastage')} w={110} d="k-wastage" />
           <N l={rteT('labourRate')} v={f.labour} set={s('labour')} d="k-labour" />
-          <F l={rteT('basis')} w={130}><select className={controls.select} value={f.basis} onChange={(e) => s('basis')(e.target.value as typeof f.basis)}><option value="per_gram">{rteT('mk.per_gram')}</option><option value="per_piece">{rteT('perPiece')}</option></select></F>
-          <F l={rteT('consume')}><select className={controls.select} value={f.consume} onChange={(e) => s('consume')(e.target.value)}><option value="">-</option>{d.items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select></F>
+          <F l={rteT('basis')} w={130}><SelectField className={controls.select} value={f.basis} onChange={(e) => s('basis')(e.target.value as typeof f.basis)}><option value="per_gram">{rteT('mk.per_gram')}</option><option value="per_piece">{rteT('perPiece')}</option></SelectField></F>
+          <F l={rteT('consume')}><SelectField className={controls.select} value={f.consume} onChange={(e) => s('consume')(e.target.value)}><option value="">-</option>{d.items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</SelectField></F>
           <F l={rteT('bulk')}><textarea className={controls.input} rows={1} value={f.tags} placeholder="6.420, 0.380, 22K, AB12CD" onChange={(e) => s('tags')(e.target.value)} /></F>
         </>}
         <button type="button" className={controls.btnPrimary} disabled={!f.karigar || !(f.gross > 0 || f.net > 0)} onClick={save} data-k-save>{rteT('save')}</button>
@@ -413,11 +415,11 @@ export function JewelLineRow({ item, date }: { item: InvoiceItem; date: string }
   const warn = huidWarning({ name: item.name, jw }, date);
   return (
     <div className={controls.row} style={{ ...row, fontSize: 'var(--text-sm)' }} data-jewel-row>
-      <F l={rteT('tag')} w={130}><select className={controls.select} value={jw.tag ?? ''} data-jw="tag" onChange={(e) => {
+      <F l={rteT('tag')} w={130}><SelectField className={controls.select} value={jw.tag ?? ''} data-jw="tag" onChange={(e) => {
         const t = stock.find((x) => x.tag === e.target.value);
         if (t) apply(tagJewel(t, jw.rate));
         else set({ tag: undefined });
-      }}><option value="">{rteT('loose')}</option>{stock.map((t) => <option key={t.id} value={t.tag}>{t.tag} · {g3(t.net_wt)} g</option>)}</select></F>
+      }}><option value="">{rteT('loose')}</option>{stock.map((t) => <option key={t.id} value={t.tag}>{t.tag} · {g3(t.net_wt)} g</option>)}</SelectField></F>
       {!jw.tag && <><MetalSelect value={jw.metal} set={(metal) => set({ metal, purity: PURITIES[metal][metal === 'gold' ? 2 : 1][0] })} /><PuritySelect metal={jw.metal} value={jw.purity} set={(purity) => set({ purity })} /><N l={rteT('gross')} v={jw.gross_wt} set={(gross_wt) => set({ gross_wt })} w={90} d="line-gross" /><N l={rteT('stoneWt')} v={jw.stone_wt} set={(stone_wt) => set({ stone_wt })} w={90} /></>}
       <N l={rteT('wastage')} v={jw.wastage_pct} set={(wastage_pct) => set({ wastage_pct })} w={80} />
       <Making v={jw.making} set={(making) => set({ making })} />
@@ -438,7 +440,7 @@ function KycFields({ kyc, set }: { kyc?: SaleKyc; set: (k: SaleKyc | undefined) 
   return (
     <span className={controls.row} style={row} data-kyc>
       <F l="PAN" w={130}><input className={controls.input} value={kyc?.pan ?? ''} maxLength={10} onChange={(e) => set({ ...kyc, pan: e.target.value.toUpperCase() || undefined })} data-kyc-pan /></F>
-      <F l={rteT('declaration')} w={160}><select className={controls.select} value={kyc?.form ?? ''} onChange={(e) => set({ ...kyc, form: (e.target.value || undefined) as SaleKyc['form'] })}><option value="">-</option><option value="60">Form 60</option><option value="97">Form 97</option></select></F>
+      <F l={rteT('declaration')} w={160}><SelectField className={controls.select} value={kyc?.form ?? ''} onChange={(e) => set({ ...kyc, form: (e.target.value || undefined) as SaleKyc['form'] })}><option value="">-</option><option value="60">Form 60</option><option value="97">Form 97</option></SelectField></F>
     </span>
   );
 }

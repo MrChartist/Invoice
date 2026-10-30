@@ -9,6 +9,7 @@ import { useT } from '../../i18n';
 import { s2T } from '../../i18n/areas/sales-r2';
 import controls from '../../styles/controls.module.css';
 import styles from './ProposalSectionsCard.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /**
  * R2-B3 (quotations): proposal sections — cover / before items / after items blocks with plain text and
@@ -35,14 +36,14 @@ export function ProposalSectionsCard() {
         </div>
         <div className={styles.actions}>
           {snippets.length > 0 && (
-            <select className={controls.select} value="" aria-label={s2T('q.snippets')}
+            <SelectField className={controls.select} value="" aria-label={s2T('q.snippets')}
               onChange={(e) => {
                 const sn = snippets.find((x) => x.id === e.target.value);
                 if (sn) save([...sections, sectionFromSnippet(sn)]);
               }}>
               <option value="">{s2T('q.snippets')}</option>
               {snippets.map((sn) => <option key={sn.id} value={sn.id}>{sn.title || sn.body.slice(0, 30)}</option>)}
-            </select>
+            </SelectField>
           )}
           <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} data-add-section
             onClick={() => save([...sections, { id: generateId(), place: 'after', title: '', body: '' }])}>
@@ -54,14 +55,14 @@ export function ProposalSectionsCard() {
         <div key={s.id} className={styles.section}>
           <div className={styles.row}>
             <input className={controls.input} value={s.title} onChange={(e) => set(s.id, { title: e.target.value })} placeholder={s2T('q.sectionTitle')} aria-label={`${s2T('q.sectionTitle')} ${i + 1}`} data-section-title />
-            <select className={controls.select} value={s.place} onChange={(e) => set(s.id, { place: e.target.value as SectionPlace })} aria-label={`${s2T('q.place')} ${i + 1}`}>
+            <SelectField className={controls.select} value={s.place} onChange={(e) => set(s.id, { place: e.target.value as SectionPlace })} aria-label={`${s2T('q.place')} ${i + 1}`}>
               {SECTION_PLACES.map((p) => <option key={p} value={p}>{s2T(`q.place.${p}`)}</option>)}
-            </select>
+            </SelectField>
             {images.length > 0 && (
-              <select className={controls.select} value={s.attachment_id ?? ''} onChange={(e) => set(s.id, { attachment_id: e.target.value || undefined })} aria-label={`${s2T('q.image')} ${i + 1}`}>
+              <SelectField className={controls.select} value={s.attachment_id ?? ''} onChange={(e) => set(s.id, { attachment_id: e.target.value || undefined })} aria-label={`${s2T('q.image')} ${i + 1}`}>
                 <option value="">{s2T('q.noImage')}</option>
                 {images.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
+              </SelectField>
             )}
           </div>
           <textarea className={controls.textarea} rows={3} value={s.body} onChange={(e) => set(s.id, { body: e.target.value })} placeholder={s2T('q.sectionBody')} aria-label={`${s2T('q.sectionBody')} ${i + 1}`} />

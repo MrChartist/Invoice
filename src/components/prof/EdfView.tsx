@@ -15,6 +15,8 @@ import { Field } from './ps-ui';
 import { runner, type Notify } from './pc-run';
 import controls from '../../styles/controls.module.css';
 import css from './exportsvc.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 const sm = `${controls.btnOutline} ${controls.btnSm}`;
 
@@ -28,7 +30,7 @@ export default function EdfView({ notify }: { notify: Notify }) {
   return (
     <>
       <div className={css.bar}>
-        <Field label={pcT('month')}><input type="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} data-ps-edf-month /></Field>
+        <Field label={pcT('month')}><DateField mode="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} data-ps-edf-month /></Field>
         <button type="button" className={controls.btnPrimary} disabled={!drafts.length} onClick={() => run(() => String(edfDb.saveDrafts(month, drafts).length))} data-ps-edf-save>{pcT('toRegister')}</button>
       </div>
       <p className={controls.label}>{pcT('prepare', { month })}</p>
@@ -46,8 +48,8 @@ function RowEdit({ r, run }: { r: EdfRow; run: (fn: () => string | void) => bool
   return (
     <span className={css.bar}>
       <input className={controls.input} placeholder={pcT('edfNo')} aria-label={pcT('edfNo')} value={f.edf_no} onChange={(e) => setF({ ...f, edf_no: e.target.value })} data-ps-edf-no />
-      <input type="date" className={controls.input} aria-label={pcT('filedOn')} value={f.filed_on} onChange={(e) => setF({ ...f, filed_on: e.target.value })} />
-      <select className={controls.select} aria-label={pcT('authority')} value={f.authority} onChange={(e) => setF({ ...f, authority: e.target.value as EdfRow['authority'] })}>{(['ad_bank', 'stpi', 'sez'] as const).map((a) => <option key={a} value={a}>{pcT(`au.${a}`)}</option>)}</select>
+      <DateField className={controls.input} aria-label={pcT('filedOn')} value={f.filed_on} onChange={(e) => setF({ ...f, filed_on: e.target.value })} />
+      <SelectField className={controls.select} aria-label={pcT('authority')} value={f.authority} onChange={(e) => setF({ ...f, authority: e.target.value as EdfRow['authority'] })}>{(['ad_bank', 'stpi', 'sez'] as const).map((a) => <option key={a} value={a}>{pcT(`au.${a}`)}</option>)}</SelectField>
       {r.small_value_ok && <label className={controls.check}><input type="checkbox" checked={f.small} onChange={(e) => setF({ ...f, small: e.target.checked })} /> {pcT('small')}</label>}
       <button type="button" className={sm} onClick={() => run(() => void edfDb.save({ id: r.id, edf_no: f.edf_no.trim() || undefined, filed_on: f.filed_on || undefined, authority: f.authority, small_value_declared: f.small || undefined }))} data-ps-edf-row-save>{pcT('save')}</button>
       <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => window.confirm(pcT('remove')) && run(() => edfDb.remove(r.id))}>{pcT('remove')}</button>

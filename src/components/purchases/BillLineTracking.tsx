@@ -11,6 +11,8 @@ import { num } from '../../lib/invoice-calc';
 import { purT } from '../../i18n/areas/purchases';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 /**
  * R9 (RT-D1): the IMEI check digit (Luhn) — a warning only (MEIDs and odd stickers exist). Same rule as `rt-imei.ts`
@@ -49,7 +51,7 @@ export function BillLineTracking({ line, index, ctx, onPatch }: {
       {godowns.length > 1 && (
         <label className={controls.field}>
           <span className={controls.label}>{purT('godown')}</span>
-          <select
+          <SelectField
             className={controls.select}
             value={line.godown_id || ctx.defaultGodown}
             aria-label={purT('lineGodown', { n })}
@@ -68,7 +70,7 @@ export function BillLineTracking({ line, index, ctx, onPatch }: {
             }}
           >
             {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
+          </SelectField>
         </label>
       )}
       {item.track_batches && (
@@ -79,11 +81,11 @@ export function BillLineTracking({ line, index, ctx, onPatch }: {
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{purT('mfgDate')}</span>
-            <input type="date" className={controls.input} value={line.mfg_date ?? ''} aria-label={purT('lineMfg', { n })} onChange={(e) => onPatch({ mfg_date: e.target.value || undefined })} />
+            <DateField className={controls.input} value={line.mfg_date ?? ''} aria-label={purT('lineMfg', { n })} onChange={(e) => onPatch({ mfg_date: e.target.value || undefined })} />
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{purT('expiryDate')}</span>
-            <input type="date" className={controls.input} value={line.expiry_date ?? ''} aria-label={purT('lineExpiry', { n })} onChange={(e) => onPatch({ expiry_date: e.target.value || undefined })} />
+            <DateField className={controls.input} value={line.expiry_date ?? ''} aria-label={purT('lineExpiry', { n })} onChange={(e) => onPatch({ expiry_date: e.target.value || undefined })} />
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{line.unit?.trim() ? purT('mrpPer', { unit: line.unit.trim() }) : purT('mrp')}</span>

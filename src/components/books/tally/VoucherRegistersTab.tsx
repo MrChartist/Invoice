@@ -10,6 +10,7 @@ import surface from '../../../styles/surface.module.css';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
 import styles from './tally.module.css';
+import { SelectField } from '../../ui/SelectField';
 
 type Reg = 'optional' | 'memo' | 'postdated' | 'reversing';
 
@@ -51,10 +52,10 @@ export function VoucherRegistersTab({ today, notify, onChanged }: { today: strin
         {classes.length > 0 && reg !== 'postdated' && (
           <label className={books.toolbarGroup}>
             <span className={books.muted}>{tallyT('classLabel')}</span>
-            <select className={controls.select} value={cls} onChange={(e) => setCls(e.target.value)}>
+            <SelectField className={controls.select} value={cls} onChange={(e) => setCls(e.target.value)}>
               <option value="">{tallyT('allClasses')}</option>
               {classes.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+            </SelectField>
           </label>
         )}
       </div>

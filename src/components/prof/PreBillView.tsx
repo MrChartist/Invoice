@@ -19,6 +19,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field } from './ps-ui';
 import { runWith, type PsDeskProps } from './ps-run';
+import { SelectField } from '../ui/SelectField';
 
 // R14 PS-C4: foreign-currency rate cards converted at the currency master's rate (lazy; nothing without such a card).
 const FxRateRow = lazy(() => import('./FxRateRow'));
@@ -71,11 +72,11 @@ export default function PreBillView({ notify }: Pick<PsDeskProps, 'notify'>) {
     <div className={surface.card}>
       <div className={surface.cardBody}>
         <div className={controls.row3}>
-          <Field label={pwT('pick')}><select className={controls.select} value={key} onChange={(e) => { setKey(e.target.value); setProject(''); setEdits({}); }} data-prebill-client>{keys.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></Field>
-          <Field label={psT('matter')}><select className={controls.select} value={project} onChange={(e) => { setProject(e.target.value); setEdits({}); setMs([]); }} data-prebill-matter><option value="">{pwT('all')}</option>{matters.map((c) => <option key={c.id} value={c.id}>{c.ps?.code ? `${c.ps.code}: ` : ''}{c.name}</option>)}</select></Field>
+          <Field label={pwT('pick')}><SelectField className={controls.select} value={key} onChange={(e) => { setKey(e.target.value); setProject(''); setEdits({}); }} data-prebill-client>{keys.map(([k, n]) => <option key={k} value={k}>{n}</option>)}</SelectField></Field>
+          <Field label={psT('matter')}><SelectField className={controls.select} value={project} onChange={(e) => { setProject(e.target.value); setEdits({}); setMs([]); }} data-prebill-matter><option value="">{pwT('all')}</option>{matters.map((c) => <option key={c.id} value={c.id}>{c.ps?.code ? `${c.ps.code}: ` : ''}{c.name}</option>)}</SelectField></Field>
           {eng && <Field label={psT('engagement')}><input className={controls.input} readOnly value={`${eng.number} · ${psT(`m.${eng.model}`)}`} /></Field>}
           {(!eng || eng.model === 'hourly' || eng.model === 'blended') && <Field label={pwT('target')}><input type="number" min={0} className={controls.input} value={target} onChange={(e) => setTarget(e.target.value)} data-prebill-target /></Field>}
-          <Field label={psT('reason')}><select className={controls.select} value={reason} onChange={(e) => setReason(e.target.value)}><option value="">{psT('none')}</option>{wipRules().reasons.map((r) => <option key={r} value={r}>{r}</option>)}</select></Field>
+          <Field label={psT('reason')}><SelectField className={controls.select} value={reason} onChange={(e) => setReason(e.target.value)}><option value="">{psT('none')}</option>{wipRules().reasons.map((r) => <option key={r} value={r}>{r}</option>)}</SelectField></Field>
         </div>
         {eng?.model === 'milestone' && (
           <div className={controls.row}>

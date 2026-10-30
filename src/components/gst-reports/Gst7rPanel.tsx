@@ -66,6 +66,8 @@ import local from './gst-reports.module.css';
 import styles from './gst-setoff.module.css';
 import { useT } from '../../i18n';
 import { r7T } from '../../i18n/areas/gst-tds-7r';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 export type Gst7rView = 'cashref' | 'isd' | 'ewbcons' | 'bygstin';
 
@@ -201,17 +203,17 @@ function CashRefundsView({ period, gstin, g1, g3, notify }: Gst7rPanelProps) {
       <h3 className={local.tbHeading}>{r7T('pmt09Title')}</h3>
       <p className={styles.muted}>{r7T('pmt09Hint')}</p>
       <div className={styles.bar}>
-        <label>{r7T('date')}<input type="date" className={controls.input} value={pmt.date} onChange={(e) => setPmt({ ...pmt, date: e.target.value })} /></label>
+        <label>{r7T('date')}<DateField className={controls.input} value={pmt.date} onChange={(e) => setPmt({ ...pmt, date: e.target.value })} /></label>
         <label>{r7T('pmtFrom')}
           <span className={styles.actions}>
-            <select aria-label={r7T('pmtFromHead')} className={controls.select} value={pmt.fromHead} onChange={(e) => setPmt({ ...pmt, fromHead: e.target.value as GstHead })}>{GST_HEADS.map((h) => <option key={h} value={h}>{GST_HEAD_LABELS[h]}</option>)}</select>
-            <select aria-label={r7T('pmtFromMinor')} className={controls.select} value={pmt.fromMinor} onChange={(e) => setPmt({ ...pmt, fromMinor: e.target.value as MinorHead })}>{MINOR_HEADS.map((m) => <option key={m} value={m}>{MINOR_HEAD_LABELS[m]}</option>)}</select>
+            <SelectField aria-label={r7T('pmtFromHead')} className={controls.select} value={pmt.fromHead} onChange={(e) => setPmt({ ...pmt, fromHead: e.target.value as GstHead })}>{GST_HEADS.map((h) => <option key={h} value={h}>{GST_HEAD_LABELS[h]}</option>)}</SelectField>
+            <SelectField aria-label={r7T('pmtFromMinor')} className={controls.select} value={pmt.fromMinor} onChange={(e) => setPmt({ ...pmt, fromMinor: e.target.value as MinorHead })}>{MINOR_HEADS.map((m) => <option key={m} value={m}>{MINOR_HEAD_LABELS[m]}</option>)}</SelectField>
           </span>
         </label>
         <label>{r7T('pmtTo')}
           <span className={styles.actions}>
-            <select aria-label={r7T('pmtToHead')} className={controls.select} value={pmt.toHead} onChange={(e) => setPmt({ ...pmt, toHead: e.target.value as GstHead })}>{GST_HEADS.map((h) => <option key={h} value={h}>{GST_HEAD_LABELS[h]}</option>)}</select>
-            <select aria-label={r7T('pmtToMinor')} className={controls.select} value={pmt.toMinor} onChange={(e) => setPmt({ ...pmt, toMinor: e.target.value as MinorHead })}>{MINOR_HEADS.map((m) => <option key={m} value={m}>{MINOR_HEAD_LABELS[m]}</option>)}</select>
+            <SelectField aria-label={r7T('pmtToHead')} className={controls.select} value={pmt.toHead} onChange={(e) => setPmt({ ...pmt, toHead: e.target.value as GstHead })}>{GST_HEADS.map((h) => <option key={h} value={h}>{GST_HEAD_LABELS[h]}</option>)}</SelectField>
+            <SelectField aria-label={r7T('pmtToMinor')} className={controls.select} value={pmt.toMinor} onChange={(e) => setPmt({ ...pmt, toMinor: e.target.value as MinorHead })}>{MINOR_HEADS.map((m) => <option key={m} value={m}>{MINOR_HEAD_LABELS[m]}</option>)}</SelectField>
           </span>
         </label>
         <label>{r7T('amount')}<input type="number" min={0} step="0.01" className={controls.input} value={pmt.amount} onChange={(e) => setPmt({ ...pmt, amount: e.target.value })} /></label>
@@ -290,17 +292,17 @@ function CashRefundsView({ period, gstin, g1, g3, notify }: Gst7rPanelProps) {
       {step && (
         <div className={styles.bar} data-refund-step>
           <label>{r7T('rfNewStatus')}
-            <select className={controls.select} value={step.status} onChange={(e) => setStep({ ...step, status: e.target.value as RefundStatus })}>
+            <SelectField className={controls.select} value={step.status} onChange={(e) => setStep({ ...step, status: e.target.value as RefundStatus })}>
               {nextRefundStatuses(refunds.find((x) => x.id === step.id)?.status ?? 'FILED').map((x) => <option key={x} value={x}>{r7T(STATUS_KEY[x])} ({REFUND_STATUS_FORM[x]})</option>)}
-            </select>
+            </SelectField>
           </label>
-          <label>{r7T('date')}<input type="date" className={controls.input} value={step.date} onChange={(e) => setStep({ ...step, date: e.target.value })} /></label>
+          <label>{r7T('date')}<DateField className={controls.input} value={step.date} onChange={(e) => setStep({ ...step, date: e.target.value })} /></label>
           {(step.status === 'SANCTIONED' || step.status === 'PROVISIONAL' || step.status === 'PAID') && <HeadInputs idPrefix="rf-step" value={step.sanctioned} onChange={(v) => setStep({ ...step, sanctioned: v })} />}
           {step.status === 'PAID' && (
             <label>{r7T('rfBank')}
-              <select className={controls.select} value={step.bank} onChange={(e) => setStep({ ...step, bank: e.target.value })}>
+              <SelectField className={controls.select} value={step.bank} onChange={(e) => setStep({ ...step, bank: e.target.value })}>
                 {banks.map((b) => <option key={b.id} value={b.id}>{b.code} · {b.name}</option>)}
-              </select>
+              </SelectField>
             </label>
           )}
           <span className={styles.actions}>
@@ -335,14 +337,14 @@ function CashRefundsView({ period, gstin, g1, g3, notify }: Gst7rPanelProps) {
       <div className={styles.formGrid}>
         <label className={controls.field}>
           <span className={controls.label}>{r7T('rfCategory')}</span>
-          <select className={controls.select} value={claim.category} onChange={(e) => setClaim({ ...claim, category: e.target.value as RefundCategory })}>
+          <SelectField className={controls.select} value={claim.category} onChange={(e) => setClaim({ ...claim, category: e.target.value as RefundCategory })}>
             {REFUND_CATEGORIES.map((c) => <option key={c} value={c}>{r7T(CATEGORY_KEY[c])}</option>)}
-          </select>
+          </SelectField>
         </label>
-        <label className={controls.field}><span className={controls.label}>{r7T('rfFrom')}</span><input type="date" className={controls.input} value={claim.from} onChange={(e) => setClaim({ ...claim, from: e.target.value })} /></label>
-        <label className={controls.field}><span className={controls.label}>{r7T('rfTo')}</span><input type="date" className={controls.input} value={claim.to} onChange={(e) => setClaim({ ...claim, to: e.target.value })} /></label>
-        <label className={controls.field}><span className={controls.label}>{r7T('rfRelevant')}</span><input type="date" className={controls.input} value={claim.relevant} onChange={(e) => setClaim({ ...claim, relevant: e.target.value })} /></label>
-        <label className={controls.field}><span className={controls.label}>{r7T('rfFiledOn')}</span><input type="date" className={controls.input} value={claim.filed} onChange={(e) => setClaim({ ...claim, filed: e.target.value })} /></label>
+        <label className={controls.field}><span className={controls.label}>{r7T('rfFrom')}</span><DateField className={controls.input} value={claim.from} onChange={(e) => setClaim({ ...claim, from: e.target.value })} /></label>
+        <label className={controls.field}><span className={controls.label}>{r7T('rfTo')}</span><DateField className={controls.input} value={claim.to} onChange={(e) => setClaim({ ...claim, to: e.target.value })} /></label>
+        <label className={controls.field}><span className={controls.label}>{r7T('rfRelevant')}</span><DateField className={controls.input} value={claim.relevant} onChange={(e) => setClaim({ ...claim, relevant: e.target.value })} /></label>
+        <label className={controls.field}><span className={controls.label}>{r7T('rfFiledOn')}</span><DateField className={controls.input} value={claim.filed} onChange={(e) => setClaim({ ...claim, filed: e.target.value })} /></label>
         <label className={controls.field}><span className={controls.label}>ARN</span><input className={controls.input} value={claim.arn} onChange={(e) => setClaim({ ...claim, arn: e.target.value })} /></label>
         <HeadInputs idPrefix="rf-new" value={claim.amounts} onChange={(v) => setClaim({ ...claim, amounts: v })} />
       </div>
@@ -426,17 +428,17 @@ function IsdView({ period, gstin, invoices, notify }: Gst7rPanelProps) {
       <Disclaimer text={`${r7T('isdIntro')} ${ISD_DISCLAIMER}`} />
       <div className={styles.bar}>
         <label>{r7T('isdRole')}
-          <select className={controls.select} value={role} onChange={(e) => {
+          <SelectField className={controls.select} value={role} onChange={(e) => {
             const r = e.target.value as 'ISD' | 'UNIT';
             setRole(r);
             setForm(blank(r === 'ISD' ? 'INWARD' : 'RECEIVED'));
           }}>
             <option value="ISD">{r7T('isdRoleIsd')}</option>
             <option value="UNIT">{r7T('isdRoleUnit')}</option>
-          </select>
+          </SelectField>
         </label>
         {role === 'ISD' && <label>{r7T('isdGstin')}<input className={`${controls.input} ${controls.inputMono}`} maxLength={15} value={isdGstin} onChange={(e) => setIsdGstin(e.target.value.toUpperCase())} /></label>}
-        {role === 'ISD' && <label>{r7T('isdMonth')}<input type="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} /></label>}
+        {role === 'ISD' && <label>{r7T('isdMonth')}<DateField mode="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} /></label>}
       </div>
 
       <h3 className={local.tbHeading}>{role === 'ISD' ? r7T('isdInwardTitle') : r7T('isdReceivedTitle')}</h3>
@@ -444,13 +446,13 @@ function IsdView({ period, gstin, invoices, notify }: Gst7rPanelProps) {
       <div className={styles.formGrid}>
         {role === 'ISD' && (
           <label className={controls.field}><span className={controls.label}>{r7T('isdKind')}</span>
-            <select className={controls.select} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as IsdKind })}>
+            <SelectField className={controls.select} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as IsdKind })}>
               <option value="INWARD">{r7T('isdKindInward')}</option>
               <option value="DISTRIBUTION">{r7T('isdKindDist')}</option>
-            </select>
+            </SelectField>
           </label>
         )}
-        <label className={controls.field}><span className={controls.label}>{r7T('date')}</span><input type="date" className={controls.input} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label>
+        <label className={controls.field}><span className={controls.label}>{r7T('date')}</span><DateField className={controls.input} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label>
         {form.kind !== 'DISTRIBUTION' && <label className={controls.field}><span className={controls.label}>{r7T('isdNumber')}</span><input className={controls.input} value={form.number} onChange={(e) => setForm({ ...form, number: e.target.value })} /></label>}
         {role === 'UNIT' && <label className={controls.field}><span className={controls.label}>{r7T('isdDistributor')}</span><input className={`${controls.input} ${controls.inputMono}`} maxLength={15} value={form.isd_gstin} onChange={(e) => setForm({ ...form, isd_gstin: e.target.value.toUpperCase() })} /></label>}
         <label className={controls.field}><span className={controls.label}>{form.kind === 'INWARD' ? r7T('isdSupplierGstin') : form.kind === 'DISTRIBUTION' ? r7T('isdRecipientGstin') : r7T('isdOurGstin')}</span><input className={`${controls.input} ${controls.inputMono}`} maxLength={15} value={form.party_gstin} onChange={(e) => setForm({ ...form, party_gstin: e.target.value.toUpperCase() })} /></label>
@@ -528,7 +530,7 @@ function IsdView({ period, gstin, invoices, notify }: Gst7rPanelProps) {
           )}
           {plan.warnings.length > 0 && <ul className={styles.muted}>{plan.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>}
           <div className={styles.bar}>
-            <label>{r7T('isdDistDate')}<input type="date" className={controls.input} value={distDate} onChange={(e) => setDistDate(e.target.value)} /></label>
+            <label>{r7T('isdDistDate')}<DateField className={controls.input} value={distDate} onChange={(e) => setDistDate(e.target.value)} /></label>
             <button type="button" className={`${controls.btn} ${controls.btnPrimary}`} disabled={!plan.shares.length} onClick={() => run(() => issueDistribution(plan.shares, { date: distDate, month, isdGstin }), r7T('isdIssued'))}>{r7T('isdIssue')}</button>
           </div>
 
@@ -574,19 +576,19 @@ function ConsolidatedEwbView({ gstin, invoices, notify }: Gst7rPanelProps) {
         <label className={controls.field}><span className={controls.label}>{r7T('cewbUser')}</span><input className={`${controls.input} ${controls.inputMono}`} maxLength={15} value={form.userGstin} onChange={(e) => setForm({ ...form, userGstin: e.target.value.toUpperCase() })} /></label>
         <label className={controls.field}><span className={controls.label}>{r7T('cewbPlace')}</span><input className={controls.input} maxLength={50} value={form.fromPlace} onChange={(e) => setForm({ ...form, fromPlace: e.target.value })} /></label>
         <label className={controls.field}><span className={controls.label}>{r7T('cewbState')}</span>
-          <select className={controls.select} value={form.fromState} onChange={(e) => setForm({ ...form, fromState: e.target.value })}>
+          <SelectField className={controls.select} value={form.fromState} onChange={(e) => setForm({ ...form, fromState: e.target.value })}>
             <option value="">-</option>
             {INDIAN_STATES.map((s) => <option key={s.code} value={s.code}>{s.code} · {s.name}</option>)}
-          </select>
+          </SelectField>
         </label>
         <label className={controls.field}><span className={controls.label}>{r7T('cewbMode')}</span>
-          <select className={controls.select} value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value as EwayTransMode })}>
+          <SelectField className={controls.select} value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value as EwayTransMode })}>
             {(['ROAD', 'RAIL', 'AIR', 'SHIP'] as const).map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
+          </SelectField>
         </label>
         <label className={controls.field}><span className={controls.label}>{r7T('cewbVehicle')}</span><input className={`${controls.input} ${controls.inputMono}`} value={form.vehicle} onChange={(e) => setForm({ ...form, vehicle: e.target.value.toUpperCase() })} /></label>
         {form.mode !== 'ROAD' && <label className={controls.field}><span className={controls.label}>{r7T('cewbDocNo')}</span><input className={controls.input} value={form.docNo} onChange={(e) => setForm({ ...form, docNo: e.target.value })} /></label>}
-        {form.mode !== 'ROAD' && <label className={controls.field}><span className={controls.label}>{r7T('cewbDocDate')}</span><input type="date" className={controls.input} value={form.docDate} onChange={(e) => setForm({ ...form, docDate: e.target.value })} /></label>}
+        {form.mode !== 'ROAD' && <label className={controls.field}><span className={controls.label}>{r7T('cewbDocDate')}</span><DateField className={controls.input} value={form.docDate} onChange={(e) => setForm({ ...form, docDate: e.target.value })} /></label>}
       </div>
       <h3 className={local.tbHeading}>{r7T('cewbPick')}</h3>
       <div className={styles.scroll}>

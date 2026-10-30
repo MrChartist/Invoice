@@ -10,6 +10,7 @@ import { useT } from '../../i18n';
 import { rT } from '../../i18n/areas/restaurant';
 import controls from '../../styles/controls.module.css';
 import styles from './restaurant.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export interface ModifiersPanelProps {
   groups: readonly ModifierGroup[];
@@ -51,10 +52,10 @@ export function ModifiersPanel({ groups, catalog, stockGroups, onSave }: Modifie
               <label className={cn(controls.field, styles.narrow)}><span className={controls.label}>{rT('optPrice')}</span><NumberInput className={controls.input} value={o.price} onChange={(v) => patch(g.id, (x) => ({ ...x, options: x.options.map((y) => (y.id === o.id ? { ...y, price: Math.max(v, 0) } : y)) }))} /></label>
               <label className={controls.field}>
                 <span className={controls.label}>{rT('optItem')}</span>
-                <select className={controls.select} value={o.item_id ?? ''} onChange={(e) => patch(g.id, (x) => ({ ...x, options: x.options.map((y) => (y.id === o.id ? { ...y, item_id: e.target.value || undefined } : y)) }))}>
+                <SelectField className={controls.select} value={o.item_id ?? ''} onChange={(e) => patch(g.id, (x) => ({ ...x, options: x.options.map((y) => (y.id === o.id ? { ...y, item_id: e.target.value || undefined } : y)) }))}>
                   <option value="">{rT('none')}</option>
                   {catalog.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                </SelectField>
               </label>
               <button type="button" className={controls.btnIcon} onClick={() => patch(g.id, (x) => ({ ...x, options: x.options.filter((y) => y.id !== o.id) }))} aria-label={rT('cancel')}><Trash2 size={14} /></button>
             </div>

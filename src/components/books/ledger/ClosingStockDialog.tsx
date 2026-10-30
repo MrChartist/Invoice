@@ -14,6 +14,7 @@ import { useT } from '../../../i18n';
 import { Modal } from '../../ui/Modal';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
+import { DateField } from '../../ui/DateField';
 
 type Mode = ClosingStockMode | 'auto';
 
@@ -96,7 +97,7 @@ export function ClosingStockDialog({ onClose, onSaved }: { onClose: () => void; 
               <div key={i} className={controls.row}>
                 <div className={controls.field}>
                   <label className={controls.label} htmlFor={`${uid}-d${i}`}>{reportsT('stockAsAt')}</label>
-                  <input id={`${uid}-d${i}`} className={controls.input} type="date" value={e.date} onChange={(ev) => setEntries((l) => l.map((x, k) => (k === i ? { ...x, date: ev.target.value } : x)))} />
+                  <DateField id={`${uid}-d${i}`} className={controls.input} value={e.date} onChange={(ev) => setEntries((l) => l.map((x, k) => (k === i ? { ...x, date: ev.target.value } : x)))} />
                 </div>
                 <div className={controls.field}>
                   <label className={controls.label} htmlFor={`${uid}-v${i}`}>{reportsT('stockValue')}</label>

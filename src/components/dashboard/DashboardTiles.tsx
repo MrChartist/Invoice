@@ -24,6 +24,7 @@ import own from './tiles.module.css';
 import { SYS, type SysColour } from '../ui/sys-colour';
 import { Skeleton } from '../ui/Skeleton';
 import { defineArea } from '../../i18n/area';
+import { SelectField } from '../ui/SelectField';
 
 const ApprovalsPanel = lazy(() => import('../approvals/ApprovalsPanel').then((m) => ({ default: m.ApprovalsPanel })));
 const BranchesPanel = lazy(() => import('../branches/BranchesPanel').then((m) => ({ default: m.BranchesPanel })));
@@ -134,11 +135,11 @@ export function DashboardTiles() {
         <h2 className={own.title}><Boxes size={16} aria-hidden="true" /> {tilesT('title')}</h2>
         <div className={own.tools}>
           {branches.length > 0 && (
-            <select className={controls.select} value={branch} onChange={(e) => setBranch(e.target.value)} aria-label={tilesT('branchFilter')}>
+            <SelectField className={controls.select} value={branch} onChange={(e) => setBranch(e.target.value)} aria-label={tilesT('branchFilter')}>
               <option value="">{tilesT('allBranches')}</option>
               {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               <option value={UNASSIGNED}>{tilesT('noBranch')}</option>
-            </select>
+            </SelectField>
           )}
           <details className={own.picker}>
             <summary>{tilesT('customise')}</summary>

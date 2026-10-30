@@ -72,7 +72,8 @@ import { cleanAltUnits, lineUnitPatch, roundTypedQty, unitChoices, unitsDb } fro
 import { canOverrideCredit, creditStatus, recordCreditOverride } from '../lib/credit-policy'; // 8.80
 import { saltIndex, saltOf } from '../lib/salt-search'; // 8.84
 import { crT } from '../i18n/areas/credit';
-import { rPosT } from '../i18n/areas/restaurant-pos'; // R3-A
+import { rPosT } from '../i18n/areas/restaurant-pos'; import { SelectField } from '../components/ui/SelectField';
+// R3-A
 
 const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
 const ZReportModal = lazy(() => import('../components/pos/ZReportModal').then((m) => ({ default: m.ZReportModal })));
@@ -987,9 +988,9 @@ export function Pos() {
                           {[l.hsn && `HSN ${l.hsn}`, typeof l.tax_rate === 'number' && record.gst_mode !== 'NONE' && `GST ${l.tax_rate}%`, lvl && posT('lineStock', { n: lvl.qty, unit: lvl.unit })].filter(Boolean).join(' · ')}
                         </span>
                         {stockItem && !stockItem.track_serials && !free && cleanAltUnits(stockItem.alt_units, stockItem.unit || 'NOS') && (
-                          <select className={cn(controls.select, styles.unitSel)} value={l.unit || stockItem.unit} onChange={(e) => setUnit(l.id, stockItem, e.target.value)} aria-label={unitT('lineUnit', { n: n + 1 })}>
+                          <SelectField className={cn(controls.select, styles.unitSel)} value={l.unit || stockItem.unit} onChange={(e) => setUnit(l.id, stockItem, e.target.value)} aria-label={unitT('lineUnit', { n: n + 1 })}>
                             {unitChoices(stockItem).map((c) => <option key={c.unit} value={c.unit}>{c.unit}</option>)}
-                          </select>
+                          </SelectField>
                         )}
                         {(l.price_basis || free) && <span className={styles.chip}><Tags size={12} aria-hidden="true" /> {free ? posT('free') : posT('basisPrice', { basis: l.price_basis ?? '' })}</span>}
                       </div>
@@ -1096,13 +1097,13 @@ export function Pos() {
               {data.store && (
                 <label className={controls.field}>
                   <span className={controls.label}><Store size={12} aria-hidden="true" /> {storeT('counter')}</span>
-                  <select className={controls.select} value={counterId} data-pos-branch onChange={(e) => {
+                  <SelectField className={controls.select} value={counterId} data-pos-branch onChange={(e) => {
                     setCounterId(e.target.value);
                     writePosBranch(e.target.value);
                   }}>
                     <option value="">{storeT('none')}</option>
                     {data.branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </select>
+                  </SelectField>
                 </label>
               )}
               {party.client ? (

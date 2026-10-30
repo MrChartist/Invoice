@@ -38,6 +38,8 @@ import { pkT } from '../../i18n/areas/dispatch-r2';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './dispatch.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Notify = (msg: string, tone?: 'success' | 'error' | 'info') => void;
 const n3 = (n: number) => n.toLocaleString('en-IN', { maximumFractionDigits: 3 });
@@ -141,10 +143,10 @@ export function PackingListDialog({ invoice, onClose, notify }: { invoice: Invoi
             {types.length > 0 && (
               <label className={controls.field}>
                 <span className={controls.label}>{pkT('packageType')}</span>
-                <select className={controls.select} value={typeId} onChange={(e) => setTypeId(e.target.value)}>
+                <SelectField className={controls.select} value={typeId} onChange={(e) => setTypeId(e.target.value)}>
                   <option value="">{pkT('customType')}</option>
                   {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
+                </SelectField>
               </label>
             )}
             <button type="button" className={controls.btnPrimary} onClick={startNew} data-packing-new>
@@ -159,7 +161,7 @@ export function PackingListDialog({ invoice, onClose, notify }: { invoice: Invoi
             <div className={styles.row}>
               <label className={controls.field}>
                 <span className={controls.label}>{pkT('date')}</span>
-                <input type="date" className={controls.input} value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
+                <DateField className={controls.input} value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
               </label>
               <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => auto('per-line')}>{pkT('autoPerLine')}</button>
               <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => auto('all-in-one')}>{pkT('autoAllInOne')}</button>

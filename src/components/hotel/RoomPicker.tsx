@@ -13,6 +13,7 @@ import { hotelDb } from '../../lib/hotel/hotel-store';
 import { errText, printHtml } from '../transport/shared';
 import controls from '../../styles/controls.module.css';
 import { escHtml as esc } from '../../lib/html-esc';
+import { SelectField } from '../ui/SelectField';
 
 
 export default function RoomPicker({ order, record, onDone, notify }: { order?: string; record?: InvoiceRecord; onDone: () => void; notify: (m: string, tone?: 'success' | 'error') => void }) {
@@ -32,9 +33,9 @@ export default function RoomPicker({ order, record, onDone, notify }: { order?: 
     }
   };
   return (
-    <select className={controls.select} value="" onChange={(e) => e.target.value && pick(Number(e.target.value))} aria-label={bT('roomCharge')} data-room-tender>
+    <SelectField className={controls.select} value="" onChange={(e) => e.target.value && pick(Number(e.target.value))} aria-label={bT('roomCharge')} data-room-tender>
       <option value="">{rooms.length ? `${hT('room')} →` : bT('noRooms')}</option>
       {rooms.map((r, i) => <option key={r.lineId} value={i}>{r.room} · {r.guest}</option>)}
-    </select>
+    </SelectField>
   );
 }

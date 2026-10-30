@@ -19,6 +19,7 @@ import { carryForward, carryForwardCsv, fyEndOf, fyId, type YearEndStepId } from
 import { loadYearEnd, lockYear, postClosingStock, postProvisions, saveYearEndMark, stopValuingStock } from '../../lib/year-end-store';
 import controls from '../../styles/controls.module.css';
 import styles from '../import/TallyImport.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export interface YearEndWizardProps {
   open: boolean;
@@ -109,10 +110,10 @@ export function YearEndWizard({ open, onClose, notify }: YearEndWizardProps) {
               <div key={i} className={styles.inline}>
                 <label className={controls.field}>
                   <span className={controls.label}>{migT('provAccount')}</span>
-                  <select className={controls.select} value={p.account_id} onChange={(e) => setProv(prov.map((x, n) => (n === i ? { ...x, account_id: e.target.value } : x)))}>
+                  <SelectField className={controls.select} value={p.account_id} onChange={(e) => setProv(prov.map((x, n) => (n === i ? { ...x, account_id: e.target.value } : x)))}>
                     <option value="">-</option>
                     {expenseAccounts.map((a) => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
-                  </select>
+                  </SelectField>
                 </label>
                 <label className={controls.field}>
                   <span className={controls.label}>{migT('provAmount')}</span>
@@ -194,9 +195,9 @@ export function YearEndWizard({ open, onClose, notify }: YearEndWizardProps) {
       <div className={styles.stack}>
         <label className={controls.field} style={{ maxWidth: '14rem' }}>
           <span className={controls.label}>{migT('yeYear')}</span>
-          <select className={controls.select} value={fy} onChange={(e) => setFy(Number(e.target.value))}>
+          <SelectField className={controls.select} value={fy} onChange={(e) => setFy(Number(e.target.value))}>
             {[current, current - 1, current - 2, current - 3].map((y) => <option key={y} value={y}>{fyId(y)}</option>)}
-          </select>
+          </SelectField>
         </label>
         {error && <p className={styles.errBox} role="alert">{error}</p>}
         {state?.steps.map((s, i) => (

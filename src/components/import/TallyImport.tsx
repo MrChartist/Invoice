@@ -20,6 +20,8 @@ import { applyTallyImport, loadExistingBooks, openingCheck, type ImportResult, t
 import { storedBooksBegin } from '../../lib/ledger/openings';
 import controls from '../../styles/controls.module.css';
 import styles from './TallyImport.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 const MAX_FILE_MB = 128;
 const ROWS = 300;
@@ -192,7 +194,7 @@ export function TallyImport({ open, onClose, notify }: TallyImportProps) {
         <div className={styles.options}>
           <label className={controls.field}>
             <span className={controls.label}>{migT('booksBegin')}</span>
-            <input type="date" className={controls.input} value={booksBegin} onChange={(e) => setBooksBegin(e.target.value)} />
+            <DateField className={controls.input} value={booksBegin} onChange={(e) => setBooksBegin(e.target.value)} />
             <span className={controls.hint}>{migT('booksBeginHint')}</span>
           </label>
           {(['includeOpenings', 'includeVouchers', 'includeStock'] as const).map((k) => (
@@ -244,11 +246,11 @@ export function TallyImport({ open, onClose, notify }: TallyImportProps) {
                         {t.kind === 'client' || t.kind === 'vendor' ? (
                           <span className={styles.chip}>{migT(t.kind === 'client' ? 'tClient' : 'tVendor')}{t.existingId ? ` · ${migT('existingWord')}` : ''}</span>
                         ) : (
-                          <select className={controls.select} aria-label={`${migT('mapAs')} ${l.rec.name}`} value={mapTo[key] ?? (t.existing === true ? t.accountId : '')}
+                          <SelectField className={controls.select} aria-label={`${migT('mapAs')} ${l.rec.name}`} value={mapTo[key] ?? (t.existing === true ? t.accountId : '')}
                             onChange={(e) => setMapTo((m) => { const n = { ...m }; if (e.target.value) n[key] = e.target.value; else delete n[key]; return n; })}>
                             <option value="">{migT('mapNew')}</option>
                             {accountChoices.map((a) => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
-                          </select>
+                          </SelectField>
                         )}
                       </td>
                       <td className={styles.num}>{drcr(l.rec.opening)}</td>

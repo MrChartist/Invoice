@@ -24,6 +24,8 @@ import { methodLabel } from '../../i18n/labels';
 import controls from '../../styles/controls.module.css';
 import styles from './PaymentModal.module.css';
 import { printWhenReady } from '../../lib/print-fonts';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 // R4-B1: 'Gift voucher' pays with a voucher code (no money moves: the ledger debits the voucher liability).
 const GV_METHOD = 'Gift voucher';
@@ -271,17 +273,17 @@ export function PaymentModal({ invoice, onClose, onChanged }: PaymentModalProps)
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{t('pay.dateReceived')}</span>
-              <input className={controls.input} type="date" value={date} max={todayInput()} onChange={(e) => setDate(e.target.value)} />
+              <DateField className={controls.input} value={date} max={todayInput()} onChange={(e) => setDate(e.target.value)} />
             </label>
           </div>
           <div className={controls.row}>
             <label className={controls.field}>
               <span className={controls.label}>{t('pay.method')}</span>
-              <select className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)}>
+              <SelectField className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)}>
                 {METHODS.map((m) => (
                   <option key={m} value={m}>{methodLabel(m)}</option>
                 ))}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{t('pay.referenceOptional', { label: referenceLabel(method) })}</span>

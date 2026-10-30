@@ -5,6 +5,7 @@ import { useT } from '../../i18n';
 import { purT } from '../../i18n/areas/purchases';
 import controls from '../../styles/controls.module.css';
 import styles from './purchases.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /** Compact "re-bill to a client" block for the expense and bill forms (roadmap 6.14). */
 export function BillableFields({ idPrefix, value, onChange, rebilledIn }: {
@@ -24,11 +25,11 @@ export function BillableFields({ idPrefix, value, onChange, rebilledIn }: {
         <div className={controls.row}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${idPrefix}-bill-client`}>{purT('client')}</label>
-            <select id={`${idPrefix}-bill-client`} className={controls.select} value={value.billable_to_client_id ?? ''}
+            <SelectField id={`${idPrefix}-bill-client`} className={controls.select} value={value.billable_to_client_id ?? ''}
               onChange={(e) => onChange({ ...value, billable_to_client_id: e.target.value || undefined })}>
               <option value="">{purT('notBillable')}</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </SelectField>
           </div>
           {on && !value.pure_agent && (
             <div className={controls.field}>

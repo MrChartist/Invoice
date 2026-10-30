@@ -15,6 +15,7 @@ import { F } from './Field';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './transport.module.css';
+import { TypedInput } from '../ui/TypedInput';
 
 type Act = { kind: 'pod' | 'cancel' | 'collect'; lr: ConsignmentNote } | null;
 
@@ -60,7 +61,7 @@ export function LrList({ notify, refresh, tick }: PanelProps) {
     }
   };
   const fld = (k: keyof typeof v, label: string, type = 'text') => (
-    <F l={label}><input className={controls.input} type={type} value={v[k]} onChange={(e) => setV((x) => ({ ...x, [k]: e.target.value }))} /></F>
+    <F l={label}><TypedInput className={controls.input} type={type} value={v[k]} onChange={(e) => setV((x) => ({ ...x, [k]: e.target.value }))} /></F>
   );
 
   if (edit) return <LrForm lr={edit === 'new' ? undefined : edit} notify={notify} onSaved={() => { setEdit(null); refresh(); }} onCancel={() => setEdit(null)} />;

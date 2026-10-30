@@ -46,6 +46,8 @@ import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import books from '../books/books.module.css';
 import styles from '../books/tally/tally.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 export interface TdsData {
   rows: TdsDeductionRow[];
@@ -302,13 +304,13 @@ function ManualModal({ row, onClose, onSaved }: { row: ManualTdsDeduction | null
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="md-sec">{tdsT('section')}</label>
-          <select id="md-sec" className={controls.select} value={v.section} onChange={(e) => set({ section: e.target.value })}>
+          <SelectField id="md-sec" className={controls.select} value={v.section} onChange={(e) => set({ section: e.target.value })}>
             {TDS_PAYABLE_SECTIONS.map((s) => <option key={s.code} value={s.code}>{withActRef(s.label, s.code, v.date, ita25Words())}</option>)}
-          </select>
+          </SelectField>
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="md-date">{tdsT('date')}</label>
-          <input id="md-date" type="date" className={controls.input} value={v.date} onChange={(e) => set({ date: e.target.value })} />
+          <DateField id="md-date" className={controls.input} value={v.date} onChange={(e) => set({ date: e.target.value })} />
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="md-base">{tdsT('base')}</label>
@@ -437,14 +439,14 @@ function ChallanModal({ data, challan, onClose, onSaved }: { data: TdsData; chal
         <div className={styles.grid}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="ch-kind">{tdsT('kind')}</label>
-            <select id="ch-kind" className={controls.select} value={kind} onChange={(e) => { setKind(e.target.value === 'TCS' ? 'TCS' : 'TDS'); setKeys([]); }}>
+            <SelectField id="ch-kind" className={controls.select} value={kind} onChange={(e) => { setKind(e.target.value === 'TCS' ? 'TCS' : 'TDS'); setKeys([]); }}>
               <option value="TDS">TDS</option>
               <option value="TCS">TCS</option>
-            </select>
+            </SelectField>
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="ch-date">{tdsT('depositDate')}</label>
-            <input id="ch-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField id="ch-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="ch-bsr">{tdsT('bsr')}</label>
@@ -468,9 +470,9 @@ function ChallanModal({ data, challan, onClose, onSaved }: { data: TdsData; chal
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="ch-method">{tdsT('paidFrom')}</label>
-            <select id="ch-method" className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)}>
+            <SelectField id="ch-method" className={controls.select} value={method} onChange={(e) => setMethod(e.target.value)}>
               {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
+            </SelectField>
           </div>
         </div>
         <div className={books.toolbar}>
@@ -572,7 +574,7 @@ export function ReturnsTab({ data, fy, quarter, canEdit, onChanged, notify }: { 
             </>
           ) : (
             <div className={books.toolbarGroup}>
-              <input aria-label={tdsT('date')} type="date" className={controls.input} value={filedOn} onChange={(e) => setFiledOn(e.target.value)} />
+              <DateField aria-label={tdsT('date')} className={controls.input} value={filedOn} onChange={(e) => setFiledOn(e.target.value)} />
               <input aria-label={tdsT('token')} placeholder={tdsT('token')} className={controls.input} value={token} onChange={(e) => setToken(e.target.value)} />
               <button type="button" className={controls.btnOutline} onClick={() => mark2(filedOn)}>{tdsT('markFiled')}</button>
             </div>

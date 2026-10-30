@@ -25,6 +25,7 @@ import { ggT } from '../../i18n/areas/gst-guards';
 import controls from '../../styles/controls.module.css';
 import styles from './gst-guards.module.css';
 import { printWhenReady } from '../../lib/print-fonts';
+import { DateField } from '../ui/DateField';
 
 export interface VendorFollowUpProps {
   match: MatchResult;
@@ -138,7 +139,7 @@ export function VendorFollowUp({ match, effect, period, periodLabel, gstin, noti
                     <span>{ggT('fuMark')}</span>
                   </label>
                   {m && (
-                    <input type="date" className={`${controls.input} ${styles.narrow}`} value={m.followed_on} max={today} aria-label={ggT('fuOn')}
+                    <DateField className={`${controls.input} ${styles.narrow}`} value={m.followed_on} max={today} aria-label={ggT('fuOn')}
                       onChange={(e) => e.target.value && mark(f, e.target.value, m.channel)} />
                   )}
                 </div>

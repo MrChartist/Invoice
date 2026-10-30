@@ -30,6 +30,7 @@ import { paiseText, parsePaise } from './masters-utils';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './masters.module.css';
+import { DateField } from '../ui/DateField';
 
 export interface OpeningTrialBalanceProps {
   onDone: () => void;
@@ -133,7 +134,7 @@ export function OpeningTrialBalance({ onDone, onBack, onBillwise, notify }: Open
     >
       <div className={styles.inline}>
         <label htmlFor={`${uid}-begin`}>{mastersT('booksBegin')}</label>
-        <input id={`${uid}-begin`} type="date" className={controls.input} style={{ maxWidth: 180 }} value={begin} readOnly={readOnly} onChange={(e) => setBegin(e.target.value)} />
+        <DateField id={`${uid}-begin`} className={controls.input} style={{ maxWidth: 180 }} value={begin} readOnly={readOnly} onChange={(e) => setBegin(e.target.value)} />
         <input type="search" className={controls.input} style={{ maxWidth: 240 }} placeholder={mastersT('search')} aria-label={mastersT('search')} value={query} onChange={(e) => setQuery(e.target.value)} />
         <label className={controls.check} htmlFor={`${uid}-zero`}>
           <input id={`${uid}-zero`} type="checkbox" checked={showZero} onChange={(e) => setShowZero(e.target.checked)} /> {mastersT('showZero')}

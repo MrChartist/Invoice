@@ -41,6 +41,7 @@ import surface from '../../../styles/surface.module.css';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
 import styles from './ledger.module.css';
+import { SelectField } from '../../ui/SelectField';
 
 // Ratio Analysis lives in the Books → Ratio analysis tab (src/components/books/tally/RatioTab.tsx), with closing stock.
 export type ReportId = 'group' | 'registers' | 'exceptions' | 'stats' | 'funds' | 'interest' | 'annual';
@@ -157,9 +158,9 @@ function RegistersView({ period }: { period: Period }) {
   return (
     <div className={books.stack}>
       <StatementToolbar filename="">
-        <select className={controls.select} value={id} onChange={(e) => setId(e.target.value as RegisterId)} aria-label={reportsT('register')}>
+        <SelectField className={controls.select} value={id} onChange={(e) => setId(e.target.value as RegisterId)} aria-label={reportsT('register')}>
           {(Object.keys(REGISTER_LABELS) as RegisterId[]).map((r) => <option key={r} value={r}>{REGISTER_LABELS[r]}</option>)}
-        </select>
+        </SelectField>
         <button type="button" className={controls.btnOutline} onClick={() => drill.push({ key: `reg:${id}:all`, title: REGISTER_LABELS[id], render: () => <VoucherTable vouchers={reg.months.flatMap((m) => m.vouchers)} ledger={ledger} /> })}>
           {reportsT('allVouchers')}
         </button>

@@ -8,6 +8,7 @@ import { mpPickT } from '../../i18n/areas/manpower-r17a-pick';
 import { psPickT } from '../../i18n/areas/prof-r14a-pick';
 import { FIRM_FORMS, MANPOWER_KINDS, type ManpowerKindId } from '../../lib/shop-presets';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export function ManpowerKindPicker({ value, onPick, form, onForm, custom, gridClass, cardClass, disabled }: {
   value?: string;
@@ -38,9 +39,9 @@ export function ManpowerKindPicker({ value, onPick, form, onForm, custom, gridCl
       {value && onForm && (
         <label className={controls.field}>
           <span className={controls.label}>{psPickT('form')}</span>
-          <select className={controls.select} value={form ?? 'proprietorship'} disabled={disabled} onChange={(e) => onForm(e.target.value)} data-manpower-form>
+          <SelectField className={controls.select} value={form ?? 'proprietorship'} disabled={disabled} onChange={(e) => onForm(e.target.value)} data-manpower-form>
             {FIRM_FORMS.map((f) => <option key={f} value={f}>{psPickT(`form.${f}`)}</option>)}
-          </select>
+          </SelectField>
         </label>
       )}
     </>

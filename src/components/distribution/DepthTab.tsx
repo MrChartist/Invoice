@@ -11,6 +11,7 @@ import { useT } from '../../i18n';
 import { skT } from '../../i18n/areas/stock-depth';
 import controls from '../../styles/controls.module.css';
 import own from './dist.module.css';
+import { SelectField } from '../ui/SelectField';
 
 type Section = 'variants' | 'kits' | 'bins';
 
@@ -65,10 +66,10 @@ export default function DepthTab({ items, tracking, onChanged }: { items: StockI
         <div className={own.stack}>
           <p className={own.muted}>{skT('variantsIntro')}</p>
           <label className={controls.field}><span className={controls.label}>{skT('parentItem')}</span>
-            <select className={controls.select} value={parentId} onChange={(e) => pickParent(e.target.value)} data-variant-parent>
+            <SelectField className={controls.select} value={parentId} onChange={(e) => pickParent(e.target.value)} data-variant-parent>
               <option value="">{skT('choose')}</option>
               {parents.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select></label>
+            </SelectField></label>
           {parent && (
             <>
               {axes.map((a, i) => (

@@ -5,6 +5,8 @@ import { psbT } from '../../i18n/areas/prof-r14b';
 import { localDb } from '../../lib/localDb';
 import { MEDIUMS, type MediaBuy, type Medium } from '../../lib/prof/ps-media';
 import controls from '../../styles/controls.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 /** `value` is the row's `ps`; `onChange` gets the next `ps` (media removed when no client is picked). */
 export default function MediaRows({ ps, onChange }: { ps: unknown; onChange: (ps: Record<string, unknown> | undefined) => void }) {
@@ -19,29 +21,29 @@ export default function MediaRows({ ps, onChange }: { ps: unknown; onChange: (ps
     onChange(Object.keys(out).length ? out : undefined);
   };
   const txt = (k: 'publication' | 'ro' | 'client_ref', l: string) => <label className={controls.field}><span className={controls.label}>{l}</span><input className={controls.input} value={m?.[k] ?? ''} onChange={(e) => set({ [k]: e.target.value || undefined })} data-ps-media={k} /></label>;
-  const day = (k: 'insert_from' | 'insert_to', l: string) => <label className={controls.field}><span className={controls.label}>{l}</span><input type="date" className={controls.input} value={m?.[k] ?? ''} onChange={(e) => set({ [k]: e.target.value || undefined })} /></label>;
+  const day = (k: 'insert_from' | 'insert_to', l: string) => <label className={controls.field}><span className={controls.label}>{l}</span><DateField className={controls.input} value={m?.[k] ?? ''} onChange={(e) => set({ [k]: e.target.value || undefined })} /></label>;
   return (
     <fieldset className={controls.row} data-ps-media-rows>
       <legend className={controls.label}>{psbT('media')}</legend>
       <label className={controls.field}>
         <span className={controls.label}>{psbT('client')}</span>
-        <select className={controls.select} value={m?.client_id ?? ''} onChange={(e) => set({ client_id: e.target.value })} data-ps-media="client">
+        <SelectField className={controls.select} value={m?.client_id ?? ''} onChange={(e) => set({ client_id: e.target.value })} data-ps-media="client">
           <option value="">-</option>
           {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        </SelectField>
       </label>
       {m && (
         <>
           <label className={controls.field}>
             <span className={controls.label}>{psbT('medium')}</span>
-            <select className={controls.select} value={m.medium} onChange={(e) => set({ medium: e.target.value as Medium })}>{MEDIUMS.map((x) => <option key={x} value={x}>{psbT(`m.${x}`)}</option>)}</select>
+            <SelectField className={controls.select} value={m.medium} onChange={(e) => set({ medium: e.target.value as Medium })}>{MEDIUMS.map((x) => <option key={x} value={x}>{psbT(`m.${x}`)}</option>)}</SelectField>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{psbT('mode')}</span>
-            <select className={controls.select} value={m.mode} onChange={(e) => set({ mode: e.target.value as MediaBuy['mode'] })} data-ps-media="mode">
+            <SelectField className={controls.select} value={m.mode} onChange={(e) => set({ mode: e.target.value as MediaBuy['mode'] })} data-ps-media="mode">
               <option value="principal">{psbT('mode.principal')}</option>
               <option value="agent">{psbT('mode.agent')}</option>
-            </select>
+            </SelectField>
           </label>
           {txt('publication', psbT('publication'))}
           {txt('ro', psbT('roNo'))}

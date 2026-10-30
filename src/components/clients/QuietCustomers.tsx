@@ -15,6 +15,7 @@ import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import { useT } from '../../i18n';
 import { svcT } from '../../i18n/areas/service-r3';
+import { SelectField } from '../ui/SelectField';
 
 type Notify = (message: string, tone?: 'success' | 'error') => void;
 
@@ -95,13 +96,13 @@ export default function QuietCustomers({ clients, notify }: { clients: Client[];
                         )}
                         {editable && (
                           <>
-                            <select className={controls.select} value="" aria-label={`${svcT('snooze')} ${r.name}`}
+                            <SelectField className={controls.select} value="" aria-label={`${svcT('snooze')} ${r.name}`}
                               onChange={(e) => { const d = Number(e.target.value); if (d) { const next = snooze(settings, r.key, d, today); update(next, svcT('snoozed', { name: r.name, date: formatDate(next.snoozed[r.key]) })); } }}>
                               <option value="">{svcT('snooze')}</option>
                               <option value="30">{svcT('snooze30')}</option>
                               <option value="60">{svcT('snooze60')}</option>
                               <option value="90">{svcT('snooze90')}</option>
-                            </select>
+                            </SelectField>
                             <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => update(exclude(settings, r.key), svcT('excluded', { name: r.name }))}>{svcT('notRegular')}</button>
                           </>
                         )}

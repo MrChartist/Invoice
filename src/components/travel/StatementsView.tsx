@@ -23,6 +23,8 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field } from './tv-ui';
 import { runWith, type TvViewProps } from './tv-run';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const STS = ['matched', 'diff', 'missing', 'ours_only'] as const;
 const sm = `${controls.btnOutline} ${controls.btnSm}`;
@@ -65,7 +67,7 @@ export default function StatementsView({ notify }: TvViewProps) {
       </div>
       {sel && (
         <section data-tv-statement-open>
-          <div style={row}><Field label={tvT('status')}><select className={controls.select} value={filter} onChange={(e) => setFilter(e.target.value)}><option value="">-</option>{STS.map((k) => <option key={k} value={k}>{cvList('sts', STS, k)}</option>)}</select></Field>
+          <div style={row}><Field label={tvT('status')}><SelectField className={controls.select} value={filter} onChange={(e) => setFilter(e.target.value)}><option value="">-</option>{STS.map((k) => <option key={k} value={k}>{cvList('sts', STS, k)}</option>)}</SelectField></Field>
             {/* PENDING 13 (R15-C cut 3): CSV of the rows not plainly matched (diff, missing, ours only, ADM, refund). */}
             <button type="button" className={sm} onClick={() => downloadText(`statement-differences-${sel.ref.replace(/[^\w-]+/g, '-')}.csv`, '\ufeff' + toCsv(statementDiffRows(sel)), 'text/csv')} data-tv-diff-csv>{cvT('diffCsv')}</button></div>
           <div className={surface.tableWrap}>
@@ -116,17 +118,17 @@ function ImportForm({ vendors, notify, onDone }: { vendors: { id: string; name: 
   };
   return (
     <div style={row} data-tv-import>
-      <Field label={cvT('type')}><select className={controls.select} value={kind} onChange={(e) => { const k = e.target.value as StatementKind; setKind(k); if (file) setFile({ ...file, cols: guess(file.t, k) }); }} data-tv-st-kind>{STATEMENT_KINDS.map((k) => <option key={k} value={k}>{cvList('kinds', STATEMENT_KINDS, k)}</option>)}</select></Field>
-      <Field label={tvT('supplier')}><select className={controls.select} value={f.vendor_id} onChange={(e) => setF({ ...f, vendor_id: e.target.value })} data-tv-st-vendor><option value="">-</option>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></Field>
+      <Field label={cvT('type')}><SelectField className={controls.select} value={kind} onChange={(e) => { const k = e.target.value as StatementKind; setKind(k); if (file) setFile({ ...file, cols: guess(file.t, k) }); }} data-tv-st-kind>{STATEMENT_KINDS.map((k) => <option key={k} value={k}>{cvList('kinds', STATEMENT_KINDS, k)}</option>)}</SelectField></Field>
+      <Field label={tvT('supplier')}><SelectField className={controls.select} value={f.vendor_id} onChange={(e) => setF({ ...f, vendor_id: e.target.value })} data-tv-st-vendor><option value="">-</option>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</SelectField></Field>
       <Field label={cvT('ref')}><input className={controls.input} value={f.ref} onChange={(e) => setF({ ...f, ref: e.target.value })} data-tv-st-ref /></Field>
-      <Field label={tvT('from')}><input type="date" className={controls.input} value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} /></Field>
-      <Field label={tvT('to')}><input type="date" className={controls.input} value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} /></Field>
+      <Field label={tvT('from')}><DateField className={controls.input} value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} /></Field>
+      <Field label={tvT('to')}><DateField className={controls.input} value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} /></Field>
       <Field label={cvT('file')}><input type="file" accept=".csv,.xlsx,.xlsm,.txt" onChange={(e) => void pick(e.target.files?.[0])} data-tv-st-file /></Field>
       {file && Object.keys(STATEMENT_PRESETS[kind]!).map((k) => (
         <Field key={k} label={({ doc_no: cvT('doc'), type: cvT('type'), date: tvT('from'), pax: tvT('pax'), gross: cvT('gross'), taxes: cvT('taxes'), commission: tvT('commission'), net: cvT('net'), hotel: r16cT('hotel'), nights: r16cT('nights') } as Record<string, string>)[k] ?? k}>
-          <select className={controls.select} value={file.cols.get(k) ?? ''} onChange={(e) => { const cols = new Map(file.cols); if (e.target.value === '') cols.delete(k); else cols.set(k, Number(e.target.value)); setFile({ ...file, cols }); }}>
+          <SelectField className={controls.select} value={file.cols.get(k) ?? ''} onChange={(e) => { const cols = new Map(file.cols); if (e.target.value === '') cols.delete(k); else cols.set(k, Number(e.target.value)); setFile({ ...file, cols }); }}>
             <option value="">-</option>{file.t.headers.map((h, i) => <option key={i} value={i}>{h}</option>)}
-          </select>
+          </SelectField>
         </Field>
       ))}
       {file && <button type="button" className={controls.btnPrimary} onClick={go} data-tv-st-import>{cvT('import')}</button>}

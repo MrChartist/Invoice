@@ -21,6 +21,7 @@ import { type Notify } from '../transport/shared';
 import { F } from '../transport/Field';
 import controls from '../../styles/controls.module.css';
 import styles from '../transport/transport.module.css';
+import { SelectField } from '../ui/SelectField';
 
 // R5-A5's credit panel, mounted for GST TDS u/s 51 (contractors need no marketplace pack).
 const TcsCreditPanel = lazy(() => import('../marketplace/TcsCreditPanel'));
@@ -69,10 +70,10 @@ export default function WorksTab({ notify }: { notify: Notify }) {
       </div>
       {view !== 'gsttds' && view !== 'retention' && !CnView && view !== 'labour' && view !== 'plant' && (
         <F l={twT('boq')}>
-          <select className={controls.select} value={boqId} onChange={(e) => go('boq', e.target.value)} data-works-boq>
+          <SelectField className={controls.select} value={boqId} onChange={(e) => go('boq', e.target.value)} data-works-boq>
             {boqs.length === 0 && <option value="">{twT('noBoq')}</option>}
             {boqs.map((b) => <option key={b.id} value={b.id}>{b.invoice_number} · {b.client?.name} · {b.issue_date}</option>)}
-          </select></F>
+          </SelectField></F>
       )}
       {view === 'boq' && <BoqPanel {...shared} boq={boq} onCreated={(id) => go('boq', id)} />}
       {view === 'ra' && boq && <><MeasurementForm key={boq.id} {...shared} boq={boq} /><RaRegister {...shared} boq={boq} /></>}

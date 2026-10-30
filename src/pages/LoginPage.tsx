@@ -23,6 +23,7 @@ import { LanguageSwitch } from '../components/ui/LanguageSwitch';
 import { reloadAfterFlush } from '../lib/storage';
 import controls from '../styles/controls.module.css';
 import styles from './LoginPage.module.css';
+import { SelectField } from '../components/ui/SelectField';
 
 interface LoginPageProps {
   onSuccess: () => void;
@@ -249,7 +250,7 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
                   <label className={controls.label} htmlFor="login-user">{t('shell.user')}</label>
                   <div className={styles.inputWrap}>
                     <Users size={16} className={styles.inputIcon} />
-                    <select
+                    <SelectField
                       id="login-user"
                       className={`${controls.select} ${styles.withIcon}`}
                       value={selected?.id ?? OWNER_ID}
@@ -260,7 +261,7 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
                           {u.name} ({roleLabel(u.role)})
                         </option>
                       ))}
-                    </select>
+                    </SelectField>
                   </div>
                 </div>
               )}

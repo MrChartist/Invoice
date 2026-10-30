@@ -14,6 +14,7 @@ import { Tbl } from './ps-d-ui';
 import type { PsDeskCtx } from './ps-desk';
 import ChasePanel from './TdsChasePanel';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const SECTIONS: ClientTdsDefault['section'][] = ['194J', '194J-T', '194C', '194H', 'none'];
 
@@ -26,9 +27,9 @@ export default function Tds194jView({ ctx }: { ctx: PsDeskCtx }) {
       <Tbl empty={fdT('none')} head={[fdT('client'), fdT('section')]} rows={clients.map((c) => {
         const d = clientTdsDefault(c, kind);
         return [c.name, (
-          <select key="s" className={controls.select} value={d?.section ?? ''} onChange={(e) => ctx.run(() => patchClientPs(c.id!, { tds: e.target.value ? { section: e.target.value as ClientTdsDefault['section'] } : undefined }))} data-ps="j-section">
+          <SelectField key="s" className={controls.select} value={d?.section ?? ''} onChange={(e) => ctx.run(() => patchClientPs(c.id!, { tds: e.target.value ? { section: e.target.value as ClientTdsDefault['section'] } : undefined }))} data-ps="j-section">
             <option value="">-</option>{SECTIONS.map((s) => <option key={s} value={s}>{s === 'none' ? fdT('noTds') : s}</option>)}
-          </select>
+          </SelectField>
         )];
       })} />
       <ChasePanel clients={clients} />

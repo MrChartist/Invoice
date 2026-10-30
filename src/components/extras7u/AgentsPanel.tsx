@@ -17,6 +17,8 @@ import { x7T } from '../../i18n/areas/extras-7u';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import own from './x7u.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Notify = (m: string, tone?: 'success' | 'error' | 'info') => void;
 const blank = (): SalesAgent => ({ id: '', name: '', rate: 0, basis: 'invoice', group_rates: [] });
@@ -76,18 +78,18 @@ export function AgentsPanel({ notify, icon }: { notify: Notify; icon?: ReactNode
               <label className={controls.field}><span className={controls.label}>{x7T('flatRate')}</span>
                 <input className={cn(controls.input, controls.inputNumeric)} inputMode="decimal" value={String(form.rate)} onChange={(e) => setForm({ ...form, rate: Number(e.target.value.replace(/[^0-9.]/g, '')) || 0 })} /></label>
               <label className={controls.field}><span className={controls.label}>{x7T('basis')}</span>
-                <select className={controls.select} value={form.basis} onChange={(e) => setForm({ ...form, basis: e.target.value === 'receipt' ? 'receipt' : 'invoice' })}>
+                <SelectField className={controls.select} value={form.basis} onChange={(e) => setForm({ ...form, basis: e.target.value === 'receipt' ? 'receipt' : 'invoice' })}>
                   <option value="invoice">{x7T('onInvoice')}</option>
                   <option value="receipt">{x7T('onReceipt')}</option>
-                </select></label>
+                </SelectField></label>
             </div>
             {(form.group_rates ?? []).map((g, i) => (
               <div key={i} className={own.row}>
                 <label className={controls.field}><span className={controls.label}>{x7T('stockGroup')}</span>
-                  <select className={controls.select} value={g.group_id} onChange={(e) => setRate(i, { group_id: e.target.value })}>
+                  <SelectField className={controls.select} value={g.group_id} onChange={(e) => setRate(i, { group_id: e.target.value })}>
                     <option value="">-</option>
                     {groups.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-                  </select></label>
+                  </SelectField></label>
                 <label className={controls.field}><span className={controls.label}>%</span>
                   <input className={cn(controls.input, controls.inputNumeric)} inputMode="decimal" value={String(g.rate)} onChange={(e) => setRate(i, { rate: Number(e.target.value.replace(/[^0-9.]/g, '')) || 0 })} /></label>
                 <button type="button" className={controls.btnGhost} onClick={() => setForm({ ...form, group_rates: (form.group_rates ?? []).filter((_, k) => k !== i) })}>{x7T('remove')}</button>
@@ -109,13 +111,13 @@ export function AgentsPanel({ notify, icon }: { notify: Notify; icon?: ReactNode
             <p className={own.sub}>{x7T('statement')}</p>
             <div className={own.row}>
               <label className={controls.field}><span className={controls.label}>{x7T('agent')}</span>
-                <select className={controls.select} value={agent.id} onChange={(e) => setAgentId(e.target.value)}>
+                <SelectField className={controls.select} value={agent.id} onChange={(e) => setAgentId(e.target.value)}>
                   {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select></label>
+                </SelectField></label>
               <label className={controls.field}><span className={controls.label}>{x7T('from')}</span>
-                <input className={controls.input} type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+                <DateField className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
               <label className={controls.field}><span className={controls.label}>{x7T('to')}</span>
-                <input className={controls.input} type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+                <DateField className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></label>
             </div>
             {st.lines.length === 0 ? <p className={own.muted}>{x7T('noCommission')}</p> : (
               <ul className={own.list} data-commission-total={st.total}>

@@ -12,6 +12,7 @@ import { sT } from '../../i18n/areas/stores-r4';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import css from './retail-r4.module.css';
+import { DateField } from '../ui/DateField';
 
 /**
  * Store prices (R4-B3): item × store grid of dated overrides, effective from the chosen date, with CSV export / import.
@@ -62,7 +63,7 @@ export default function StorePricesGrid({ onClose, notify }: { onClose: () => vo
       {branches.length === 0 ? <p className={css.muted}>{sT('spNoBranches')}</p> : (
         <div className={css.stack}>
           <div className={css.bar}>
-            <label className={controls.field}><span className={controls.label}>{sT('spFrom')}</span><input type="date" className={controls.input} value={from} onChange={(e) => { setFrom(e.target.value); setEdits({}); }} /></label>
+            <label className={controls.field}><span className={controls.label}>{sT('spFrom')}</span><DateField className={controls.input} value={from} onChange={(e) => { setFrom(e.target.value); setEdits({}); }} /></label>
             <label className={cn(controls.field, css.grow)}><span className={controls.label}>{sT('spFilter')}</span><input className={controls.input} value={filter} onChange={(e) => setFilter(e.target.value)} /></label>
             <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => downloadText(`store-prices-${from}.csv`, gridCsv(items, branches, branchPricesDb.all(), from), 'text/csv')}><Download size={14} aria-hidden="true" /> {sT('csv')}</button>
             <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => fileRef.current?.click()}><Upload size={14} aria-hidden="true" /> {sT('spImport')}</button>

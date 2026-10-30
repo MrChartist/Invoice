@@ -23,6 +23,8 @@ import { useT } from '../../i18n';
 import { svcT } from '../../i18n/areas/service-r3';
 import { isPackOn } from '../../lib/industry-packs';
 import { localDb } from '../../lib/localDb';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 // R14 (PS-A): professional rows, only while the `practice` pack is on (one small lazy chunk).
 const MatterLink = lazy(() => import('../prof/ProfRows').then((m) => ({ default: m.MatterLink })));
 
@@ -225,12 +227,12 @@ export default function ProjectsBoard({ clients, prefs, entries, invoices, proje
         <div className={styles.spread}>
           <div className={styles.row}>
             {projects.length > 0 && (
-              <select className={controls.select} value={project?.id ?? ''} onChange={(e) => onSelect(e.target.value || null)} aria-label={svcT('pickProject')} data-project-select>
+              <SelectField className={controls.select} value={project?.id ?? ''} onChange={(e) => onSelect(e.target.value || null)} aria-label={svcT('pickProject')} data-project-select>
                 {projects.map((p) => {
                   const b = projectBurn(p, entries, tasks, prefs, live, todayInput());
                   return <option key={p.id} value={p.id}>{p.name}{b.pct !== null ? ` · ${Math.floor(b.pct)}%` : ''}</option>;
                 })}
-              </select>
+              </SelectField>
             )}
             {editable && (
               <button type="button" className={controls.btnOutline} onClick={() => setEditProject(draftOf())} data-new-project>
@@ -349,9 +351,9 @@ export default function ProjectsBoard({ clients, prefs, entries, invoices, proje
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="tk-col">{svcT('columns')}</label>
-                <select id="tk-col" className={controls.select} value={taskDraft.column} onChange={(e) => setTaskDraft({ ...taskDraft, column: e.target.value })}>
+                <SelectField id="tk-col" className={controls.select} value={taskDraft.column} onChange={(e) => setTaskDraft({ ...taskDraft, column: e.target.value })}>
                   {columns.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
+                </SelectField>
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="tk-est">{svcT('estimateHours')}</label>
@@ -359,10 +361,10 @@ export default function ProjectsBoard({ clients, prefs, entries, invoices, proje
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="tk-who">{svcT('assignee')}</label>
-                <select id="tk-who" className={controls.select} value={taskDraft.assignee_id} onChange={(e) => setTaskDraft({ ...taskDraft, assignee_id: e.target.value })}>
+                <SelectField id="tk-who" className={controls.select} value={taskDraft.assignee_id} onChange={(e) => setTaskDraft({ ...taskDraft, assignee_id: e.target.value })}>
                   <option value="">{svcT('nobody')}</option>
                   {people.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                </select>
+                </SelectField>
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="tk-rate">{svcT('taskRate')}</label>
@@ -370,7 +372,7 @@ export default function ProjectsBoard({ clients, prefs, entries, invoices, proje
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="tk-due">{svcT('due')}</label>
-                <input id="tk-due" type="date" className={controls.input} value={taskDraft.due} onChange={(e) => setTaskDraft({ ...taskDraft, due: e.target.value })} />
+                <DateField id="tk-due" className={controls.input} value={taskDraft.due} onChange={(e) => setTaskDraft({ ...taskDraft, due: e.target.value })} />
               </div>
             </div>
             <div className={styles.row}>

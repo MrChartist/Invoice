@@ -32,6 +32,8 @@ import { br2T } from '../../../i18n/areas/books-r2';
 import surface from '../../../styles/surface.module.css';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
+import { SelectField } from '../../ui/SelectField';
+import { DateField } from '../../ui/DateField';
 
 type Notify = (msg: string, tone?: 'success' | 'error') => void;
 const rs = (paise: number) => formatMoney(paise / 100);
@@ -178,24 +180,24 @@ export default function DeferralsTab({ period, notify }: { period: Period; notif
               <div className={books.toolbar}>
                 <label className={controls.field}>
                   <span className={controls.label}>{br2T('sourceKind')}</span>
-                  <select className={controls.select} value={kind} onChange={(e) => { setKind(e.target.value as 'invoice' | 'purchase'); setDocId(''); }}>
+                  <SelectField className={controls.select} value={kind} onChange={(e) => { setKind(e.target.value as 'invoice' | 'purchase'); setDocId(''); }}>
                     <option value="invoice">{br2T('fromInvoice')}</option>
                     <option value="purchase">{br2T('fromBill')}</option>
-                  </select>
+                  </SelectField>
                 </label>
                 <label className={controls.field}>
                   <span className={controls.label}>{br2T('document')}</span>
-                  <select className={controls.select} value={docId} onChange={(e) => pickDoc(e.target.value)} data-defer-doc>
+                  <SelectField className={controls.select} value={docId} onChange={(e) => pickDoc(e.target.value)} data-defer-doc>
                     <option value="">{docs.length ? br2T('chooseDoc') : br2T('noDocs')}</option>
                     {docs.map((d) => <option key={d.id} value={d.id}>{d.number || '-'} · {d.party} · {formatDate(d.date)}</option>)}
-                  </select>
+                  </SelectField>
                 </label>
                 {lines.length > 1 && (
                   <label className={controls.field}>
                     <span className={controls.label}>{br2T('line')}</span>
-                    <select className={controls.select} value={line?.line_index ?? 0} onChange={(e) => pickLine(Number(e.target.value))}>
+                    <SelectField className={controls.select} value={line?.line_index ?? 0} onChange={(e) => pickLine(Number(e.target.value))}>
                       {lines.map((l) => <option key={l.line_index} value={l.line_index}>{l.name} · ₹{formatMoney(l.amount)}</option>)}
-                    </select>
+                    </SelectField>
                   </label>
                 )}
               </div>
@@ -208,7 +210,7 @@ export default function DeferralsTab({ period, notify }: { period: Period; notif
                     </label>
                     <label className={controls.field}>
                       <span className={controls.label}>{br2T('start')}</span>
-                      <input type="date" className={controls.input} value={start} onChange={(e) => setStart(e.target.value)} />
+                      <DateField className={controls.input} value={start} onChange={(e) => setStart(e.target.value)} />
                     </label>
                     <label className={controls.field}>
                       <span className={controls.label}>{br2T('months')}</span>
@@ -216,14 +218,14 @@ export default function DeferralsTab({ period, notify }: { period: Period; notif
                     </label>
                     <label className={controls.field}>
                       <span className={controls.label}>{br2T('endDate')}</span>
-                      <input type="date" className={controls.input} min={start} onChange={(e) => e.target.value && start && setMonths(monthsBetween(start, e.target.value))} />
+                      <DateField className={controls.input} min={start} onChange={(e) => e.target.value && start && setMonths(monthsBetween(start, e.target.value))} />
                     </label>
                     <label className={controls.field}>
                       <span className={controls.label}>{br2T('method')}</span>
-                      <select className={controls.select} value={method} onChange={(e) => setMethod(e.target.value as DeferralMethod)}>
+                      <SelectField className={controls.select} value={method} onChange={(e) => setMethod(e.target.value as DeferralMethod)}>
                         <option value="months">{br2T('byMonths')}</option>
                         <option value="days">{br2T('byDays')}</option>
-                      </select>
+                      </SelectField>
                     </label>
                   </div>
                   {preview.length > 0 && (
@@ -256,7 +258,7 @@ export default function DeferralsTab({ period, notify }: { period: Period; notif
             <div className={books.toolbarGroup}>
               <label className={controls.field}>
                 <span className={controls.label}>{br2T('postUpTo')}</span>
-                <input type="date" className={controls.input} value={upTo} onChange={(e) => setUpTo(e.target.value)} />
+                <DateField className={controls.input} value={upTo} onChange={(e) => setUpTo(e.target.value)} />
               </label>
               <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={postNow}>{br2T('postNow')}</button>
             </div>

@@ -7,6 +7,8 @@ import { pLinkT } from '../../i18n/areas/production-r4-links'; // R4-A4
 import controls from '../../styles/controls.module.css';
 import styles from './masters.module.css';
 import inv from './inventory.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 export interface MastersDraft {
   group_id: string;
@@ -40,7 +42,7 @@ export function MastersFields({ draft, onChange, baseUnit, trackStock, serialIte
       <span className={controls.label}>{label}</span>
       {draft[k].map((e, i) => (
         <div key={i} className={styles.pairRow}>
-          <input type="date" className={controls.input} value={e.from} aria-label={`${label} · ${imT('from')}`}
+          <DateField className={controls.input} value={e.from} aria-label={`${label} · ${imT('from')}`}
             onChange={(ev) => set(k, draft[k].map((x, j) => (j === i ? { ...x, from: ev.target.value } : x)))} />
           <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={e.rate} placeholder={imT('rate')} aria-label={`${label} · ${imT('rate')}`}
             onChange={(ev) => set(k, draft[k].map((x, j) => (j === i ? { ...x, rate: ev.target.value } : x)))} />
@@ -58,17 +60,17 @@ export function MastersFields({ draft, onChange, baseUnit, trackStock, serialIte
       <div className={controls.row}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor={`${uid}-grp`}>{imT('group')}</label>
-          <select id={`${uid}-grp`} className={controls.select} value={draft.group_id} onChange={(e) => set('group_id', e.target.value)}>
+          <SelectField id={`${uid}-grp`} className={controls.select} value={draft.group_id} onChange={(e) => set('group_id', e.target.value)}>
             <option value="">{imT('primary')}</option>
             {groups.map((r) => <option key={r.node.id} value={r.node.id}>{r.path}</option>)}
-          </select>
+          </SelectField>
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor={`${uid}-cat`}>{imT('category')}</label>
-          <select id={`${uid}-cat`} className={controls.select} value={draft.category_id} onChange={(e) => set('category_id', e.target.value)}>
+          <SelectField id={`${uid}-cat`} className={controls.select} value={draft.category_id} onChange={(e) => set('category_id', e.target.value)}>
             <option value="">{imT('notCategorised')}</option>
             {categories.map((r) => <option key={r.node.id} value={r.node.id}>{r.path}</option>)}
-          </select>
+          </SelectField>
         </div>
       </div>
 
@@ -86,10 +88,10 @@ export function MastersFields({ draft, onChange, baseUnit, trackStock, serialIte
                 <div key={i} className={styles.pairRow}>
                   <div className={controls.field}>
                     <label className={controls.label} htmlFor={`${uid}-au${i}`}>{imT('altUnit')}</label>
-                    <select id={`${uid}-au${i}`} className={controls.select} value={a.unit} onChange={(e) => set('alt', draft.alt.map((x, j) => (j === i ? { ...x, unit: e.target.value } : x)))}>
+                    <SelectField id={`${uid}-au${i}`} className={controls.select} value={a.unit} onChange={(e) => set('alt', draft.alt.map((x, j) => (j === i ? { ...x, unit: e.target.value } : x)))}>
                       <option value="" />
                       {[...new Set([...units, a.unit].filter(Boolean))].filter((u) => u.toUpperCase() !== baseUnit.toUpperCase()).map((u) => <option key={u} value={u}>{u}</option>)}
-                    </select>
+                    </SelectField>
                   </div>
                   <div className={controls.field}>
                     <label className={controls.label} htmlFor={`${uid}-af${i}`}>{imT('altFactor', { unit: baseUnit })}</label>
@@ -103,14 +105,14 @@ export function MastersFields({ draft, onChange, baseUnit, trackStock, serialIte
                   <Plus size={14} aria-hidden="true" /> {imT('addAlt')}
                 </button>
                 {presets.length > 0 && (
-                  <select className={controls.select} value="" aria-label={imT('fromCompound')}
+                  <SelectField className={controls.select} value="" aria-label={imT('fromCompound')}
                     onChange={(e) => {
                       const c = presets.find((x) => x.id === e.target.value);
                       if (c?.first) set('alt', [...draft.alt.filter((x) => x.unit.toUpperCase() !== c.first?.toUpperCase()), { unit: c.first, factor: String(c.factor ?? '') }]);
                     }}>
                     <option value="">{imT('fromCompound')}</option>
                     {presets.map((c) => <option key={c.id} value={c.id}>{imT('compoundRow', { first: c.first ?? '', factor: c.factor ?? 0, second: c.second ?? '' })}</option>)}
-                  </select>
+                  </SelectField>
                 )}
               </div>
             </div>

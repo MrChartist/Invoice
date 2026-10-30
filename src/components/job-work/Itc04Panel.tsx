@@ -13,6 +13,7 @@ import type { JwData } from './lines';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './job-work.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /** ITC-04 working paper: Table 4 (sent) and Table 5A / 5B / 5C (received back / supplied), per return period. */
 export function Itc04Panel({ data }: { data: JwData }) {
@@ -39,9 +40,9 @@ export function Itc04Panel({ data }: { data: JwData }) {
       <div className={controls.row3} style={{ marginTop: '0.75rem' }}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="itc-fy">{jwT('fy')}</label>
-          <select id="itc-fy" className={controls.select} value={fy} onChange={(e) => { setFy(Number(e.target.value)); setPeriodKey(''); }}>
+          <SelectField id="itc-fy" className={controls.select} value={fy} onChange={(e) => { setFy(Number(e.target.value)); setPeriodKey(''); }}>
             {[0, 1, 2, 3, 4].map((d) => thisFy - d).map((y) => <option key={y} value={y}>FY {y}-{String(y + 1).slice(2)}</option>)}
-          </select>
+          </SelectField>
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="itc-to">{jwT('turnover')}</label>
@@ -49,19 +50,19 @@ export function Itc04Panel({ data }: { data: JwData }) {
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="itc-freq">{jwT('frequency')}</label>
-          <select id="itc-freq" className={controls.select} value={override} onChange={(e) => { setOverride(e.target.value as Itc04Frequency | ''); setPeriodKey(''); }}>
+          <SelectField id="itc-freq" className={controls.select} value={override} onChange={(e) => { setOverride(e.target.value as Itc04Frequency | ''); setPeriodKey(''); }}>
             <option value="">{freqLabel(auto)}</option>
             {(['Q', 'H', 'A'] as const).filter((f) => f !== auto).map((f) => <option key={f} value={f}>{freqLabel(f)}</option>)}
-          </select>
+          </SelectField>
         </div>
       </div>
       <p className={styles.muted}>{jwT('freqRule')}</p>
       <div className={controls.row3}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="itc-per">{jwT('period')}</label>
-          <select id="itc-per" className={controls.select} value={period.key} onChange={(e) => setPeriodKey(e.target.value)}>
+          <SelectField id="itc-per" className={controls.select} value={period.key} onChange={(e) => setPeriodKey(e.target.value)}>
             {periods.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
-          </select>
+          </SelectField>
           <span className={styles.muted}>{formatDate(period.from)} – {formatDate(period.to)} · {jwT('dueOn', { date: formatDate(period.due) })}</span>
         </div>
         <div className={controls.field}>

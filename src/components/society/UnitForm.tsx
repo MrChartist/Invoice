@@ -14,6 +14,7 @@ import { addMember, deleteUnit, saveUnit } from '../../lib/society/hs-units-save
 import controls from '../../styles/controls.module.css';
 import { Field as F, type Notify } from './hs-ui';
 import { numIn, row } from './hs-form';
+import { SelectField } from '../ui/SelectField';
 
 type Draft = Omit<SocietyUnit, 'id' | 'updated_at'>;
 
@@ -41,9 +42,9 @@ export default function UnitForm({ unit, units, clients, heads, notify, onDone }
         <F label={hsT('wing')}><input className={controls.input} value={u.wing ?? ''} onChange={(e) => set({ wing: e.target.value, ...(unit ? {} : { code: suggestCode(units, e.target.value) }) })} data-hs-unit-field="wing" /></F>
         <F label={hsT('code')}><input className={controls.input} value={u.code} onChange={(e) => set({ code: e.target.value })} data-hs-unit-field="code" /></F>
         <F label={hsT('use')}>
-          <select className={controls.select} value={u.use} onChange={(e) => set({ use: e.target.value as HsUnitUse })}>
+          <SelectField className={controls.select} value={u.use} onChange={(e) => set({ use: e.target.value as HsUnitUse })}>
             {UNIT_USES.map((x) => <option key={x} value={x}>{hsList('uses', UNIT_USES, x)}</option>)}
-          </select>
+          </SelectField>
         </F>
         {num('carpet_area', hsT('carpet'))}
         {num('super_area', hsT('super'))}
@@ -54,9 +55,9 @@ export default function UnitForm({ unit, units, clients, heads, notify, onDone }
       <div style={row}>
         <F label={hsT('owner')}><input className={controls.input} list="hs-members" value={owner} onChange={(e) => setOwner(e.target.value)} data-hs-unit-field="owner" /></F>
         <F label={hsT('occupancy')}>
-          <select className={controls.select} value={u.occupancy} onChange={(e) => set({ occupancy: e.target.value as HsOccupancy })} data-hs-unit-field="occupancy">
+          <SelectField className={controls.select} value={u.occupancy} onChange={(e) => set({ occupancy: e.target.value as HsOccupancy })} data-hs-unit-field="occupancy">
             {OCCUPANCIES.map((x) => <option key={x} value={x}>{hsList('occs', OCCUPANCIES, x)}</option>)}
-          </select>
+          </SelectField>
         </F>
         {u.occupancy === 'tenant' && <F label={hsT('tenant')}><input className={controls.input} list="hs-members" value={tenant} onChange={(e) => setTenant(e.target.value)} data-hs-unit-field="tenant" /></F>}
         {heads.some((h) => h.basis === 'per_inlet') && <F label={hsT('inlets')}><input type="number" min={0} max={50} className={controls.input} value={u.inlets ?? ''} onChange={(e) => set({ inlets: numIn(e.target.value) })} data-hs-unit-field="inlets" /></F>}

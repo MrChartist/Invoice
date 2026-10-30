@@ -13,6 +13,7 @@ import type { UnitMaster } from '../../lib/units';
 import { s7T } from '../../i18n/areas/inventory-7s';
 import controls from '../../styles/controls.module.css';
 import styles from './job-work.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const MODES: EwayTransMode[] = ['ROAD', 'RAIL', 'AIR', 'SHIP'];
 
@@ -40,9 +41,9 @@ export function JobWorkEwayDialog({ challan, items, units, onClose }: { challan:
         <p className={styles.muted}>{s7T('ewayCa')}</p>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="jwe-mode">{s7T('mode')}</label>
-          <select id="jwe-mode" className={controls.select} value={mode} onChange={(e) => setMode(e.target.value as EwayTransMode)}>
+          <SelectField id="jwe-mode" className={controls.select} value={mode} onChange={(e) => setMode(e.target.value as EwayTransMode)}>
             {MODES.map((m) => <option key={m} value={m}>{s7T(`mode${m}`)}</option>)}
-          </select>
+          </SelectField>
         </div>
         {build.notes.length > 0 && (
           <div className={styles.notice}>

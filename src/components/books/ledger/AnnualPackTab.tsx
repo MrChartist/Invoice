@@ -30,6 +30,7 @@ import { NotesEditor } from './NotesEditor';
 import controls from '../../../styles/controls.module.css';
 import surface from '../../../styles/surface.module.css';
 import books from '../books.module.css';
+import { SelectField } from '../../ui/SelectField';
 
 const ENTITY_KEY = { proprietorship: 'entProp', partnership: 'entFirm', llp: 'entLlp', company: 'entCompany', cooperative: 'entCoop', association: 'entAssoc' } as const;
 
@@ -188,15 +189,15 @@ export default function AnnualPackTab({ period, today, notify }: { period: Perio
           <div className={books.toolbar}>
             <label className={controls.field}>
               <span className={controls.label}>{br2T('fy')}</span>
-              <select className={controls.select} value={fy} onChange={(e) => changeFy(Number(e.target.value))} data-annual-fy>
+              <SelectField className={controls.select} value={fy} onChange={(e) => changeFy(Number(e.target.value))} data-annual-fy>
                 {years.map((y) => <option key={y} value={y}>{`FY ${y}-${String(y + 1).slice(2)}`}{y === lastClosed ? ' ✓' : ''}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{br2T('entity')}</span>
-              <select className={controls.select} value={entity} onChange={(e) => setEntity(e.target.value as EntityType)}>
+              <SelectField className={controls.select} value={entity} onChange={(e) => setEntity(e.target.value as EntityType)}>
                 {ENTITY_TYPES.map((t) => <option key={t} value={t}>{br2T(ENTITY_KEY[t])}</option>)}
-              </select>
+              </SelectField>
             </label>
           </div>
           <p className={controls.hint}>{br2T('entityHint')}</p>

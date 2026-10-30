@@ -8,6 +8,8 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Payroll.module.css';
 import { gridKeyDown, inr, parseAmount } from './shared';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 interface Props {
   version: number;
@@ -67,7 +69,7 @@ export function StructuresTab({ version, refresh, notify }: Props) {
       <div className={styles.toolbar}>
         <label className={controls.field}>
           <span className={controls.label}>{pT('structures.for')}</span>
-          <select className={controls.select} value={owner} onChange={(e) => { setOwner(e.target.value); setDraft(null); }}>
+          <SelectField className={controls.select} value={owner} onChange={(e) => { setOwner(e.target.value); setDraft(null); }}>
             <optgroup label={pT('tabs.employees')}>
               {employees.map((e) => <option key={e.id} value={`e:${e.id}`}>{e.code} · {e.name}</option>)}
             </optgroup>
@@ -76,15 +78,15 @@ export function StructuresTab({ version, refresh, notify }: Props) {
                 {groups.map((g) => <option key={g.id} value={`g:${g.id}`}>{pT('structures.group', { name: g.name })}</option>)}
               </optgroup>
             )}
-          </select>
+          </SelectField>
         </label>
         {mine.length > 0 && (
           <label className={controls.field}>
             <span className={controls.label}>{pT('structures.history')}</span>
-            <select className={controls.select} value={current?.id ?? ''} onChange={(e) => { const s = mine.find((x) => x.id === e.target.value); setDraft(s ? toDraft(s) : null); }}>
+            <SelectField className={controls.select} value={current?.id ?? ''} onChange={(e) => { const s = mine.find((x) => x.id === e.target.value); setDraft(s ? toDraft(s) : null); }}>
               {mine.map((s) => <option key={s.id} value={s.id}>{pT('structures.from', { date: formatDate(s.effective_from) })}</option>)}
               {current && !current.id && <option value="">{pT('structures.newFrom', { date: current.effective_from })}</option>}
-            </select>
+            </SelectField>
           </label>
         )}
         <button type="button" className={controls.btnOutline} onClick={() => setDraft({ effective_from: todayInput(), amounts: current ? { ...current.amounts } : {} })}>
@@ -99,7 +101,7 @@ export function StructuresTab({ version, refresh, notify }: Props) {
           <>
             <label className={controls.field} style={{ maxWidth: '14rem' }}>
               <span className={controls.label}>{pT('structures.effective')}</span>
-              <input className={controls.input} type="date" value={current.effective_from} onChange={(e) => setDraft({ ...current, effective_from: e.target.value })} />
+              <DateField className={controls.input} value={current.effective_from} onChange={(e) => setDraft({ ...current, effective_from: e.target.value })} />
             </label>
             <div className={surface.tableWrap}>
               <table className={surface.table}>

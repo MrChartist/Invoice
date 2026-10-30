@@ -14,6 +14,8 @@ import { rcvT, refLabel } from '../../i18n/areas/receivables';
 import { methodLabel } from '../../i18n/labels';
 import { areaNodes } from '../../i18n/areas/nodes';
 import styles from './advances.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 const METHODS = ['Bank transfer', 'UPI', 'Cash', 'Cheque', 'Card', 'Other'];
 
@@ -162,28 +164,28 @@ export function AdvanceFormModal({ open, advance, partyName, onClose, onSaved }:
         <div className={controls.row3}>
           <label className={controls.field}>
             <span className={controls.label}>{rcvT('afDate')}</span>
-            <input className={controls.input} type="date" value={form.date} max={todayInput()} onChange={(e) => set('date', e.target.value)} />
+            <DateField className={controls.input} value={form.date} max={todayInput()} onChange={(e) => set('date', e.target.value)} />
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{rcvT('afFor')}</span>
-            <select className={controls.select} value={form.supply} onChange={(e) => set('supply', e.target.value as AdvanceSupply)}>
+            <SelectField className={controls.select} value={form.supply} onChange={(e) => set('supply', e.target.value as AdvanceSupply)}>
               <option value="services">{rcvT('services')}</option>
               <option value="goods">{rcvT('goods')}</option>
-            </select>
+            </SelectField>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{rcvT('afRate')}</span>
-            <select className={controls.select} value={form.rate} onChange={(e) => set('rate', e.target.value)}>
+            <SelectField className={controls.select} value={form.rate} onChange={(e) => set('rate', e.target.value)}>
               {gstRateOptions(form.date, Number(form.rate)).map((r) => <option key={r} value={String(r)}>{r}%</option>)}
-            </select>
+            </SelectField>
           </label>
         </div>
         <label className={controls.field}>
           <span className={controls.label}>{rcvT('afPos')}</span>
-          <select className={controls.select} value={form.pos} onChange={(e) => set('pos', e.target.value)}>
+          <SelectField className={controls.select} value={form.pos} onChange={(e) => set('pos', e.target.value)}>
             <option value="">{rcvT('afChoose')}</option>
             {INDIAN_STATES.map((s) => <option key={s.code} value={s.code}>{s.code} : {s.name}</option>)}
-          </select>
+          </SelectField>
         </label>
         <div className={styles.taxBox} role="status" aria-live="polite">
           {preview.applies
@@ -199,9 +201,9 @@ export function AdvanceFormModal({ open, advance, partyName, onClose, onSaved }:
         <div className={controls.row}>
           <label className={controls.field}>
             <span className={controls.label}>{rcvT('method')}</span>
-            <select className={controls.select} value={form.method} onChange={(e) => set('method', e.target.value)}>
+            <SelectField className={controls.select} value={form.method} onChange={(e) => set('method', e.target.value)}>
               {METHODS.map((m) => <option key={m} value={m}>{methodLabel(m)}</option>)}
-            </select>
+            </SelectField>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{rcvT('optional', { label: refLabel(form.method) })}</span>

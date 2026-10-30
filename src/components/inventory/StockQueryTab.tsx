@@ -7,6 +7,7 @@ import { imT } from '../../i18n/areas/inventory-masters';
 import controls from '../../styles/controls.module.css';
 import styles from './masters.module.css';
 import inv from './inventory.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /** Stock Query (WP-8): one item — stock by godown / batch, last purchase / sale rates, pending orders, prices. */
 export function StockQueryTab({ items, version, today, initialId }: { items: StockItem[]; version: number; today: string; initialId?: string }) {
@@ -39,10 +40,10 @@ export function StockQueryTab({ items, version, today, initialId }: { items: Sto
       <div className={styles.toolbar}>
         <div className={controls.field} style={{ minWidth: 260 }}>
           <label className={controls.label} htmlFor="sq-item">{imT('queryItem')}</label>
-          <select id="sq-item" className={controls.select} value={id} onChange={(e) => setId(e.target.value)}>
+          <SelectField id="sq-item" className={controls.select} value={id} onChange={(e) => setId(e.target.value)}>
             <option value="">{imT('chooseItem')}</option>
             {tracked.map((i) => <option key={i.id} value={i.id}>{i.name}{i.sku ? ` (${i.sku})` : ''}</option>)}
-          </select>
+          </SelectField>
         </div>
       </div>
       {q && (

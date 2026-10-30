@@ -16,6 +16,7 @@ import { getTable } from '../../lib/storage';
 import { tvdT } from '../../i18n/areas/travel-r15d';
 import { vendorTdsHint } from '../../lib/travel/tv-events';
 import { dmcHint } from '../../lib/travel/tv-pos';
+import { SelectField } from '../ui/SelectField';
 
 type Tag = PurchaseRecord['tv'];
 
@@ -39,17 +40,17 @@ export default function TripPick({ value, onChange, itc, setItc }: { value: Tag;
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }} data-tv-trip-pick>
       <Field label={tvT('trip')}>
-        <select className={controls.select} value={value?.trip_id ?? ''} onChange={(e) => pick(e.target.value)} data-tv-bill-trip>
+        <SelectField className={controls.select} value={value?.trip_id ?? ''} onChange={(e) => pick(e.target.value)} data-tv-bill-trip>
           <option value="">-</option>
           {trips.map((t) => <option key={t.id} value={t.id}>{tripLabel(t)}</option>)}
-        </select>
+        </SelectField>
       </Field>
       {value?.trip_id && bookings.length > 0 && (
         <Field label={tvT('booking')}>
-          <select className={controls.select} value={value.booking_id ?? ''} onChange={(e) => pick(value.trip_id, e.target.value || undefined)} data-tv-bill-booking>
+          <SelectField className={controls.select} value={value.booking_id ?? ''} onChange={(e) => pick(value.trip_id, e.target.value || undefined)} data-tv-bill-booking>
             <option value="">-</option>
             {bookings.map((b) => <option key={b.id} value={b.id}>{b.start} · {tvList('comps', TV_COMPONENTS, b.component)}{b.ref ? ` · ${b.ref}` : ''}</option>)}
-          </select>
+          </SelectField>
         </Field>
       )}
       {value?.regime === 'to5' && (itc

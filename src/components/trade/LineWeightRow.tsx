@@ -15,6 +15,7 @@ import type { InvoiceItem } from '../../types/invoice';
 import type { LineWeight, WeightUnit } from '../../types/trade-r8';
 import controls from '../../styles/controls.module.css';
 import own from '../distribution/dist.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export function WeightFields({ wt, unit, onChange, onClear }: { wt: LineWeight; unit?: string; onChange: (wt: LineWeight) => void; onClear: () => void }) {
   const set = (p: Partial<LineWeight>) => onChange({ ...wt, ...p });
@@ -30,14 +31,14 @@ export function WeightFields({ wt, unit, onChange, onClear }: { wt: LineWeight; 
           <input className={controls.input} list="r8b-kinds" value={wt.kind} onChange={(e) => set({ kind: e.target.value.toUpperCase() })} /></label>
         {num(tbT('gross'), wt.gross, 'gross', 'gross')}
         <label className={controls.field}><span className={controls.label}>{tbT('unit')}</span>
-          <select className={controls.select} value={wt.gross_unit} onChange={(e) => set({ gross_unit: e.target.value as WeightUnit })}>{WEIGHT_UNITS.map((u) => <option key={u}>{u}</option>)}</select></label>
+          <SelectField className={controls.select} value={wt.gross_unit} onChange={(e) => set({ gross_unit: e.target.value as WeightUnit })}>{WEIGHT_UNITS.map((u) => <option key={u}>{u}</option>)}</SelectField></label>
         {num(tbT('tare'), wt.tare_per_package, 'tare_per_package', 'tare')}
         <label className={controls.field}><span className={controls.label}>{tbT('ded')}</span>
           <span className={own.row}>
             <NumberInput className={controls.input} value={wt.deduction.value} onChange={(x) => set({ deduction: { ...wt.deduction, value: x } })} data-wt="ded" />
-            <select className={controls.select} value={wt.deduction.basis} onChange={(e) => set({ deduction: { ...wt.deduction, basis: e.target.value as LineWeight['deduction']['basis'] } })}>
+            <SelectField className={controls.select} value={wt.deduction.basis} onChange={(e) => set({ deduction: { ...wt.deduction, basis: e.target.value as LineWeight['deduction']['basis'] } })}>
               {(['per_qtl', 'per_package', 'percent'] as const).map((b) => <option key={b} value={b}>{tbT(`ded.${b}`)}</option>)}
-            </select>
+            </SelectField>
           </span></label>
       </div>
       <datalist id="r8b-kinds">{PACKAGE_KINDS.map((k) => <option key={k} value={k} />)}</datalist>

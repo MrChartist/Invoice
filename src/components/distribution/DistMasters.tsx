@@ -12,6 +12,7 @@ import own from './dist.module.css';
 const PartyRatesEditor = lazy(() => import('../trade/PartyRatesEditor'));
 import { impliedPacks } from '../../lib/shop-mode';
 import { localDb } from '../../lib/localDb';
+import { SelectField } from '../ui/SelectField';
 
 const DAYS = [0, 1, 2, 3, 4, 5, 6];
 interface Agent { id: string; name: string }
@@ -63,10 +64,10 @@ export default function DistMasters({ onDone }: { onDone: (msg: string, error?: 
           <ul>{routes.map((r) => <li key={r.id}>{r.name}{r.area_id ? ` · ${nameOf(areas, r.area_id)}` : ''} <button type="button" className={controls.btnIcon} aria-label={distT('deleteNamed', { name: r.name })} onClick={() => run(() => { routesDb.remove(r.id); return distT('deleted'); })}><Trash2 size={12} /></button></li>)}</ul>
           <form className={own.row} onSubmit={(e) => { e.preventDefault(); run(() => { routesDb.save({ name: route.name, ...(route.area_id ? { area_id: route.area_id } : {}) }); setRoute({ id: '', name: '', area_id: '' }); return distT('saved'); }); }}>
             <input className={controls.input} value={route.name} placeholder={distT('routeName')} aria-label={distT('routeName')} onChange={(e) => setRoute({ ...route, name: e.target.value })} />
-            <select className={controls.select} value={route.area_id} aria-label={distT('area')} onChange={(e) => setRoute({ ...route, area_id: e.target.value })}>
+            <SelectField className={controls.select} value={route.area_id} aria-label={distT('area')} onChange={(e) => setRoute({ ...route, area_id: e.target.value })}>
               <option value="">{distT('noArea')}</option>
               {areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
+            </SelectField>
             <button type="submit" className={`${controls.btnOutline} ${controls.btnSm}`}>{distT('add')}</button>
           </form>
         </div>
@@ -94,18 +95,18 @@ export default function DistMasters({ onDone }: { onDone: (msg: string, error?: 
       <form className={own.stack} onSubmit={(e) => { e.preventDefault(); run(() => { const { id, ...rest } = beat; beatsDb.save(id ? { ...rest, id } : rest); setBeat({ id: '', name: '', days: [] }); return distT('saved'); }); }}>
         <div className={own.row}>
           <input className={controls.input} value={beat.name} placeholder={distT('beatName')} aria-label={distT('beatName')} onChange={(e) => setBeat({ ...beat, name: e.target.value })} data-beat-name />
-          <select className={controls.select} value={beat.area_id ?? ''} aria-label={distT('area')} onChange={(e) => setBeat({ ...beat, area_id: e.target.value || undefined })}>
+          <SelectField className={controls.select} value={beat.area_id ?? ''} aria-label={distT('area')} onChange={(e) => setBeat({ ...beat, area_id: e.target.value || undefined })}>
             <option value="">{distT('noArea')}</option>
             {areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
-          <select className={controls.select} value={beat.route_id ?? ''} aria-label={distT('route')} onChange={(e) => setBeat({ ...beat, route_id: e.target.value || undefined })}>
+          </SelectField>
+          <SelectField className={controls.select} value={beat.route_id ?? ''} aria-label={distT('route')} onChange={(e) => setBeat({ ...beat, route_id: e.target.value || undefined })}>
             <option value="">{distT('noRoute')}</option>
             {routes.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-          </select>
-          <select className={controls.select} value={beat.agent_id ?? ''} aria-label={distT('salesman')} onChange={(e) => setBeat({ ...beat, agent_id: e.target.value || undefined })}>
+          </SelectField>
+          <SelectField className={controls.select} value={beat.agent_id ?? ''} aria-label={distT('salesman')} onChange={(e) => setBeat({ ...beat, agent_id: e.target.value || undefined })}>
             <option value="">{distT('noSalesman')}</option>
             {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
+          </SelectField>
         </div>
         <div className={own.tabs} role="group" aria-label={distT('days')}>
           {DAYS.map((d) => (
@@ -121,11 +122,11 @@ export default function DistMasters({ onDone }: { onDone: (msg: string, error?: 
       <p className={own.muted}>{distT('partiesIntro')}</p>
       <div className={own.row}>
         <input type="search" className={controls.input} value={q} placeholder={distT('searchParties')} aria-label={distT('searchParties')} onChange={(e) => setQ(e.target.value)} />
-        <select className={controls.select} value={beatFilter} aria-label={distT('beat')} onChange={(e) => setBeatFilter(e.target.value)}>
+        <SelectField className={controls.select} value={beatFilter} aria-label={distT('beat')} onChange={(e) => setBeatFilter(e.target.value)}>
           <option value="">{distT('allBeats')}</option>
           <option value="-">{distT('notAssigned')}</option>
           {beats.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
+        </SelectField>
       </div>
       <div className={own.tableWrap}>
         <table className={own.table}>
@@ -146,22 +147,22 @@ export default function DistMasters({ onDone }: { onDone: (msg: string, error?: 
       </div>
       {pick.size > 0 && (
         <div className={own.row}>
-          <select className={controls.select} value={assign.area_id} aria-label={distT('area')} onChange={(e) => setAssign({ ...assign, area_id: e.target.value })}>
+          <SelectField className={controls.select} value={assign.area_id} aria-label={distT('area')} onChange={(e) => setAssign({ ...assign, area_id: e.target.value })}>
             <option value="">{distT('keepArea')}</option><option value="-">{distT('clear')}</option>
             {areas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
-          <select className={controls.select} value={assign.beat_id} aria-label={distT('beat')} onChange={(e) => setAssign({ ...assign, beat_id: e.target.value })} data-assign-beat>
+          </SelectField>
+          <SelectField className={controls.select} value={assign.beat_id} aria-label={distT('beat')} onChange={(e) => setAssign({ ...assign, beat_id: e.target.value })} data-assign-beat>
             <option value="">{distT('keepBeat')}</option><option value="-">{distT('clear')}</option>
             {beats.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-          <select className={controls.select} value={assign.agent_id} aria-label={distT('salesman')} onChange={(e) => setAssign({ ...assign, agent_id: e.target.value })}>
+          </SelectField>
+          <SelectField className={controls.select} value={assign.agent_id} aria-label={distT('salesman')} onChange={(e) => setAssign({ ...assign, agent_id: e.target.value })}>
             <option value="">{distT('keepSalesman')}</option><option value="-">{distT('clear')}</option>
             {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-          </select>
-          <select className={controls.select} value={assign.credit_policy} aria-label={crT('mode')} onChange={(e) => setAssign({ ...assign, credit_policy: e.target.value })}>
+          </SelectField>
+          <SelectField className={controls.select} value={assign.credit_policy} aria-label={crT('mode')} onChange={(e) => setAssign({ ...assign, credit_policy: e.target.value })}>
             <option value="">{distT('keepCredit')}</option><option value="-">{crT('companyDefault')}</option>
             <option value="off">{crT('off')}</option><option value="warn">{crT('warn')}</option><option value="block">{crT('block')}</option>
-          </select>
+          </SelectField>
           <button type="button" className={controls.btnPrimary} data-assign onClick={() => run(() => {
             const v = (x: string) => (x === '' ? undefined : x === '-' ? '' : x);
             const n = assignParties([...pick], { area_id: v(assign.area_id), beat_id: v(assign.beat_id), agent_id: v(assign.agent_id), credit_policy: v(assign.credit_policy) });

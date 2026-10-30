@@ -14,6 +14,7 @@ import { uxT } from '../../i18n/areas/invoicing-ux';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import ux from './ux.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /**
  * A5 "customer & items first": the document details card (type, number, dates, currency) shown as one
@@ -48,9 +49,9 @@ export function MetaSummary({ forceOpen, editing, children }: { forceOpen?: bool
       <div className={ux.box}>
         <div className={ux.row}>
           {/* QA-3 F21: the type (Quotation, Proforma…) is picked here, not behind "Edit"; locked once a saved doc has a number. */}
-          <select className={`${controls.select} ${ux.typePick}`} value={s.doc_type} onChange={(e) => s.setDocType(e.target.value as DocumentType)} disabled={!!editing && Boolean(s.invoice_number)} aria-label={t('meta.type')} data-meta-type>
+          <SelectField className={`${controls.select} ${ux.typePick}`} value={s.doc_type} onChange={(e) => s.setDocType(e.target.value as DocumentType)} disabled={!!editing && Boolean(s.invoice_number)} aria-label={t('meta.type')} data-meta-type>
             {DOC_TYPES.map((d) => <option key={d} value={d}>{docLabel(d)}</option>)}
-          </select>
+          </SelectField>
           <span>{s.invoice_number || uxT('metaAutoNumber')}</span>
           <span className={ux.muted}>· {formatDate(s.issue_date)}</span>
           {due && <span className={`${ux.muted} ${ux.nowrap}`}>· {due}</span>}

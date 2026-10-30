@@ -3,6 +3,7 @@ import controls from '../../styles/controls.module.css';
 import styles from './gst-reports.module.css';
 import { useT } from '../../i18n';
 import { gvT } from '../../i18n/areas/gst-views';
+import { SelectField } from '../ui/SelectField';
 
 const MONTHS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3] as const;
 
@@ -42,7 +43,7 @@ export function PeriodPicker({ value, onChange, fyOptions }: PeriodPickerProps) 
 
       <label className={styles.periodField}>
         <span className={controls.label}>{gvT('financialYear')}</span>
-        <select
+        <SelectField
           className={controls.select}
           value={value.fyStart}
           onChange={(e) => onChange({ ...value, fyStart: Number(e.target.value) })}
@@ -52,13 +53,13 @@ export function PeriodPicker({ value, onChange, fyOptions }: PeriodPickerProps) 
               FY {String(y).slice(2)}-{String(y + 1).slice(2)}
             </option>
           ))}
-        </select>
+        </SelectField>
       </label>
 
       {value.kind === 'month' && (
         <label className={styles.periodField}>
           <span className={controls.label}>{gvT('month')}</span>
-          <select
+          <SelectField
             className={controls.select}
             value={value.month}
             onChange={(e) => onChange({ ...value, month: Number(e.target.value) })}
@@ -66,14 +67,14 @@ export function PeriodPicker({ value, onChange, fyOptions }: PeriodPickerProps) 
             {MONTHS.map((m) => (
               <option key={m} value={m}>{gvT(`m${m}`)}</option>
             ))}
-          </select>
+          </SelectField>
         </label>
       )}
 
       {value.kind === 'quarter' && (
         <label className={styles.periodField}>
           <span className={controls.label}>{gvT('quarter')}</span>
-          <select
+          <SelectField
             className={controls.select}
             value={value.quarter}
             onChange={(e) => onChange({ ...value, quarter: Number(e.target.value) as 1 | 2 | 3 | 4 })}
@@ -82,7 +83,7 @@ export function PeriodPicker({ value, onChange, fyOptions }: PeriodPickerProps) 
             <option value={2}>{gvT('q2')}</option>
             <option value={3}>{gvT('q3')}</option>
             <option value={4}>{gvT('q4')}</option>
-          </select>
+          </SelectField>
         </label>
       )}
 

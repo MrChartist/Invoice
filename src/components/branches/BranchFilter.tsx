@@ -8,6 +8,7 @@ import { UNASSIGNED, loadBranches } from '../../lib/branch';
 import { useT } from '../../i18n';
 import { branchT } from '../../i18n/areas/branch-books';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export function BranchFilter({ value, onChange, className, testId }: { value: string; onChange: (v: string) => void; className?: string; testId?: string }) {
   useT();
@@ -20,12 +21,12 @@ export function BranchFilter({ value, onChange, className, testId }: { value: st
   }, []);
   if (!branches.length) return null;
   return (
-    <select className={className ?? controls.select} aria-label={branchT('filterLabel')} value={value} onChange={(e) => onChange(e.target.value)} data-testid={testId}>
+    <SelectField className={className ?? controls.select} aria-label={branchT('filterLabel')} value={value} onChange={(e) => onChange(e.target.value)} data-testid={testId}>
       <option value="">{branchT('allBranches')}</option>
       {branches.map((b) => (
         <option key={b.id} value={b.id}>{b.code ? `${b.code} · ${b.name}` : b.name}</option>
       ))}
       <option value={UNASSIGNED}>{branchT('noBranch')}</option>
-    </select>
+    </SelectField>
   );
 }

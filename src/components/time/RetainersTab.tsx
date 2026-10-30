@@ -22,6 +22,8 @@ import controls from '../../styles/controls.module.css';
 import styles from './service-r3.module.css';
 import { useT } from '../../i18n';
 import { svcT } from '../../i18n/areas/service-r3';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Notify = (message: string, tone?: 'success' | 'error') => void;
 
@@ -226,10 +228,10 @@ export default function RetainersTab({ clients, prefs, entries, invoices, notify
                             ? <>{numbers.get(p.fee_invoice_id) ?? ''}{p.fee_state === 'cancelled' ? ` · ${svcT('feeCancelled')}` : ''}</>
                             : editable && clientInvoices.length && !p.closed
                               ? (
-                                <select className={controls.select} value="" onChange={(e) => linkFee(p.period, e.target.value)} aria-label={`${svcT('linkFee')} ${p.label}`}>
+                                <SelectField className={controls.select} value="" onChange={(e) => linkFee(p.period, e.target.value)} aria-label={`${svcT('linkFee')} ${p.label}`}>
                                   <option value="">{svcT('feePending')} · {svcT('linkFee')}</option>
                                   {clientInvoices.map((i) => <option key={i.id} value={i.id}>{i.invoice_number} · {i.issue_date}</option>)}
-                                </select>
+                                </SelectField>
                               )
                               : svcT('feePending')}
                         </td>
@@ -250,10 +252,10 @@ export default function RetainersTab({ clients, prefs, entries, invoices, notify
             <div className={styles.form}>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="rt-client">{svcT('client')}</label>
-                <select id="rt-client" className={controls.select} value={draft.client_key} onChange={(e) => setDraft({ ...draft, client_key: e.target.value })} disabled={!!draft.id}>
+                <SelectField id="rt-client" className={controls.select} value={draft.client_key} onChange={(e) => setDraft({ ...draft, client_key: e.target.value })} disabled={!!draft.id}>
                   <option value="">{svcT('none')}</option>
                   {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                </SelectField>
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="rt-hours">{svcT('hoursPerPeriod')}</label>
@@ -261,10 +263,10 @@ export default function RetainersTab({ clients, prefs, entries, invoices, notify
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="rt-period">{svcT('period')}</label>
-                <select id="rt-period" className={controls.select} value={draft.period} onChange={(e) => setDraft({ ...draft, period: e.target.value as RetainerPeriodKind })}>
+                <SelectField id="rt-period" className={controls.select} value={draft.period} onChange={(e) => setDraft({ ...draft, period: e.target.value as RetainerPeriodKind })}>
                   <option value="month">{svcT('month')}</option>
                   <option value="quarter">{svcT('quarter')}</option>
-                </select>
+                </SelectField>
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="rt-fee">{svcT('fee')}</label>
@@ -272,7 +274,7 @@ export default function RetainersTab({ clients, prefs, entries, invoices, notify
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="rt-start">{svcT('start')}</label>
-                <input id="rt-start" type="date" className={controls.input} value={draft.start} onChange={(e) => setDraft({ ...draft, start: e.target.value })} />
+                <DateField id="rt-start" className={controls.input} value={draft.start} onChange={(e) => setDraft({ ...draft, start: e.target.value })} />
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="rt-cap">{svcT('rolloverCap')}</label>
@@ -284,10 +286,10 @@ export default function RetainersTab({ clients, prefs, entries, invoices, notify
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="rt-rec">{svcT('recurringTpl')}</label>
-                <select id="rt-rec" className={controls.select} value={draft.recurring_id} onChange={(e) => setDraft({ ...draft, recurring_id: e.target.value })}>
+                <SelectField id="rt-rec" className={controls.select} value={draft.recurring_id} onChange={(e) => setDraft({ ...draft, recurring_id: e.target.value })}>
                   <option value="">{svcT('noRecurring')}</option>
                   {recurring.map((r) => <option key={r.id} value={r.id}>{r.name || r.id}</option>)}
-                </select>
+                </SelectField>
               </div>
             </div>
             {projects.length > 0 && (

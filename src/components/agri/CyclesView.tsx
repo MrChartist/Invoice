@@ -22,6 +22,7 @@ import type { AgCycleSettings, AgDeduction, FarmerCycle, FarmerCycleLine } from 
 import controls from '../../styles/controls.module.css';
 import { F, Grid, In } from './agri-ui';
 import { money, useRun, wrap, type Done } from './agri-util';
+import { SelectField } from '../ui/SelectField';
 
 const KINDS: AgDeduction['kind'][] = ['advance', 'loan', 'share', 'insurance', 'union', 'other'];
 
@@ -68,19 +69,19 @@ export default function CyclesView({ onDone }: { onDone: Done }) {
   return (
     <div data-ag-cycles>
       <div style={wrap}>
-        <F label={agT('cycleLength')}><select className={controls.select} value={cs.length} onChange={(e) => run(() => { saveAgriSettings({ cycles: { ...cs, length: e.target.value as AgCycleSettings['length'] } }); })}>{(['weekly', '10day', 'fortnight', 'monthly'] as const).map((k) => <option key={k} value={k}>{agT(`len.${k}`)}</option>)}</select></F>
-        <F label={agT('centre')}><select className={controls.select} value={centre} onChange={(e) => setCentre(e.target.value)}><option value="">-</option>{s.centres?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></F>
+        <F label={agT('cycleLength')}><SelectField className={controls.select} value={cs.length} onChange={(e) => run(() => { saveAgriSettings({ cycles: { ...cs, length: e.target.value as AgCycleSettings['length'] } }); })}>{(['weekly', '10day', 'fortnight', 'monthly'] as const).map((k) => <option key={k} value={k}>{agT(`len.${k}`)}</option>)}</SelectField></F>
+        <F label={agT('centre')}><SelectField className={controls.select} value={centre} onChange={(e) => setCentre(e.target.value)}><option value="">-</option>{s.centres?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</SelectField></F>
         <F label={agT('dayInCycle')}><In v={day} set={setDay} type="date" /></F>
         <span>{agT('period', { from: per.from, to: per.to })}</span>
       </div>
       <div style={wrap}>
-        <F label={agT('farmer')}><select className={controls.select} value={add.fid} onChange={(e) => setAdd({ ...add, fid: e.target.value })} data-ag-c-farmer><option value="">-</option>{farmers.map((f) => <option key={f.id} value={f.id}>{f.ag.code} · {f.name}</option>)}</select></F>
+        <F label={agT('farmer')}><SelectField className={controls.select} value={add.fid} onChange={(e) => setAdd({ ...add, fid: e.target.value })} data-ag-c-farmer><option value="">-</option>{farmers.map((f) => <option key={f.id} value={f.id}>{f.ag.code} · {f.name}</option>)}</SelectField></F>
         <F label={agT('qty')}><In v={add.qty} set={(v) => setAdd({ ...add, qty: v })} type="number" w={80} /></F>
         <F label={agT('unit')}><In v={add.unit} set={(v) => setAdd({ ...add, unit: v })} w={60} /></F>
         <F label={agT('amount')}><In v={add.amount} set={(v) => setAdd({ ...add, amount: v })} type="number" w={100} data-ag-c-amount /></F>
         <button type="button" className={controls.btnOutline} onClick={addLine} data-ag-c-add>{agT('addLine')}</button>
-        <F label={agT('deduction')}><select className={controls.select} value={ded.fid} onChange={(e) => setDed({ ...ded, fid: e.target.value })}><option value="">-</option>{lines.map((l) => <option key={l.farmer_id} value={l.farmer_id}>{l.name}</option>)}</select></F>
-        <select className={controls.select} value={ded.kind} onChange={(e) => setDed({ ...ded, kind: e.target.value as AgDeduction['kind'] })}>{KINDS.map((k) => <option key={k} value={k}>{agT(`d.${k}`)}</option>)}</select>
+        <F label={agT('deduction')}><SelectField className={controls.select} value={ded.fid} onChange={(e) => setDed({ ...ded, fid: e.target.value })}><option value="">-</option>{lines.map((l) => <option key={l.farmer_id} value={l.farmer_id}>{l.name}</option>)}</SelectField></F>
+        <SelectField className={controls.select} value={ded.kind} onChange={(e) => setDed({ ...ded, kind: e.target.value as AgDeduction['kind'] })}>{KINDS.map((k) => <option key={k} value={k}>{agT(`d.${k}`)}</option>)}</SelectField>
         <In v={ded.amount} set={(v) => setDed({ ...ded, amount: v })} type="number" w={80} />
         <button type="button" className={controls.btnOutline} disabled={!ded.fid} onClick={addDed}>{agT('addDeduction')}</button>
       </div>
@@ -88,7 +89,7 @@ export default function CyclesView({ onDone }: { onDone: Done }) {
       {lines.length > 0 && <p>{agT('totals', { gross: money(t.gross), ded: money(t.deductions), net: money(t.net) })}</p>}
       <button type="button" className={controls.btnPrimary} disabled={!lines.length} onClick={() => run(() => { const c = saveCycleDraft({ centre_id: centre || undefined, period_from: per.from, period_to: per.to, source: 'produce', lines }); setLines([]); return agT('draftSaved', { no: c.number }); })} data-ag-c-save>{agT('saveDraft')}</button>
       <div style={wrap}>
-        <F label={agT('bankPreset')}><select className={controls.select} value={preset} onChange={(e) => setPreset(e.target.value as UploadPreset)}>{UPLOAD_PRESETS.map((p) => <option key={p}>{p}</option>)}</select></F>
+        <F label={agT('bankPreset')}><SelectField className={controls.select} value={preset} onChange={(e) => setPreset(e.target.value as UploadPreset)}>{UPLOAD_PRESETS.map((p) => <option key={p}>{p}</option>)}</SelectField></F>
         <F label={agT('debitAccount')}><In v={debit} set={setDebit} /></F>
       </div>
       <Grid attr="cycles" head={[agT('number'), agT('periodCol'), agT('farmers'), agT('net'), agT('status'), '']} rows={cycles.map((c) => [c.number, `${c.period_from} – ${c.period_to}`, c.lines.length, money(cycleTotals(c).net), agT(`st.${c.status}`), (

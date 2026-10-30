@@ -6,6 +6,7 @@ import { downloadText } from '../../lib/download';
 import { useT } from '../../i18n';
 import { skT } from '../../i18n/areas/stock-depth';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /** 8.87: raw TSPL / EPL / ZPL for thermal roll layouts — over Web Serial (feature-detected) or as a file. */
 export default function RawLabelButtons({ items, layout, onMessage }: { items: LabelItem[]; layout: LabelLayout; onMessage: (m: string) => void }) {
@@ -25,9 +26,9 @@ export default function RawLabelButtons({ items, layout, onMessage }: { items: L
   };
   return (
     <>
-      <select className={controls.select} value={lang} aria-label={skT('rawLang')} onChange={(e) => setLang(e.target.value as RawLanguage)}>
+      <SelectField className={controls.select} value={lang} aria-label={skT('rawLang')} onChange={(e) => setLang(e.target.value as RawLanguage)}>
         {RAW_LANGUAGES.map((l) => <option key={l} value={l}>{l.toUpperCase()}</option>)}
-      </select>
+      </SelectField>
       {serial && <button type="button" className={controls.btnOutline} disabled={!items.some((i) => i.copies > 0)} onClick={() => void send()}><Printer size={16} aria-hidden="true" /> {skT('sendSerial')}</button>}
       <button type="button" className={controls.btnOutline} disabled={!items.some((i) => i.copies > 0)} onClick={() => downloadText(`labels.${lang === 'zpl' ? 'zpl' : 'prn'}`, text())}><Download size={16} aria-hidden="true" /> {skT('saveRaw')}</button>
     </>

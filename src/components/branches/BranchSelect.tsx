@@ -8,6 +8,7 @@ import { loadBranches } from '../../lib/branch';
 import { useT } from '../../i18n';
 import { wireT } from '../../i18n/areas/wiring';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export function BranchSelect({ id, value, onChange }: { id: string; value?: string; onChange: (branchId: string | undefined) => void }) {
   useT();
@@ -22,12 +23,12 @@ export function BranchSelect({ id, value, onChange }: { id: string; value?: stri
   return (
     <div className={controls.field}>
       <label className={controls.label} htmlFor={id}>{wireT('branch')}</label>
-      <select id={id} className={controls.select} value={value ?? ''} onChange={(e) => onChange(e.target.value || undefined)}>
+      <SelectField id={id} className={controls.select} value={value ?? ''} onChange={(e) => onChange(e.target.value || undefined)}>
         <option value="">{wireT('branchAuto')}</option>
         {branches.map((b) => (
           <option key={b.id} value={b.id}>{b.code ? `${b.code} · ${b.name}` : b.name}</option>
         ))}
-      </select>
+      </SelectField>
     </div>
   );
 }

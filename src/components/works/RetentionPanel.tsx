@@ -19,6 +19,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from '../transport/transport.module.css';
 import own from './works.module.css';
+import { DateField } from '../ui/DateField';
 
 export function RetentionPanel({ notify, refresh, tick }: PanelProps) {
   const bills = useMemo(() => localDb.invoices.getAll().filter((i) => i.ra_deductions?.length && i.status !== 'Cancelled' && i.status !== 'Draft'), [tick]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -37,7 +38,7 @@ export function RetentionPanel({ notify, refresh, tick }: PanelProps) {
   return (
     <div className={styles.stack}>
       <div className={styles.toolbar}>
-        <F l={twT('date')}><input className={controls.input} type="date" value={f.day} onChange={(e) => setF({ ...f, day: e.target.value })} /></F>
+        <F l={twT('date')}><DateField className={controls.input} value={f.day} onChange={(e) => setF({ ...f, day: e.target.value })} /></F>
         <F l={twT('method')}><input className={controls.input} value={f.method} onChange={(e) => setF({ ...f, method: e.target.value })} /></F>
       </div>
       <div className={surface.tableWrap}>

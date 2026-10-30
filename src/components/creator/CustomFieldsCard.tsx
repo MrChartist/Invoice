@@ -9,6 +9,7 @@ import surface from '../../styles/surface.module.css';
 import { useT } from '../../i18n';
 import { edT } from '../../i18n/areas/editor';
 import styles from './CustomFieldsCard.module.css';
+import { TypedInput } from '../ui/TypedInput';
 
 type Row = Pick<CustomFieldDef, 'id' | 'label' | 'type' | 'print'> & { scope?: 'party'; stored?: CustomFieldValue };
 
@@ -55,7 +56,7 @@ export function CustomFieldsCard({ refreshKey = 0 }: { refreshKey?: number }) {
                   {print && <Printer size={12} className={styles.printIcon} aria-label={edT('cfPrinted')} />}
                   {row.scope === 'party' && <span className={styles.tag}>{edT('cfClient')}</span>}
                 </label>
-                <input
+                <TypedInput
                   id={id}
                   className={row.type === 'number' ? controls.inputNumeric : controls.input}
                   type={row.type === 'date' ? 'date' : 'text'}

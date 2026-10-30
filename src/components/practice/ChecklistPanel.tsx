@@ -7,6 +7,7 @@ import { dkT } from '../../i18n/areas/desks-r3';
 import { checklistLabel } from '../../i18n/areas/desks-checklist';
 import controls from '../../styles/controls.module.css';
 import styles from './practice.module.css';
+import { DateField } from '../ui/DateField';
 
 /** R3-C6 monthly client checklist of the open company: tick per month; unticked items carry over. */
 export function ChecklistPanel({ onChanged }: { onChanged?: () => void }) {
@@ -29,7 +30,7 @@ export function ChecklistPanel({ onChanged }: { onChanged?: () => void }) {
       <div className={styles.row}>
         <label className={controls.field}>
           <span className={controls.label}>{dkT('ck.month')}</span>
-          <input className={controls.input} type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
+          <DateField className={controls.input} mode="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
         </label>
         <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => { setDraft(template.join('\n')); setEditing((v) => !v); }}>{dkT('ck.editTemplate')}</button>
       </div>

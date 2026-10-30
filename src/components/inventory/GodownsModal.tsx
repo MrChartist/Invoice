@@ -23,6 +23,7 @@ import surface from '../../styles/surface.module.css';
 import styles from './inventory.module.css';
 import { errText } from '../../i18n/lib-msg';
 import { costCentreLabel, loadCostCentres, pickableCentres } from '../../lib/cost-centres';
+import { SelectField } from '../ui/SelectField';
 
 // 7.167: a godown may belong to a cost centre (its stock shows on that centre's column of the Project P&L).
 const ccT = defineArea(
@@ -133,36 +134,36 @@ export function GodownsModal({ open, godowns, tracking, transfersUse, onClose, o
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="gd-parent">{imT('godownParent')}</label>
-              <select id="gd-parent" className={controls.select} value={editing.parent_id} onChange={(e) => setEditing({ ...editing, parent_id: e.target.value })}>
+              <SelectField id="gd-parent" className={controls.select} value={editing.parent_id} onChange={(e) => setEditing({ ...editing, parent_id: e.target.value })}>
                 <option value="">{imT('topLevel')}</option>
                 {tree.filter((r) => !blocked.has(r.node.id)).map((r) => <option key={r.node.id} value={r.node.id}>{r.path}</option>)}
-              </select>
+              </SelectField>
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="gd-kind">{skT('godownKind')}</label>
-              <select id="gd-kind" className={controls.select} value={editing.kind ?? ''} onChange={(e) => setEditing({ ...editing, kind: e.target.value as Godown['kind'] | '' })} disabled={editing.id === MAIN_GODOWN_ID}>
+              <SelectField id="gd-kind" className={controls.select} value={editing.kind ?? ''} onChange={(e) => setEditing({ ...editing, kind: e.target.value as Godown['kind'] | '' })} disabled={editing.id === MAIN_GODOWN_ID}>
                 <option value="">{skT('kindNormal')}</option>
                 <option value="van">{skT('kindVan')}</option>
                 <option value="expiry">{skT('kindExpiry')}</option>
-              </select>
+              </SelectField>
             </div>
             {editing.kind !== 'transit' && (
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="gd-replenish">{replT('label')}</label>
-                <select id="gd-replenish" className={controls.select} value={editing.replenish_from ?? ''} onChange={(e) => setEditing({ ...editing, replenish_from: e.target.value })}>
+                <SelectField id="gd-replenish" className={controls.select} value={editing.replenish_from ?? ''} onChange={(e) => setEditing({ ...editing, replenish_from: e.target.value })}>
                   <option value="">{replT('none')}</option>
                   {godowns.filter((x) => x.id !== editing.id && !x.kind).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-                </select>
+                </SelectField>
                 <span className={controls.hint}>{replT('hint')}</span>
               </div>
             )}
             {centres.length > 0 && (
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="gd-cc">{ccT('label')}</label>
-                <select id="gd-cc" className={controls.select} value={editing.cost_centre_id ?? ''} onChange={(e) => setEditing({ ...editing, cost_centre_id: e.target.value || undefined })}>
+                <SelectField id="gd-cc" className={controls.select} value={editing.cost_centre_id ?? ''} onChange={(e) => setEditing({ ...editing, cost_centre_id: e.target.value || undefined })}>
                   <option value="">{ccT('none')}</option>
                   {pickableCentres(centres, editing.cost_centre_id).map((c) => <option key={c.id} value={c.id}>{costCentreLabel(c, centres)}</option>)}
-                </select>
+                </SelectField>
                 <span className={controls.hint}>{ccT('hint')}</span>
               </div>
             )}

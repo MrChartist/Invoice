@@ -10,6 +10,9 @@ import { F } from './Field';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './transport.module.css';
+import { TypedInput } from '../ui/TypedInput';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const blank = () => ({ id: '', reg: '', own: true, type: '', cap: '', owner: '', min: '', max: '', docs: {} as Partial<Record<VehicleDocKind, string>>, declOn: '', declN: '', declPan: '' });
 
@@ -53,7 +56,7 @@ export function VehiclesPanel({ notify, refresh, tick }: PanelProps) {
     }
   };
   const txt = (k: 'reg' | 'type' | 'cap' | 'min' | 'max' | 'declOn' | 'declN' | 'declPan', label: string, type = 'text') => f && (
-    <F l={label}><input className={controls.input} type={type} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} data-veh-field={k} /></F>
+    <F l={label}><TypedInput className={controls.input} type={type} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} data-veh-field={k} /></F>
   );
   return (
     <div className={styles.stack}>
@@ -67,11 +70,11 @@ export function VehiclesPanel({ notify, refresh, tick }: PanelProps) {
             {txt('min', twT('kmplMin'), 'number')}{txt('max', twT('kmplMax'), 'number')}
             {!f.own && (
               <F l={twT('owner')}>
-                <select className={controls.select} value={f.owner} onChange={(e) => setF({ ...f, owner: e.target.value })}><option value="">-</option>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></F>
+                <SelectField className={controls.select} value={f.owner} onChange={(e) => setF({ ...f, owner: e.target.value })}><option value="">-</option>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</SelectField></F>
             )}
             {!f.own && f.owner && <>{txt('declOn', twT('decl194c6On'), 'date')}{txt('declN', twT('declVehicles'), 'number')}{txt('declPan', 'PAN')}</>}
             {VEHICLE_DOC_KINDS.map((k) => (
-              <label key={k} className={controls.field}><span className={controls.label}>{twT(`doc.${k}`)}</span><input className={controls.input} type="date" value={f.docs[k] ?? ''} onChange={(e) => setF({ ...f, docs: { ...f.docs, [k]: e.target.value } })} /></label>
+              <label key={k} className={controls.field}><span className={controls.label}>{twT(`doc.${k}`)}</span><DateField className={controls.input} value={f.docs[k] ?? ''} onChange={(e) => setF({ ...f, docs: { ...f.docs, [k]: e.target.value } })} /></label>
             ))}
           </div>
           {!f.own && <p className={styles.note}>{twT('decl194c6Hint')}</p>}

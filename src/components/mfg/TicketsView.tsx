@@ -9,6 +9,7 @@ import { B, printHtml } from '../transport/shared';
 import controls from '../../styles/controls.module.css';
 import { Table } from './mfb-ui';
 import { fmt, row, useRun, type Done } from './mfb-util';
+import { SelectField } from '../ui/SelectField';
 
 export default function TicketsView({ ctx, done }: { ctx: MfgContext; done: Done }) {
   const [tick, run] = useRun(done, P('saved'));
@@ -24,7 +25,7 @@ export default function TicketsView({ ctx, done }: { ctx: MfgContext; done: Done
         const actual = o ? actualPaper(e) : undefined;
         return [
           e.number, e.job,
-          o ? fmt(o.planned_qty) : <select key="q" className={controls.select} aria-label={P('qty')} value={qty[e.id] ?? String(bs[0]?.qty ?? '')} onChange={(x) => setQty({ ...qty, [e.id]: x.target.value })}>{bs.map((x) => <option key={x.qty} value={x.qty}>{x.qty}</option>)}</select>,
+          o ? fmt(o.planned_qty) : <SelectField key="q" className={controls.select} aria-label={P('qty')} value={qty[e.id] ?? String(bs[0]?.qty ?? '')} onChange={(x) => setQty({ ...qty, [e.id]: x.target.value })}>{bs.map((x) => <option key={x.qty} value={x.qty}>{x.qty}</option>)}</SelectField>,
           o ? <Link key="o" to={`/manufacturing?tab=orders&order=${o.id}`}>{o.number}</Link> : '-',
           b ? `${fmt(b.sheets)}${actual !== undefined ? ` · ${P('issued', { n: fmt(actual) })}` : ''}` : '-',
           <span key="a" style={row}>

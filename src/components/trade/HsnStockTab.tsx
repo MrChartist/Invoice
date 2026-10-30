@@ -8,6 +8,7 @@ import { hsnStockCsv, hsnStockTotal } from '../../lib/trade/tr-hsn-stock';
 import { loadHsnStock } from '../../lib/trade/tr-stock-live';
 import controls from '../../styles/controls.module.css';
 import own from '../distribution/dist.module.css';
+import { DateField } from '../ui/DateField';
 
 export default function HsnStockTab({ today }: { today: string }) {
   useT();
@@ -16,7 +17,7 @@ export default function HsnStockTab({ today }: { today: string }) {
   return (
     <section className={own.stack} data-hsn-stock>
       <div className={own.row}>
-        <label className={controls.field}><span className={controls.label}>{trT('asOf')}</span><input type="date" className={controls.input} value={asOf} onChange={(e) => setAsOf(e.target.value)} /></label>
+        <label className={controls.field}><span className={controls.label}>{trT('asOf')}</span><DateField className={controls.input} value={asOf} onChange={(e) => setAsOf(e.target.value)} /></label>
         <div><button type="button" className={controls.btnOutline} disabled={!rows.length} onClick={() => downloadText(`hsn-stock-${asOf}.csv`, hsnStockCsv(rows, godownName), 'text/csv')}>{trT('csv')}</button></div>
       </div>
       <div className={own.tableWrap}>

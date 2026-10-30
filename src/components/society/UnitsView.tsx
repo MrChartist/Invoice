@@ -19,6 +19,7 @@ import surface from '../../styles/surface.module.css';
 import UnitForm from './UnitForm';
 import { Field, type HsViewProps } from './hs-ui';
 import { row } from './hs-form';
+import { SelectField } from '../ui/SelectField';
 
 export default function UnitsView({ notify }: HsViewProps) {
   useT();
@@ -87,10 +88,10 @@ export default function UnitsView({ notify }: HsViewProps) {
   const tot = unitTotals(shown);
   const pick = (k: keyof UnitFilter, ids: readonly string[], name: (id: string) => string) => (
     <Field label={hsT(k)}>
-      <select className={controls.select} value={f[k] ?? ''} onChange={(e) => setF({ ...f, [k]: e.target.value || undefined })}>
+      <SelectField className={controls.select} value={f[k] ?? ''} onChange={(e) => setF({ ...f, [k]: e.target.value || undefined })}>
         <option value="">{hsT('all')}</option>
         {ids.map((id) => <option key={id} value={id}>{name(id)}</option>)}
-      </select>
+      </SelectField>
     </Field>
   );
   return (

@@ -21,6 +21,7 @@ import { defineArea } from '../../i18n/area';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export interface LineItemsEditorProps {
   lines: PurchaseLine[];
@@ -152,9 +153,9 @@ export function LineItemsEditor({ lines, onChange, stock, date, freeCells }: Lin
                     const f = lineFactor(l);
                     return (
                       <>
-                        <select className={`${controls.ghost} ${styles.lineUnit}`} value={l.unit || it.unit} aria-label={unitT('lineUnit', { n: i + 1 })} onChange={(e) => patch(l.id, lineUnitPatch(it, l, e.target.value))}>
+                        <SelectField className={`${controls.ghost} ${styles.lineUnit}`} value={l.unit || it.unit} aria-label={unitT('lineUnit', { n: i + 1 })} onChange={(e) => patch(l.id, lineUnitPatch(it, l, e.target.value))}>
                           {unitChoices(it).map((c) => <option key={c.unit} value={c.unit}>{c.unit}</option>)}
-                        </select>
+                        </SelectField>
                         {f !== 1 && <span className={styles.lineUnitHint}>{unitT('equals', { qty: Math.round(l.quantity * f * 1000) / 1000, unit: it.unit })}</span>}
                       </>
                     );
@@ -180,7 +181,7 @@ export function LineItemsEditor({ lines, onChange, stock, date, freeCells }: Lin
                   </td>
                 )}
                 <td data-label={purT('thGstPct')}>
-                  <select
+                  <SelectField
                     className={controls.ghost}
                     value={l.tax_rate}
                     aria-label={purT('lineGst', { n: i + 1 })}
@@ -189,7 +190,7 @@ export function LineItemsEditor({ lines, onChange, stock, date, freeCells }: Lin
                     {gstRateOptions(date, l.tax_rate).map((s) => (
                       <option key={s} value={s}>{s}%</option>
                     ))}
-                  </select>
+                  </SelectField>
                 </td>
                 <td className={styles.lineAmount} data-label={purT('thAmount')}>{formatCurrency(lineValue(l))}</td>
                 <td>

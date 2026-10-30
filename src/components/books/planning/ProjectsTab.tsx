@@ -42,6 +42,7 @@ import styles from './planning.module.css';
 import { useT } from '../../../i18n';
 import { planT } from '../../../i18n/areas/books-planning';
 import { peekTable } from '../../../lib/storage';
+import { SelectField } from '../../ui/SelectField';
 
 // R4-A2: memo row "materials used (stock, not posted)" from production orders tagged with a cost centre (lazy).
 const ProjectMaterialsRow = lazy(() => import('../../production/ProjectMaterialsRow'));
@@ -306,25 +307,25 @@ function CostCentreForm({ centre, centres, clients, onClose, onSaved }: {
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="cc-kind">{planT('colKind')}</label>
-            <select id="cc-kind" className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as CostCentreKind)}>
+            <SelectField id="cc-kind" className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as CostCentreKind)}>
               {COST_CENTRE_KINDS.map((k) => <option key={k} value={k}>{kindLabel(k)}</option>)}
-            </select>
+            </SelectField>
           </div>
         </div>
         <div className={controls.row}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="cc-parent">{planT('groupUnder')}</label>
-            <select id="cc-parent" className={controls.select} value={parent} onChange={(e) => setParent(e.target.value)}>
+            <SelectField id="cc-parent" className={controls.select} value={parent} onChange={(e) => setParent(e.target.value)}>
               <option value="">{planT('topLevel')}</option>
               {parents.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+            </SelectField>
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="cc-client">{planT('clientOptional')}</label>
-            <select id="cc-client" className={controls.select} value={client} onChange={(e) => setClient(e.target.value)}>
+            <SelectField id="cc-client" className={controls.select} value={client} onChange={(e) => setClient(e.target.value)}>
               <option value="">{planT('none')}</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </SelectField>
           </div>
         </div>
         <label className={controls.check}>

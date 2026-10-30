@@ -11,6 +11,8 @@ import { NumberInput } from '../ui/NumberInput';
 import { Fld, Tbl } from './ps-d-ui';
 import { inr, sm, type PsDeskCtx, row } from './ps-desk';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 export default function Tds194tView({ ctx }: { ctx: PsDeskCtx }) {
   const today = todayInput();
@@ -23,18 +25,18 @@ export default function Tds194tView({ ctx }: { ctx: PsDeskCtx }) {
     <>
       <div style={row}>
         <Fld l={fdT('fy')}>
-          <select className={controls.select} value={fy} onChange={(e) => setFy(+e.target.value)}>{[fy + 1, fy, fy - 1].map((y) => <option key={y} value={y}>{`FY ${y}-${String(y + 1).slice(2)}`}</option>)}</select>
+          <SelectField className={controls.select} value={fy} onChange={(e) => setFy(+e.target.value)}>{[fy + 1, fy, fy - 1].map((y) => <option key={y} value={y}>{`FY ${y}-${String(y + 1).slice(2)}`}</option>)}</SelectField>
         </Fld>
         <Fld l={fdT('kind')}>
-          <select className={controls.select} value={f.partner} onChange={(e) => setF({ ...f, partner: e.target.value })} data-ps="t-partner">
+          <SelectField className={controls.select} value={f.partner} onChange={(e) => setF({ ...f, partner: e.target.value })} data-ps="t-partner">
             <option value="">-</option>{data.partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          </SelectField>
         </Fld>
         <Fld l={fdT('credit')}>
-          <select className={controls.select} value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as PartnerCreditKind })}>{KINDS_194T.map((k) => <option key={k} value={k}>{fdT(`k.${k}`)}</option>)}</select>
+          <SelectField className={controls.select} value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as PartnerCreditKind })}>{KINDS_194T.map((k) => <option key={k} value={k}>{fdT(`k.${k}`)}</option>)}</SelectField>
         </Fld>
         <Fld l={fdT('amount')}><NumberInput className={controls.input} style={{ maxWidth: 120 }} value={f.amount} onChange={(v) => setF({ ...f, amount: v })} data-ps="t-amount" /></Fld>
-        <Fld l={fdT('date')}><input type="date" className={controls.input} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} data-ps="t-date" /></Fld>
+        <Fld l={fdT('date')}><DateField className={controls.input} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} data-ps="t-date" /></Fld>
         <button type="button" className={controls.btnPrimary} onClick={() => ctx.run(() => { const r = creditPartner({ partnerId: f.partner, kind: f.kind, amount: f.amount, date: f.date }); return r.tds ? `${fdT('tds')}: ${inr(r.tds)}` : fdT('saved'); })} data-ps-b="t-credit">{fdT('post')}</button>
       </div>
       <p className={controls.hint}>{fdT('note194t')} {sectionText('194T', f.date)}</p>

@@ -17,6 +17,8 @@ import { fxbT } from '../../../i18n/areas/extras-7u';
 import controls from '../../../styles/controls.module.css';
 import surface from '../../../styles/surface.module.css';
 import styles from './bankdocs.module.css';
+import { SelectField } from '../../ui/SelectField';
+import { DateField } from '../../ui/DateField';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 const KIND_LABEL = { opening: 'kOpening', receipt: 'kReceipt', in: 'kIn', out: 'kOut', revalue: 'kRevalue', reversal: 'kReversal' } as const;
@@ -101,9 +103,9 @@ export default function ForexBankPanel({ notify }: { notify: Notify }) {
       <p className={styles.warn} role="note">{fxbT('intro')}</p>
       <div className={styles.grid}>
         <label className={controls.field}><span className={controls.label}>{fxbT('account')}</span>
-          <select className={controls.select} value={accountId} onChange={(e) => pick(e.target.value)}>
+          <SelectField className={controls.select} value={accountId} onChange={(e) => pick(e.target.value)}>
             {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}{a.currency ? ` · ${a.currency}` : ''}</option>)}
-          </select></label>
+          </SelectField></label>
         <label className={controls.field}><span className={controls.label}>{fxbT('currency')}</span>
           <input className={controls.input} maxLength={3} value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} /></label>
         <label className={controls.field}><span className={controls.label}>{fxbT('fcyOpening', { cur: currency })}</span>
@@ -119,9 +121,9 @@ export default function ForexBankPanel({ notify }: { notify: Notify }) {
         <>
           <div className={styles.grid}>
             <label className={controls.field}><span className={controls.label}>{fxbT('from')}</span>
-              <input className={controls.input} type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+              <DateField className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
             <label className={controls.field}><span className={controls.label}>{fxbT('to')}</span>
-              <input className={controls.input} type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+              <DateField className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></label>
           </div>
           <div className={styles.totals} data-forex-summary>
             <span>{fxbT('fcyBalance')}: <strong>{cur} {n(summary.fcy)}</strong></span>
@@ -137,14 +139,14 @@ export default function ForexBankPanel({ notify }: { notify: Notify }) {
             <div className={surface.cardBody}>
               <div className={styles.grid}>
                 <label className={controls.field}><span className={controls.label}>{fxbT('kind')}</span>
-                  <select className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as FxMoveKind | 'vendor')}>
+                  <SelectField className={controls.select} value={kind} onChange={(e) => setKind(e.target.value as FxMoveKind | 'vendor')}>
                     <option value="revalue">{fxbT('kRevalue')}</option>
                     <option value="out">{fxbT('kOut')}</option>
                     <option value="vendor">{fxbT('kVendor')}</option>
                     <option value="in">{fxbT('kIn')}</option>
-                  </select></label>
+                  </SelectField></label>
                 <label className={controls.field}><span className={controls.label}>{fxbT('date')}</span>
-                  <input className={controls.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+                  <DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
                 {kind !== 'revalue' && (
                   <label className={controls.field}><span className={controls.label}>{fxbT('amountFcy', { cur })}</span>
                     <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={fcy} onChange={(e) => setFcy(e.target.value.replace(/[^0-9.]/g, ''))} /></label>
@@ -153,14 +155,14 @@ export default function ForexBankPanel({ notify }: { notify: Notify }) {
                   <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value.replace(/[^0-9.]/g, ''))} /></label>
                 {kind === 'revalue' && (
                   <label className={controls.field}><span className={controls.label}>{fxbT('reverseOn')}</span>
-                    <input className={controls.input} type="date" value={reverse} min={shiftDay(date, 1)} onChange={(e) => setReverse(e.target.value)} data-fx-reverse /></label>
+                    <DateField className={controls.input} value={reverse} min={shiftDay(date, 1)} onChange={(e) => setReverse(e.target.value)} data-fx-reverse /></label>
                 )}
                 {kind === 'vendor' && (
                   <label className={controls.field}><span className={controls.label}>{fxbT('vendor')}</span>
-                    <select className={controls.select} value={vendorId} onChange={(e) => setVendorId(e.target.value)} data-fx-vendor>
+                    <SelectField className={controls.select} value={vendorId} onChange={(e) => setVendorId(e.target.value)} data-fx-vendor>
                       <option value="">-</option>
                       {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                    </select></label>
+                    </SelectField></label>
                 )}
                 {(kind === 'out' || kind === 'vendor') && (
                   <label className={controls.field}><span className={controls.label}>{kind === 'vendor' ? fxbT('inrSettled') : fxbT('inrReceived')}</span>
@@ -168,9 +170,9 @@ export default function ForexBankPanel({ notify }: { notify: Notify }) {
                 )}
                 {(kind === 'in' || kind === 'out') && (
                   <label className={controls.field}><span className={controls.label}>{kind === 'in' ? fxbT('fromLedger') : fxbT('toLedger')}</span>
-                    <select className={controls.select} value={counter} onChange={(e) => setCounter(e.target.value)}>
+                    <SelectField className={controls.select} value={counter} onChange={(e) => setCounter(e.target.value)}>
                       {counters.map((a) => <option key={a.id} value={a.id}>{a.code} · {a.name}</option>)}
-                    </select></label>
+                    </SelectField></label>
                 )}
                 {(kind === 'in' || kind === 'out') && partyLedger && (
                   <label className={controls.field}><span className={controls.label}>{fxbT('party')}</span>

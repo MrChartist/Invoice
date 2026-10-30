@@ -28,6 +28,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field } from './ps-ui';
 import { runWith, type PsDeskProps } from './ps-run';
+import { DateField } from '../ui/DateField';
 
 export default function YearEndWipView({ notify }: Pick<PsDeskProps, 'notify'>) {
   const run = runWith(notify);
@@ -67,8 +68,8 @@ export default function YearEndWipView({ notify }: Pick<PsDeskProps, 'notify'>) 
     <div className={surface.card}>
       <div className={surface.cardBody}>
         <div className={controls.row3}>
-          <Field label={pwT('closing')}><input type="date" className={controls.input} value={closing} onChange={(e) => setClosing(e.target.value)} data-ye-closing /></Field>
-          {can('settings.manage') && <Field label={pwT('accrueFrom')}><input type="date" className={controls.input} value={accrue} onChange={(e) => setAccrue(e.target.value)} onBlur={() => run(() => saveProfSettings({ wip: { ...readProfSettings().wip, accrue_from: accrue || undefined } }), psT('saved'))} /></Field>}
+          <Field label={pwT('closing')}><DateField className={controls.input} value={closing} onChange={(e) => setClosing(e.target.value)} data-ye-closing /></Field>
+          {can('settings.manage') && <Field label={pwT('accrueFrom')}><DateField className={controls.input} value={accrue} onChange={(e) => setAccrue(e.target.value)} onBlur={() => run(() => saveProfSettings({ wip: { ...readProfSettings().wip, accrue_from: accrue || undefined } }), psT('saved'))} /></Field>}
         </div>
         <div className={surface.tableWrap}>
           <table className={surface.table} data-yearend>

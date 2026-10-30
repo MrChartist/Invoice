@@ -110,4 +110,4 @@ export function duplicateRoute(kind: Exclude<EntryKind, 'purchase'>, id: string,
 /** Ctrl+A in a form: submit it the way its Save button does. */
 export const acceptForm: KeyHandler = (e) => void (e.target as Element | null)?.closest?.('form')?.requestSubmit();
 /** F2 in a form: its first date field. */
-export const focusFormDate: KeyHandler = (e) => void (e.target as Element | null)?.closest?.('form')?.querySelector<HTMLElement>('input[type="date"]')?.focus();
+export const focusFormDate: KeyHandler = (e) => void (e.target as Element | null)?.closest?.('form')?.querySelector<HTMLElement>('input[data-date-field="date"]')?.focus();

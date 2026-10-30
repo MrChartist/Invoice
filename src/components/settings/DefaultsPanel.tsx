@@ -9,6 +9,7 @@ import controls from '../../styles/controls.module.css';
 import { Toggle } from '../ui/Toggle';
 import surface from '../../styles/surface.module.css';
 import styles from './Settings.module.css';
+import { SelectField } from '../ui/SelectField';
 
 interface Props {
   settings: AppSettings;
@@ -27,23 +28,23 @@ export function DefaultsPanel({ settings, onChange }: Props) {
           <div className={controls.row3}>
             <label className={controls.field}>
               <span className={controls.label}>{setT('currency')}</span>
-              <select className={controls.select} value={settings.defaultCurrency} onChange={(e) => onChange({ defaultCurrency: e.target.value })}>
+              <SelectField className={controls.select} value={settings.defaultCurrency} onChange={(e) => onChange({ defaultCurrency: e.target.value })}>
                 {CURRENCIES.map((c) => (
                   <option key={c.code} value={c.code}>
                     {c.symbol} {c.code} : {c.label}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{setT('defaultGst')}</span>
-              <select className={controls.select} value={settings.defaultTaxRate} onChange={(e) => onChange({ defaultTaxRate: Number(e.target.value) })}>
+              <SelectField className={controls.select} value={settings.defaultTaxRate} onChange={(e) => onChange({ defaultTaxRate: Number(e.target.value) })}>
                 {gstRateOptions(undefined, settings.defaultTaxRate).map((r) => (
                   <option key={r} value={r}>
                     {r === 0 ? setT('exempt') : `${r}%`}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{setT('dueDays')}</span>

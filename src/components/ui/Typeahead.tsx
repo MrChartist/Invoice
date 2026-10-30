@@ -20,6 +20,14 @@ function rank<T>(fn: (query: string) => Suggestion<T>[], q: string): Suggestion<
   return list;
 }
 
+/** The typed text marked inside a suggestion (same look as the pickers' list). */
+function Marked({ text, q }: { text: string; q: string }) {
+  const at = q.trim() ? text.toLowerCase().indexOf(q.trim().toLowerCase()) : -1;
+  if (at < 0) return <>{text}</>;
+  const n = q.trim().length;
+  return <>{text.slice(0, at)}<mark className={styles.mark}>{text.slice(at, at + n)}</mark>{text.slice(at + n)}</>;
+}
+
 /**
  * Text input with an inline suggestion list (ARIA combobox). ↑/↓ move, Enter picks,
  * Esc closes. Keys are only swallowed while the list is open, so the editor's own
@@ -45,6 +53,11 @@ export function Typeahead<T>({ value, onChange, getSuggestions, onPick, onKeyDow
         e.stopPropagation();
         const n = list.length;
         setActive((i) => (e.key === 'ArrowDown' ? (i + 1) % n : (i <= 0 ? n - 1 : i - 1)));
+        return;
+      }
+      if ((e.key === 'Home' || e.key === 'End') && e.altKey) {
+        e.preventDefault();
+        setActive(e.key === 'Home' ? 0 : list.length - 1);
         return;
       }
       if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && active >= 0 && list[active]) {
@@ -89,7 +102,7 @@ export function Typeahead<T>({ value, onChange, getSuggestions, onPick, onKeyDow
         onKeyDown={keyDown}
       />
       {shown && (
-        <ul className={styles.list} role="listbox" id={`${id}-list`}>
+        <ul className={`material ${styles.list}`} data-mat="regular" role="listbox" id={`${id}-list`}>
           {list.map((s, i) => (
             <li
               key={i}
@@ -104,7 +117,7 @@ export function Typeahead<T>({ value, onChange, getSuggestions, onPick, onKeyDow
               }}
               onMouseEnter={() => setActive(i)}
             >
-              <span className={styles.label}>{s.label}</span>
+              <span className={styles.label} title={s.label}><Marked text={s.label} q={value} /></span>
               {s.sub && <span className={styles.sub}>{s.sub}</span>}
             </li>
           ))}

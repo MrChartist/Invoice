@@ -13,6 +13,7 @@ import type { MfgContext } from '../manufacturing/context';
 import { Fld, Tbl } from './mfd-ui';
 import { row, rs, run, sm } from './mfd-util';
 import controls from '../../styles/controls.module.css';
+import { DateField } from '../ui/DateField';
 
 export default function WipView({ ctx }: { ctx: MfgContext }) {
   useT();
@@ -24,7 +25,7 @@ export default function WipView({ ctx }: { ctx: MfgContext }) {
     <section data-wip-view>
       <p data-mfd-absorb>{sdT('absorbState', { s: absorbOn(s, today) ? sdT('on') : sdT('off') })}</p>
       <div style={row}>
-        <Fld l={sdT('absorb')}><input type="date" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} data-mfd="absorb-from" /></Fld>
+        <Fld l={sdT('absorb')}><DateField className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} data-mfd="absorb-from" /></Fld>
         <button type="button" className={sm} onClick={() => flip(true)} data-mfd-b="absorb-on">{sdT('absorbOn')}</button>
         <button type="button" className={sm} onClick={() => flip(false)} data-mfd-b="absorb-off">{sdT('absorbOff')}</button>
         <button type="button" className={sm} onClick={() => downloadWipStatement(today)}>{sdT('wipCsv')}</button>

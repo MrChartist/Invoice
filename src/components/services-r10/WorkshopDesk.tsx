@@ -38,6 +38,8 @@ import { printWorkshop } from './WorkshopJobCardPrint';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './services.module.css';
+import { SelectField } from '../ui/SelectField';
+import { TypedInput } from '../ui/TypedInput';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 type Form = Record<string, string>;
@@ -57,10 +59,10 @@ function Fields({ spec, f, set }: { spec: readonly (readonly [string, (string | 
         <label key={k} className={controls.field}>
           <span className={controls.label}>{label ?? wsT(k as WsKey)}</span>
           {Array.isArray(t)
-            ? <select className={controls.select} value={f[k] ?? ''} onChange={(e) => set({ ...f, [k]: e.target.value })} {...{ [`data-ws-${k}`]: '' }}>{opts(t)}</select>
+            ? <SelectField className={controls.select} value={f[k] ?? ''} onChange={(e) => set({ ...f, [k]: e.target.value })} {...{ [`data-ws-${k}`]: '' }}>{opts(t)}</SelectField>
             : t === 'area'
               ? <textarea className={controls.textarea} rows={3} value={f[k] ?? ''} onChange={(e) => set({ ...f, [k]: e.target.value })} {...{ [`data-ws-${k}`]: '' }} />
-              : <input className={controls.input} type={(t as string) || 'text'} value={f[k] ?? ''} onChange={(e) => set({ ...f, [k]: e.target.value })} {...{ [`data-ws-${k}`]: '' }} />}
+              : <TypedInput className={controls.input} type={(t as string) || 'text'} value={f[k] ?? ''} onChange={(e) => set({ ...f, [k]: e.target.value })} {...{ [`data-ws-${k}`]: '' }} />}
         </label>
       ))}
     </div>
@@ -303,7 +305,7 @@ function MotorClaims({ c }: { c: Ctx }) {
         <div key={l.id} className={styles.bar}>
           <span>{l.name} · {formatCurrency(round2(num(l.quantity) * num(l.rate)))}</span>
           <input className={controls.input} type="number" value={s[`a:${l.id}`] ?? ''} onChange={(e) => setS({ ...s, [`a:${l.id}`]: e.target.value })} aria-label={`${wsT('approved')} ${l.name}`} style={{ maxWidth: 120 }} />
-          {l.type === 'Product' && <select className={controls.select} value={s[`c:${l.id}`] ?? ''} onChange={(e) => setS({ ...s, [`c:${l.id}`]: e.target.value })} aria-label={wsT('cat')}>{opts(PART_CATEGORIES.map((x) => [x, x] as const))}</select>}
+          {l.type === 'Product' && <SelectField className={controls.select} value={s[`c:${l.id}`] ?? ''} onChange={(e) => setS({ ...s, [`c:${l.id}`]: e.target.value })} aria-label={wsT('cat')}>{opts(PART_CATEGORIES.map((x) => [x, x] as const))}</SelectField>}
         </div>
       ))}
       <div className={styles.actions}><button type="button" className={controls.btnPrimary} disabled={!bill} onClick={split} data-ws-split>{wsT('split')}</button>{!splitJobs.length && <span className={controls.hint}>{wsT('needDraft')}</span>}</div>

@@ -19,6 +19,8 @@ import { qtyText, type JwData, type PartyValue } from './lines';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './job-work.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 type Line = PrincipalMovement['lines'][number];
 const blank = (): Line => ({ id: generateId(), name: '', qty: 1 });
@@ -186,14 +188,14 @@ function PrincipalModal({ data, doc, kind, onClose }: { data: JwData; doc: Princ
         <div className={controls.row3}>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="jwp-date">{jwT('date')}</label>
-            <input id="jwp-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField id="jwp-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="jwp-order">{jwT('order')}</label>
-            <select id="jwp-order" className={controls.select} value={orderId} onChange={(e) => pickOrder(e.target.value)}>
+            <SelectField id="jwp-order" className={controls.select} value={orderId} onChange={(e) => pickOrder(e.target.value)}>
               <option value="">{jwT('noOrder')}</option>
               {orders.map((o) => <option key={o.id} value={o.id}>{o.number} · {o.party_name}</option>)}
-            </select>
+            </SelectField>
           </div>
         </div>
         <div className={controls.row3}>
@@ -206,7 +208,7 @@ function PrincipalModal({ data, doc, kind, onClose }: { data: JwData; doc: Princ
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor="jwp-cd">{jwT('principalChallanDate')}</label>
-            <input id="jwp-cd" type="date" className={controls.input} value={challanDate} onChange={(e) => setChallanDate(e.target.value)} />
+            <DateField id="jwp-cd" className={controls.input} value={challanDate} onChange={(e) => setChallanDate(e.target.value)} />
           </div>
         </div>
         <div className={styles.wrap}>
@@ -221,10 +223,10 @@ function PrincipalModal({ data, doc, kind, onClose }: { data: JwData; doc: Princ
                   <td><input className={controls.input} aria-label={`${label} ${i + 1} ${jwT('hsn')}`} value={l.hsn ?? ''} onChange={(e) => patch(l.id, { hsn: e.target.value || undefined })} /></td>
                   <td><input className={cn(controls.input, controls.inputNumeric)} inputMode="decimal" aria-label={jwT('lineValue', { label, n: i + 1 })} value={l.value ? String(l.value) : ''} onChange={(e) => patch(l.id, { value: num(e.target.value) || undefined })} /></td>
                   <td>
-                    <select className={controls.select} aria-label={`${label} ${i + 1} ${s7T('godown')}`} value={l.godown_id ?? ''} onChange={(e) => patch(l.id, { godown_id: e.target.value || undefined })}>
+                    <SelectField className={controls.select} aria-label={`${label} ${i + 1} ${s7T('godown')}`} value={l.godown_id ?? ''} onChange={(e) => patch(l.id, { godown_id: e.target.value || undefined })}>
                       <option value="">-</option>
                       {data.ownGodowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                    </select>
+                    </SelectField>
                   </td>
                   <td><input className={controls.input} aria-label={`${label} ${i + 1} ${s7T('batch')}`} value={l.batch_no ?? ''} onChange={(e) => patch(l.id, { batch_no: e.target.value || undefined })} /></td>
                   <td><button type="button" className={controls.btnIcon} aria-label={`${label} ${jwT('removeLine', { n: i + 1 })}`} onClick={() => setLines((ls) => ls.filter((x) => x.id !== l.id))}><Trash2 size={15} aria-hidden="true" /></button></td>
@@ -273,9 +275,9 @@ function ChargesModal({ data, order, onClose }: { data: JwData; order: JobWorkOr
         <p className={styles.muted}>{jwT('chargesInvoiceHint')}</p>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="jwi-c">{jwT('chargesClass')}</label>
-          <select id="jwi-c" className={controls.select} value={cls} onChange={(e) => pickClass(e.target.value as JwChargeClass)}>
+          <SelectField id="jwi-c" className={controls.select} value={cls} onChange={(e) => pickClass(e.target.value as JwChargeClass)}>
             {JW_CHARGE_CLASSES.map((c) => <option key={c} value={c}>{jwT(CLASS_LABEL[c])}</option>)}
-          </select>
+          </SelectField>
           <span className={styles.muted}>{jwT('chargesClassHint', { rate: String(suggested.rate), ca: suggested.ca })}</span>
         </div>
         <div className={controls.row}>

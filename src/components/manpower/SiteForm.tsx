@@ -18,6 +18,8 @@ import { saveClientMp, saveSite } from '../../lib/manpower/mp-sites-io';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field as F, RegimeChip, type Notify } from './mp-ui';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const row = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '0.75rem' } as const;
 
@@ -46,22 +48,22 @@ export default function SiteForm({ site, sites, clients, entity, notify, onDone 
         <F label={mpT('name')}><input className={controls.input} value={name} onChange={(e) => setName(e.target.value)} data-mp-site-name /></F>
         <F label={mpT('code')}><input className={controls.input} value={mp.code} onChange={(e) => set({ code: e.target.value })} data-mp-site-code /></F>
         <F label={mpT('client')}>
-          <select className={controls.select} value={clientId} onChange={(e) => { setClientId(e.target.value); setFlags(clients.find((c) => c.id === e.target.value)?.mp ?? {}); }} data-mp-site-client>
+          <SelectField className={controls.select} value={clientId} onChange={(e) => { setClientId(e.target.value); setFlags(clients.find((c) => c.id === e.target.value)?.mp ?? {}); }} data-mp-site-client>
             <option value="">-</option>
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}{c.gstin ? ` (${c.gstin})` : ''}</option>)}
-          </select>
+          </SelectField>
         </F>
         <F label={mpT('state')}><input className={controls.input} value={mp.state ?? ''} maxLength={2} onChange={(e) => set({ state: e.target.value })} /></F>
         <F label={mpT('address')}><input className={controls.input} value={mp.address ?? ''} onChange={(e) => set({ address: e.target.value })} /></F>
       </div>
       <div style={row}>
-        <F label={mpT('from')}><input type="date" className={controls.input} value={mp.contract.from ?? ''} onChange={(e) => set({ contract: { ...mp.contract, from: e.target.value } })} /></F>
-        <F label={mpT('to')}><input type="date" className={controls.input} value={mp.contract.to ?? ''} onChange={(e) => set({ contract: { ...mp.contract, to: e.target.value } })} data-mp-site-to /></F>
+        <F label={mpT('from')}><DateField className={controls.input} value={mp.contract.from ?? ''} onChange={(e) => set({ contract: { ...mp.contract, from: e.target.value } })} /></F>
+        <F label={mpT('to')}><DateField className={controls.input} value={mp.contract.to ?? ''} onChange={(e) => set({ contract: { ...mp.contract, to: e.target.value } })} data-mp-site-to /></F>
         <F label={mpT('ref')}><input className={controls.input} value={mp.contract.ref ?? ''} onChange={(e) => set({ contract: { ...mp.contract, ref: e.target.value } })} /></F>
         <F label={mpT('status')}>
-          <select className={controls.select} value={mp.status} onChange={(e) => set({ status: e.target.value as SiteStatus })}>
+          <SelectField className={controls.select} value={mp.status} onChange={(e) => set({ status: e.target.value as SiteStatus })}>
             {SITE_STATUSES.map((s) => <option key={s} value={s}>{mpList('sts', SITE_STATUSES, s)}</option>)}
-          </select>
+          </SelectField>
         </F>
       </div>
       <div className={surface.tableWrap}>
@@ -75,9 +77,9 @@ export default function SiteForm({ site, sites, clients, entity, notify, onDone 
                 <td><input type="number" min={1} className={controls.input} aria-label={mpT('heads')} value={p.heads} onChange={(e) => post(i, { heads: num(e.target.value) })} data-mp-post-heads /></td>
                 <td><input type="number" min={1} max={24} className={controls.input} aria-label={mpT('shift')} value={p.shift_hours} onChange={(e) => post(i, { shift_hours: num(e.target.value) })} /></td>
                 <td>
-                  <select className={controls.select} aria-label={mpT('basis')} value={p.basis} onChange={(e) => post(i, { basis: e.target.value as MpBasis })} data-mp-post-basis>
+                  <SelectField className={controls.select} aria-label={mpT('basis')} value={p.basis} onChange={(e) => post(i, { basis: e.target.value as MpBasis })} data-mp-post-basis>
                     {MP_BASES.map((b) => <option key={b} value={b}>{mpList('bases', MP_BASES, b)}</option>)}
-                  </select>
+                  </SelectField>
                 </td>
                 <td><input type="number" min={0} step="0.01" className={controls.input} aria-label={mpT('rate')} value={p.rate} onChange={(e) => post(i, { rate: num(e.target.value) })} data-mp-post-rate /></td>
                 <td><button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => set({ posts: mp.posts.filter((_, k) => k !== i) })}>{mpT('remove')}</button></td>
@@ -128,13 +130,13 @@ function DeployList({ site, notify }: { site: Site; notify: Notify }) {
           <button type="button" className={`${controls.btnGhost} ${controls.btnSm}`} onClick={() => void go(e.id, '')}>{mbT('release')}</button>
         </span>
       ))}
-      <select className={controls.select} aria-label={mbT('person')} value={pick.e} onChange={(ev) => setPick({ ...pick, e: ev.target.value })} data-mp-deploy-person>
+      <SelectField className={controls.select} aria-label={mbT('person')} value={pick.e} onChange={(ev) => setPick({ ...pick, e: ev.target.value })} data-mp-deploy-person>
         <option value="">-</option>
         {staff.filter((e) => e.cost_centre_id !== site.id && e.active !== false).map((e) => <option key={e.id} value={e.id}>{e.code} {e.name}</option>)}
-      </select>
-      <select className={controls.select} aria-label={mpT('post')} value={pick.p} onChange={(ev) => setPick({ ...pick, p: ev.target.value })}>
+      </SelectField>
+      <SelectField className={controls.select} aria-label={mpT('post')} value={pick.p} onChange={(ev) => setPick({ ...pick, p: ev.target.value })}>
         {site.mp.posts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-      </select>
+      </SelectField>
       <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} disabled={!pick.e} onClick={() => void go(pick.e, site.id, pick.p)} data-mp-deploy>{mbT('deployTo')}</button>
     </fieldset>
   );

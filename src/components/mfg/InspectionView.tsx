@@ -12,6 +12,7 @@ import { B, printHtml, today } from '../transport/shared';
 import controls from '../../styles/controls.module.css';
 import { Num, Sel, Table, Txt } from './mfb-ui';
 import { n, opt, row, useRun, type Done } from './mfb-util';
+import { SelectField } from '../ui/SelectField';
 
 const KINDS: readonly InspectionReport['kind'][] = ['first_article', 'lot', 'final'];
 const vals = (s: string) => s.split(/[\s,;]+/).filter(Boolean).map(Number).filter((x) => Number.isFinite(x));
@@ -64,7 +65,7 @@ export default function InspectionView({ ctx, done }: { ctx: MfgContext; done: D
         return [
           r.number, r.date, `${w?.number ?? '-'} rev ${r.rev}`, <span key="r" data-mfb-result={r.result}>{S(`r.${r.result}`)}</span>,
           <span key="a" style={row}>
-            <select className={controls.select} style={{ maxWidth: 200 }} aria-label={S('attach')} value={att[r.id] ?? ''} onChange={(e) => setAtt({ ...att, [r.id]: e.target.value })}>{opt(d.drafts, (i) => i.id, (i) => `${i.invoice_number || i.doc_type} · ${i.client?.name ?? ''}`).map(([k, s]) => <option key={k} value={k}>{s}</option>)}</select>
+            <SelectField className={controls.select} style={{ maxWidth: 200 }} aria-label={S('attach')} value={att[r.id] ?? ''} onChange={(e) => setAtt({ ...att, [r.id]: e.target.value })}>{opt(d.drafts, (i) => i.id, (i) => `${i.invoice_number || i.doc_type} · ${i.client?.name ?? ''}`).map(([k, s]) => <option key={k} value={k}>{s}</option>)}</SelectField>
             <button type="button" className={B.gs} disabled={!w || !att[r.id]} onClick={() => run(() => { attachToInvoice(r.id, att[r.id], w!); return S('attached'); })}>{S('attach')}</button>
           </span>,
           <span key="x" style={row}>

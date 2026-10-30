@@ -20,6 +20,8 @@ import { purCategory } from '../../i18n/areas/purchases';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import css from './capture.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const FREQS: Frequency[] = ['monthly', 'quarterly', 'half-yearly', 'yearly', 'weekly', 'custom-days'];
 
@@ -110,39 +112,39 @@ export default function RecurringBillsPanel({ businessState, onChanged }: { busi
             <div className={cn(css.grid)} style={{ marginTop: '0.75rem' }}>
               <label className={controls.field}><span className={controls.label}>{capT('recName')}</span><input className={controls.input} value={f.name} maxLength={80} onChange={(e) => set({ name: e.target.value })} placeholder={capT('recNamePh')} /></label>
               <label className={controls.field}><span className={controls.label}>{capT('recKind')}</span>
-                <select className={controls.select} value={f.kind} onChange={(e) => set({ kind: e.target.value === 'PURCHASE' ? 'PURCHASE' : 'EXPENSE' })}>
+                <SelectField className={controls.select} value={f.kind} onChange={(e) => set({ kind: e.target.value === 'PURCHASE' ? 'PURCHASE' : 'EXPENSE' })}>
                   <option value="EXPENSE">{capT('kindExpense')}</option>
                   <option value="PURCHASE">{capT('kindBill')}</option>
-                </select>
+                </SelectField>
               </label>
               <label className={controls.field}><span className={controls.label}>{capT('supplier')}</span>
-                <select className={controls.select} value={f.vendorId} onChange={(e) => set({ vendorId: e.target.value })}>
+                <SelectField className={controls.select} value={f.vendorId} onChange={(e) => set({ vendorId: e.target.value })}>
                   <option value="">-</option>
                   {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                </select>
+                </SelectField>
               </label>
               {f.kind === 'EXPENSE' && (
                 <label className={controls.field}><span className={controls.label}>{capT('head')}</span>
-                  <select className={controls.select} value={f.category} onChange={(e) => set({ category: e.target.value })}>
+                  <SelectField className={controls.select} value={f.category} onChange={(e) => set({ category: e.target.value })}>
                     {PURCHASE_CATEGORIES.map((c) => <option key={c} value={c}>{purCategory(c)}</option>)}
-                  </select>
+                  </SelectField>
                 </label>
               )}
               <label className={controls.field}><span className={controls.label}>{capT('recItem')}</span><input className={controls.input} value={f.item} maxLength={120} onChange={(e) => set({ item: e.target.value })} placeholder={capT('recItemPh')} /></label>
               <label className={controls.field}><span className={controls.label}>{capT('recAmount')}</span><NumberInput className={cn(controls.input, controls.inputNumeric)} value={f.amount} onChange={(v) => set({ amount: v })} /></label>
               <label className={controls.field}><span className={controls.label}>{capT('gstRate')}</span>
-                <select className={controls.select} value={f.rate} onChange={(e) => set({ rate: Number(e.target.value) })}>
+                <SelectField className={controls.select} value={f.rate} onChange={(e) => set({ rate: Number(e.target.value) })}>
                   {gstRateOptions(undefined, f.rate).map((s) => <option key={s} value={s}>{s}%</option>)}
-                </select>
+                </SelectField>
               </label>
               <label className={controls.field}><span className={controls.label}>{capT('recFreq')}</span>
-                <select className={controls.select} value={f.frequency} onChange={(e) => set({ frequency: e.target.value as Frequency })}>
+                <SelectField className={controls.select} value={f.frequency} onChange={(e) => set({ frequency: e.target.value as Frequency })}>
                   {FREQS.map((x) => <option key={x} value={x}>{recT(`freq.${x}`)}</option>)}
-                </select>
+                </SelectField>
               </label>
               <label className={controls.field}><span className={controls.label}>{capT('recEvery')}</span><NumberInput className={cn(controls.input, controls.inputNumeric)} value={f.interval} onChange={(v) => set({ interval: Math.max(1, Math.round(v)) })} /></label>
-              <label className={controls.field}><span className={controls.label}>{capT('recStart')}</span><input type="date" className={controls.input} value={f.start} onChange={(e) => set({ start: e.target.value })} /></label>
-              <label className={controls.field}><span className={controls.label}>{capT('recEnd')}</span><input type="date" className={controls.input} value={f.end} min={f.start} onChange={(e) => set({ end: e.target.value })} /></label>
+              <label className={controls.field}><span className={controls.label}>{capT('recStart')}</span><DateField className={controls.input} value={f.start} onChange={(e) => set({ start: e.target.value })} /></label>
+              <label className={controls.field}><span className={controls.label}>{capT('recEnd')}</span><DateField className={controls.input} value={f.end} min={f.start} onChange={(e) => set({ end: e.target.value })} /></label>
               <label className={controls.field}><span className={controls.label}>{capT('recDue')}</span><NumberInput className={cn(controls.input, controls.inputNumeric)} value={f.due} onChange={(v) => set({ due: Math.max(0, Math.round(v)) })} /></label>
             </div>
             <label className={controls.check} style={{ marginTop: '0.5rem' }}>

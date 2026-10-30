@@ -16,6 +16,8 @@ import { paiseText, parsePaise } from './masters-utils';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './masters.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 export interface BillwiseOpeningProps {
   /** Party ledger id (`party:debtor:<clientId>` / `party:creditor:<vendorId>`). */
@@ -124,15 +126,15 @@ export function BillwiseOpening({ ledgerId, onDone, onBack, notify }: BillwiseOp
               <tr key={r.key}>
                 <td>{mastersT('newRef')}</td>
                 <td><input className={`${controls.input} ${styles.cellText}`} aria-label={`Bill ${i + 1} reference`} value={r.ref_no} readOnly={readOnly} autoFocus={i === 0} onChange={(e) => set(r.key, { ref_no: e.target.value })} /></td>
-                <td><input type="date" className={controls.input} aria-label={`Bill ${i + 1} date`} value={r.date} readOnly={readOnly} onChange={(e) => set(r.key, { date: e.target.value })} /></td>
-                <td><input type="date" className={controls.input} aria-label={`Bill ${i + 1} due date`} value={r.due_date ?? ''} readOnly={readOnly} onChange={(e) => set(r.key, { due_date: e.target.value })} /></td>
+                <td><DateField className={controls.input} aria-label={`Bill ${i + 1} date`} value={r.date} readOnly={readOnly} onChange={(e) => set(r.key, { date: e.target.value })} /></td>
+                <td><DateField className={controls.input} aria-label={`Bill ${i + 1} due date`} value={r.due_date ?? ''} readOnly={readOnly} onChange={(e) => set(r.key, { due_date: e.target.value })} /></td>
                 <td><input className={`${controls.input} ${styles.cellInput}`} inputMode="numeric" aria-label={`Bill ${i + 1} credit days`} value={r.credit_days} readOnly={readOnly} onChange={(e) => set(r.key, { credit_days: e.target.value })} /></td>
                 <td><input className={`${controls.input} ${styles.cellInput}`} inputMode="decimal" aria-label={`Bill ${i + 1} amount`} value={r.amount} readOnly={readOnly} onChange={(e) => set(r.key, { amount: e.target.value })} /></td>
                 <td>
-                  <select className={`${controls.select} ${styles.drcr}`} aria-label={`Bill ${i + 1} Dr / Cr`} value={r.dr_cr} disabled={readOnly} onChange={(e) => set(r.key, { dr_cr: e.target.value === 'Cr' ? 'Cr' : 'Dr' })}>
+                  <SelectField className={`${controls.select} ${styles.drcr}`} aria-label={`Bill ${i + 1} Dr / Cr`} value={r.dr_cr} disabled={readOnly} onChange={(e) => set(r.key, { dr_cr: e.target.value === 'Cr' ? 'Cr' : 'Dr' })}>
                     <option value="Dr">{mastersT('dr')}</option>
                     <option value="Cr">{mastersT('cr')}</option>
-                  </select>
+                  </SelectField>
                 </td>
                 <td>
                   {!readOnly && (

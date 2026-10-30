@@ -6,6 +6,7 @@ import { useT } from '../../i18n';
 import { psbT } from '../../i18n/areas/prof-r14b';
 import { psOfParty, workUnitOf, type PsPartyB, type WorkUnit } from '../../lib/prof/ps-legal';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 type PsHolder = { ps?: unknown };
 const merge = (p: PsHolder, patch: Partial<PsPartyB>) => ({ ps: { ...((p.ps as object | undefined) ?? {}), ...patch } });
@@ -18,10 +19,10 @@ export function ClientLegalRow({ value, onChange }: { value: PsHolder; onChange:
     <div className={controls.row} data-ps-client-legal>
       <label className={controls.field}>
         <span className={controls.label}>{psbT('legalStatus')}</span>
-        <select className={controls.select} value={ps.entity ?? ''} onChange={(e) => onChange(merge(value, { entity: (e.target.value || undefined) as PsPartyB['entity'] }))}>
+        <SelectField className={controls.select} value={ps.entity ?? ''} onChange={(e) => onChange(merge(value, { entity: (e.target.value || undefined) as PsPartyB['entity'] }))}>
           <option value="">{psbT('e.')}</option>
           {(['business', 'individual', 'government', 'advocate'] as const).map((k) => <option key={k} value={k}>{psbT(`e.${k}`)}</option>)}
-        </select>
+        </SelectField>
       </label>
       <label className={controls.check}><input type="checkbox" checked={!!ps.small_business} onChange={(e) => onChange(merge(value, { small_business: e.target.checked || undefined }))} /> {psbT('small')}</label>
     </div>
@@ -38,8 +39,8 @@ export function VendorAdvocateRow({ value, onChange }: { value: PsHolder; onChan
 export function WorkUnitSelect({ value, label, disabled, onChange }: { value: PsHolder; label: string; disabled?: boolean; onChange: (ps: Record<string, unknown>) => void }) {
   useT();
   return (
-    <select className={controls.select} value={workUnitOf(value)} disabled={disabled} aria-label={`${psbT('unit')} ${label}`} onChange={(e) => onChange({ ...((value.ps as object | undefined) ?? {}), unit: e.target.value === 'hour' ? undefined : (e.target.value as WorkUnit) })}>
+    <SelectField className={controls.select} value={workUnitOf(value)} disabled={disabled} aria-label={`${psbT('unit')} ${label}`} onChange={(e) => onChange({ ...((value.ps as object | undefined) ?? {}), unit: e.target.value === 'hour' ? undefined : (e.target.value as WorkUnit) })}>
       {(['hour', 'appearance', 'item'] as const).map((u) => <option key={u} value={u}>{psbT(`u.${u}`)}</option>)}
-    </select>
+    </SelectField>
   );
 }

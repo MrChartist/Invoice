@@ -7,6 +7,7 @@ import { useT } from '../../i18n';
 import { agPickT } from '../../i18n/areas/agri-r12-pick';
 import { AGRI_KINDS, MILL_KINDS, type AgriKindId } from '../../lib/shop-presets';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export function AgriKindPicker({ value, onPick, mill, onMill, custom, gridClass, cardClass, disabled }: {
   value?: string;
@@ -37,9 +38,9 @@ export function AgriKindPicker({ value, onPick, mill, onMill, custom, gridClass,
       {value === 'mill' && onMill && (
         <label className={controls.field} data-agri-mill>
           <span className={controls.label}>{agPickT('mill')}</span>
-          <select className={controls.select} value={mill || 'rice'} disabled={disabled} onChange={(e) => onMill(e.target.value)}>
+          <SelectField className={controls.select} value={mill || 'rice'} disabled={disabled} onChange={(e) => onMill(e.target.value)}>
             {MILL_KINDS.map((m) => <option key={m} value={m}>{agPickT(`mill.${m}`)}</option>)}
-          </select>
+          </SelectField>
         </label>
       )}
     </>

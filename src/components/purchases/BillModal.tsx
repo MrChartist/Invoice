@@ -61,6 +61,8 @@ import { errText } from '../../i18n/lib-msg';
 import { acceptForm, deleteEntry, entryKeyDown, focusFormDate } from '../../lib/keys/entry-actions'; // R20-B
 import type { EntrySheet } from '../keys/EntrySheets';
 import { kbT } from '../../i18n/areas/keys-r20b';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 const EntrySheets = lazy(() => import('../keys/EntrySheets'));
 
 export interface BillModalProps {
@@ -360,23 +362,23 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="bill-date">{purT('billDate')}</label>
-          <input id="bill-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField id="bill-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="bill-due">{purT('dueDate')}</label>
-          <input id="bill-due" type="date" className={controls.input} value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          <DateField id="bill-due" className={controls.input} value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
         </div>
       </div>
 
       <div className={controls.row}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="bill-pos">{purT('placeOfSupply')}</label>
-          <select id="bill-pos" className={controls.select} value={pos} onChange={(e) => setPos(e.target.value)}>
+          <SelectField id="bill-pos" className={controls.select} value={pos} onChange={(e) => setPos(e.target.value)}>
             <option value="">{purT('notSpecified')}</option>
             {INDIAN_STATES.map((s) => (
               <option key={s.code} value={s.code}>{s.code} : {s.name}</option>
             ))}
-          </select>
+          </SelectField>
           <span className={controls.hint}>
             {interState ? purT('interState') : purT('intraState')}
             {!businessState && purT('setGstinHint')}
@@ -384,11 +386,11 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="bill-cat">{purT('category')}</label>
-          <select id="bill-cat" className={controls.select} value={category} onChange={(e) => setCategory(e.target.value)}>
+          <SelectField id="bill-cat" className={controls.select} value={category} onChange={(e) => setCategory(e.target.value)}>
             {PURCHASE_CATEGORIES.map((c) => (
               <option key={c} value={c}>{purCategory(c)}</option>
             ))}
-          </select>
+          </SelectField>
         </div>
       </div>
       <CostCentreSelect id="bill-cost-centre" label={purT('costCentre')} centres={centres} value={costCentre} onChange={setCostCentre} />
@@ -440,7 +442,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
           <div className={controls.row}>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="bill-import">{purT('import')}</label>
-              <select id="bill-import" className={controls.select} value={importType} onChange={(e) => {
+              <SelectField id="bill-import" className={controls.select} value={importType} onChange={(e) => {
                   const t = e.target.value as ImportType | '';
                   setImportType(t);
                   // Foreign suppliers have no GSTIN, which unticks ITC on vendor pick; imports carry ITC.
@@ -449,7 +451,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
                 <option value="">{purT('domestic')}</option>
                 <option value="GOODS">{purT('importGoods')}</option>
                 <option value="SERVICES">{purT('importServices')}</option>
-              </select>
+              </SelectField>
             </div>
             <label className={controls.check}>
               <input type="checkbox" checked={rcm || importType === 'SERVICES'} disabled={!!importType} onChange={(e) => setRcm(e.target.checked)} />
@@ -464,7 +466,7 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="bill-boe-date">{purT('boeDate')}</label>
-                <input id="bill-boe-date" type="date" className={controls.input} value={boeDate} onChange={(e) => setBoeDate(e.target.value)} />
+                <DateField id="bill-boe-date" className={controls.input} value={boeDate} onChange={(e) => setBoeDate(e.target.value)} />
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="bill-port">{purT('portCode')}</label>
@@ -506,11 +508,11 @@ function BillForm({ purchase, seed, vendors, onVendorCreated, businessState, onS
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="bill-rev-reason">{purT('reason')}</label>
-                <select id="bill-rev-reason" className={controls.select} value={reason} onChange={(e) => setReason(e.target.value as ItcReversalReason)}>
+                <SelectField id="bill-rev-reason" className={controls.select} value={reason} onChange={(e) => setReason(e.target.value as ItcReversalReason)}>
                   {ITC_REVERSAL_REASONS.map((r) => (
                     <option key={r.value} value={r.value}>{purT(`rr.${r.value}`)}</option>
                   ))}
-                </select>
+                </SelectField>
               </div>
             </div>
           )}

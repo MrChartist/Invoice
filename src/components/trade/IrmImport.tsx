@@ -12,6 +12,7 @@ import { useT } from '../../i18n';
 import { trErr, trT } from '../../i18n/areas/trade-trust-r4';
 import controls from '../../styles/controls.module.css';
 import styles from './trade.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export default function IrmImport({ onClose, onDone }: { onClose: () => void; onDone: (n: number) => void }) {
   useT();
@@ -57,10 +58,10 @@ export default function IrmImport({ onClose, onDone }: { onClose: () => void; on
               {IRM_FIELDS.map((f) => (
                 <label key={f.key} className={`${controls.field} ${styles.narrow}`}>
                   <span className={controls.label}>{trT('importColumn', { field: trT(`f_${f.key}` as `f_${IrmField}`) })}</span>
-                  <select className={controls.select} value={String(parsed.mapping[f.key] ?? -1)} onChange={(e) => setMapping({ ...parsed.mapping, [f.key]: Number(e.target.value) })}>
+                  <SelectField className={controls.select} value={String(parsed.mapping[f.key] ?? -1)} onChange={(e) => setMapping({ ...parsed.mapping, [f.key]: Number(e.target.value) })}>
                     <option value="-1">{trT('importNotMapped')}</option>
                     {parsed.header.map((h, i) => <option key={i} value={i}>{h}</option>)}
-                  </select>
+                  </SelectField>
                 </label>
               ))}
             </div>

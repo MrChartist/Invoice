@@ -23,6 +23,7 @@ import styles from './InvoicePreview.module.css';
 import { receivableBalance } from '../../lib/rcm';
 import { canDocRight } from '../../lib/user-rights';
 import { rPosT } from '../../i18n/areas/restaurant-pos';
+import { SelectField } from '../ui/SelectField';
 
 
 interface InvoicePreviewModalProps {
@@ -295,7 +296,7 @@ const PreviewBody = ({ isOpen, onClose, autoAction }: InvoicePreviewModalProps) 
           </button>
           <div className={styles.templateName}>
             <span className={styles.swatch} style={{ background: meta.accent }} />
-            <select
+            <SelectField
               value={invoice.template_id}
               onChange={(e) => invoice.setTemplate(e.target.value)}
               aria-label="Template"
@@ -305,7 +306,7 @@ const PreviewBody = ({ isOpen, onClose, autoAction }: InvoicePreviewModalProps) 
                   {t.name} : {t.category}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
           <button type="button" className={controls.btnIcon} onClick={() => step(1)} aria-label="Next template">
             <ChevronRight size={18} />

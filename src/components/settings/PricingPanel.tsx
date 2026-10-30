@@ -23,6 +23,8 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './CatalogPanel.module.css';
 import { libMsg } from '../../i18n/lib-msg';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 
@@ -213,10 +215,10 @@ export function PricingPanel({ notify }: { notify: Notify }) {
             {/* 8E (8.145): "MRP less %" levels take the percent off the item's MRP. */}
             <label className={controls.field}>
               <span className={controls.label}>{retailT('levelBasis')}</span>
-              <select className={controls.select} value={level.basis ?? 'rate'} onChange={(e) => setLevel({ ...level, basis: e.target.value === 'mrp' ? 'mrp' : undefined })} data-level-basis>
+              <SelectField className={controls.select} value={level.basis ?? 'rate'} onChange={(e) => setLevel({ ...level, basis: e.target.value === 'mrp' ? 'mrp' : undefined })} data-level-basis>
                 <option value="rate">{retailT('basisRate')}</option>
                 <option value="mrp">{retailT('basisMrp')}</option>
-              </select>
+              </SelectField>
             </label>
             {error && <p className={controls.error} role="alert">{error}</p>}
           </div>
@@ -240,7 +242,7 @@ export function PricingPanel({ notify }: { notify: Notify }) {
           <div className={styles.form}>
             <label className={controls.field}>
               <span className={controls.label}>{setT('itemReq')}</span>
-              <select
+              <SelectField
                 className={controls.select}
                 value={scheme.item_id}
                 onChange={(e) => {
@@ -250,7 +252,7 @@ export function PricingPanel({ notify }: { notify: Notify }) {
               >
                 <option value="">{setT('chooseItem')}</option>
                 {catalog.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-              </select>
+              </SelectField>
             </label>
             <div className={controls.row}>
               <label className={controls.field}>
@@ -265,11 +267,11 @@ export function PricingPanel({ notify }: { notify: Notify }) {
             <div className={controls.row}>
               <label className={controls.field}>
                 <span className={controls.label}>{setT('fromOpt')}</span>
-                <input type="date" className={controls.input} value={scheme.valid_from ?? ''} onChange={(e) => setScheme({ ...scheme, valid_from: e.target.value || undefined })} />
+                <DateField className={controls.input} value={scheme.valid_from ?? ''} onChange={(e) => setScheme({ ...scheme, valid_from: e.target.value || undefined })} />
               </label>
               <label className={controls.field}>
                 <span className={controls.label}>{setT('toOpt')}</span>
-                <input type="date" className={controls.input} value={scheme.valid_to ?? ''} onChange={(e) => setScheme({ ...scheme, valid_to: e.target.value || undefined })} />
+                <DateField className={controls.input} value={scheme.valid_to ?? ''} onChange={(e) => setScheme({ ...scheme, valid_to: e.target.value || undefined })} />
               </label>
             </div>
             {error && <p className={controls.error} role="alert">{error}</p>}

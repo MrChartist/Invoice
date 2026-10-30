@@ -27,6 +27,8 @@ import { money, qtyText, type MfgContext } from './context';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './manufacturing.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 // R13 (MF-A4): the dated view of the plan (lazy, offered with the shop-floor pack).
 const DatedPlanView = lazy(() => import('../mfg/DatedPlanView'));
@@ -128,11 +130,11 @@ export function MrpTab({ ctx }: { ctx: MfgContext }) {
       <div className={styles.planGrid}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="pp-date">{s7T('planDate')}{number ? ` · ${number}` : ''}</label>
-          <input id="pp-date" type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField id="pp-date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="pp-due">{s7T('dueDate')}</label>
-          <input id="pp-due" type="date" className={controls.input} value={due} onChange={(e) => setDue(e.target.value)} />
+          <DateField id="pp-due" className={controls.input} value={due} onChange={(e) => setDue(e.target.value)} />
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="pp-narr">{s7T('narration')}</label>
@@ -146,10 +148,10 @@ export function MrpTab({ ctx }: { ctx: MfgContext }) {
             {lines.map((l, i) => (
               <tr key={l.id}>
                 <td>
-                  <select id={`pp-${l.id}`} className={controls.select} aria-label={`${s7T('planItem')} ${i + 1}`} value={l.item_id} onChange={(e) => patch(l.id, { item_id: e.target.value })}>
+                  <SelectField id={`pp-${l.id}`} className={controls.select} aria-label={`${s7T('planItem')} ${i + 1}`} value={l.item_id} onChange={(e) => patch(l.id, { item_id: e.target.value })}>
                     <option value="">{s7T('choose')}</option>
                     {tracked.map((it) => <option key={it.id} value={it.id}>{it.name}{withBom.has(it.id) ? ' ★' : ''}</option>)}
-                  </select>
+                  </SelectField>
                 </td>
                 <td>
                   <input className={cn(controls.input, controls.inputNumeric)} inputMode="decimal" aria-label={`${s7T('planQty')} ${i + 1}`} value={String(l.qty ?? '')}
@@ -224,10 +226,10 @@ export function MrpTab({ ctx }: { ctx: MfgContext }) {
       )}
       {ctx.canBooks && buy.some((r) => r.suggested > 0) && (
         <div className={styles.bar} style={{ marginTop: '0.5rem', justifyContent: 'flex-end' }}>
-          <select className={controls.select} aria-label={s7T('vendor')} value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
+          <SelectField className={controls.select} aria-label={s7T('vendor')} value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
             <option value="">{s7T('vendor')}: {buy[0]?.vendor ?? s7T('choose')}</option>
             {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-          </select>
+          </SelectField>
           <button type="button" className={cn(controls.btnPrimary, controls.btnSm)} onClick={createPo} data-testid="mrp-po">
             <ShoppingCart size={14} aria-hidden="true" /> {s7T('createPo', { n: buy.filter((r) => r.suggested > 0).length })}
           </button>

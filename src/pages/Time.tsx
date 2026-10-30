@@ -49,7 +49,8 @@ import { svcT } from '../i18n/areas/service-r3'; // R3-B
 import { WorkTypesCard } from '../components/time/WorkTypesCard';
 import { visiblePackTabs, type PackId } from '../lib/industry-packs'; // R5-B; R10: tabs shared by packs (`alsoPacks`)
 import { defineArea } from '../i18n/area';
-import { TIME_TABS, type TimeTab } from './page-tabs'; // R6-B1
+import { TIME_TABS, type TimeTab } from './page-tabs'; import { SelectField } from '../components/ui/SelectField';
+// R6-B1
 
 // R3-B2 / B3: the projects board and retainers are their own lazy tab chunks.
 const ProjectsBoard = lazy(() => import('../components/time/ProjectsBoard'));
@@ -475,19 +476,19 @@ export function Time() {
           <div className={controls.row}>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="tp-round">{timeT('roundTo')}</label>
-              <select id="tp-round" className={controls.select} value={prefs.round_increment}
+              <SelectField id="tp-round" className={controls.select} value={prefs.round_increment}
                 onChange={(e) => updatePrefs({ round_increment: Number(e.target.value), round_mode: Number(e.target.value) ? (prefs.round_mode === 'none' ? 'nearest' : prefs.round_mode) : 'none' })}>
                 {[0, 6, 10, 15, 30].map((n) => <option key={n} value={n}>{n ? timeT('nMinutes', { n }) : timeT('exact')}</option>)}
-              </select>
+              </SelectField>
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="tp-mode">{timeT('rounding')}</label>
-              <select id="tp-mode" className={controls.select} value={prefs.round_mode} disabled={!prefs.round_increment}
+              <SelectField id="tp-mode" className={controls.select} value={prefs.round_mode} disabled={!prefs.round_increment}
                 onChange={(e) => updatePrefs({ round_mode: e.target.value as TimePrefs['round_mode'] })}>
                 <option value="nearest">{timeT('nearest')}</option>
                 <option value="up">{timeT('up')}</option>
                 <option value="none">{timeT('none')}</option>
-              </select>
+              </SelectField>
             </div>
           </div>
           <div className={controls.row}>

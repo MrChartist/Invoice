@@ -32,6 +32,7 @@ import { useT } from '../../i18n';
 import { shareT } from '../../i18n/areas/share';
 import { remindT } from '../../i18n/areas/reminders';
 import { areaNodes } from '../../i18n/areas/nodes';
+import { SelectField } from '../ui/SelectField';
 
 export interface ReminderModalProps {
   invoice: InvoiceRecord;
@@ -239,9 +240,9 @@ function ReminderModalBody({
             </div>
             <div className={controls.field}>
               <span className={controls.label}>{shareT('rmLanguage')}</span>
-              <select className={controls.select} aria-label={shareT('rmLanguage')} value={lang} onChange={(e) => isMessageLang(e.target.value) && regenerate(stage, e.target.value)}>
+              <SelectField className={controls.select} aria-label={shareT('rmLanguage')} value={lang} onChange={(e) => isMessageLang(e.target.value) && regenerate(stage, e.target.value)}>
                 {MESSAGE_LANGS.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
-              </select>
+              </SelectField>
             </div>
           </div>
 

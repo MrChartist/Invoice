@@ -23,6 +23,8 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field } from './tv-ui';
 import { pct, runWith, type TvViewProps } from './tv-run';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const money = (n: number) => formatCurrency(n);
 const row = { display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end', marginBottom: '0.75rem' } as const;
@@ -51,9 +53,9 @@ export default function EventsView({ notify }: TvViewProps) {
     <section data-tv-events>
       <div style={row}>
         <Field label={tvT('event')}>
-          <select className={controls.select} value={sel.id} onChange={(e) => setOpen(e.target.value)} data-tv-event-pick>
+          <SelectField className={controls.select} value={sel.id} onChange={(e) => setOpen(e.target.value)} data-tv-event-pick>
             {data.events.map((t) => <option key={t.id} value={t.id}>{tripLabel(t)}</option>)}
-          </select>
+          </SelectField>
         </Field>
       </div>
       <EventForm key={sel.id + tick} trip={sel} notify={notify} onSaved={() => setTick((x) => x + 1)} />
@@ -97,22 +99,22 @@ function EventForm({ trip, notify, onSaved }: { trip: Trip; notify: TvViewProps[
       <div style={row}>
         {txt('venue', 'data-tv-ev-venue')}{txt('city', 'data-tv-ev-city')}
         <Field label={tvdT('state')}>
-          <select className={controls.select} value={e.state ?? ''} onChange={(x) => set({ state: x.target.value })} data-tv-ev-state>
+          <SelectField className={controls.select} value={e.state ?? ''} onChange={(x) => set({ state: x.target.value })} data-tv-ev-state>
             <option value="">-</option>
             {INDIAN_STATES.map((s) => <option key={s.code} value={s.code}>{s.name}</option>)}
             <option value="96">{tvdT('abroad')}</option>
-          </select>
+          </SelectField>
         </Field>
-        <Field label={tvT('from')}><input type="date" className={controls.input} value={e.date_from ?? ''} onChange={(x) => set({ date_from: x.target.value })} /></Field>
-        <Field label={tvT('to')}><input type="date" className={controls.input} value={e.date_to ?? ''} onChange={(x) => set({ date_to: x.target.value })} /></Field>
+        <Field label={tvT('from')}><DateField className={controls.input} value={e.date_from ?? ''} onChange={(x) => set({ date_from: x.target.value })} /></Field>
+        <Field label={tvT('to')}><DateField className={controls.input} value={e.date_to ?? ''} onChange={(x) => set({ date_to: x.target.value })} /></Field>
         <Field label={tvdT('guests')}><input className={controls.input} inputMode="numeric" value={e.guests ?? ''} onChange={(x) => set({ guests: Number(x.target.value) || undefined })} /></Field>
         <button type="button" className={controls.btnPrimary} onClick={() => save(e)} data-tv-ev-save>{tvT('save')}</button>
       </div>
       <div style={row}>
         <Field label={tvdT('head')}>
-          <select className={controls.select} value={head} onChange={(x) => setHead(x.target.value as TvComponent)} data-tv-ev-head>
+          <SelectField className={controls.select} value={head} onChange={(x) => setHead(x.target.value as TvComponent)} data-tv-ev-head>
             {TV_COMPONENTS.map((k) => <option key={k} value={k}>{comp(k)}</option>)}
-          </select>
+          </SelectField>
         </Field>
         <Field label={tvdT('approved')}><input className={controls.input} inputMode="decimal" value={amt} onChange={(x) => setAmt(x.target.value)} data-tv-ev-amt /></Field>
         <button type="button" className={controls.btnOutline} onClick={() => { const next = { ...e, budget: [...(e.budget ?? []).filter((b) => b.head !== head), { head, approved: Number(amt) || 0 }] }; setE(next); setAmt(''); save(next); }} data-tv-ev-add>{tvdT('addHead')}</button>

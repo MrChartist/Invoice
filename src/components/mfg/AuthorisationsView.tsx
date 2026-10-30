@@ -12,6 +12,8 @@ import type { MfgContext } from '../manufacturing/context';
 import { Fld, Tbl } from './mfd-ui';
 import { row, rs, run, sm } from './mfd-util';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const STATUSES: AuthorisationStatus[] = ['open', 'eodc_applied', 'redeemed', 'lapsed'];
 
@@ -31,10 +33,10 @@ export default function AuthorisationsView({ ctx }: { ctx: MfgContext }) {
     return sdT('saved');
   });
   const itemSel = (k: 'exp' | 'imp') => (
-    <select className={controls.select} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} data-mfd={`aa-${k}`}>
+    <SelectField className={controls.select} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} data-mfd={`aa-${k}`}>
       <option value="">-</option>
       {ctx.items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-    </select>
+    </SelectField>
   );
   const num = (k: 'duty' | 'multiple' | 'expQty' | 'fob' | 'impQty' | 'cif') => <NumberInput className={controls.input} style={{ maxWidth: 110 }} value={f[k]} onChange={(v) => setF({ ...f, [k]: v })} data-mfd={`aa-${k}`} />;
   const tagInvoice = (a: ExportAuthorisation) => run(ctx, () => {
@@ -53,13 +55,13 @@ export default function AuthorisationsView({ ctx }: { ctx: MfgContext }) {
     <>
       <div style={row}>
         <Fld l={sdT('kind')}>
-          <select className={controls.select} value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as AuthorisationKind })} data-mfd="aa-kind">
+          <SelectField className={controls.select} value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as AuthorisationKind })} data-mfd="aa-kind">
             <option value="aa">{sdT('kindAa')}</option>
             <option value="epcg">{sdT('kindEpcg')}</option>
-          </select>
+          </SelectField>
         </Fld>
         <Fld l={sdT('number')}><input className={controls.input} value={f.number} onChange={(e) => setF({ ...f, number: e.target.value })} data-mfd="aa-number" /></Fld>
-        <Fld l={sdT('issued')}><input type="date" className={controls.input} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} data-mfd="aa-date" /></Fld>
+        <Fld l={sdT('issued')}><DateField className={controls.input} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} data-mfd="aa-date" /></Fld>
         <Fld l={sdT('sion')}><input className={controls.input} value={f.sion} onChange={(e) => setF({ ...f, sion: e.target.value })} /></Fld>
         <Fld l={sdT('dutySaved')}>{num('duty')}</Fld>
         {f.kind === 'epcg' && <Fld l="×">{num('multiple')}</Fld>}
@@ -75,16 +77,16 @@ export default function AuthorisationsView({ ctx }: { ctx: MfgContext }) {
       </div>
       <div style={row}>
         <Fld l={sdT('tagInv')}>
-          <select className={controls.select} value={tag.inv} onChange={(e) => setTag({ ...tag, inv: e.target.value })} data-mfd="aa-inv">
+          <SelectField className={controls.select} value={tag.inv} onChange={(e) => setTag({ ...tag, inv: e.target.value })} data-mfd="aa-inv">
             <option value="">-</option>
             {data.invoices.filter((i) => i.doc_type === 'INVOICE' || i.doc_type === 'TAX_INVOICE').slice(-200).map((i) => <option key={i.id} value={i.id}>{i.invoice_number} · {i.client?.name}</option>)}
-          </select>
+          </SelectField>
         </Fld>
         <Fld l={sdT('tagBill')}>
-          <select className={controls.select} value={tag.bill} onChange={(e) => setTag({ ...tag, bill: e.target.value })} data-mfd="aa-bill">
+          <SelectField className={controls.select} value={tag.bill} onChange={(e) => setTag({ ...tag, bill: e.target.value })} data-mfd="aa-bill">
             <option value="">-</option>
             {data.bills.slice(-200).map((b) => <option key={b.id} value={b.id}>{b.bill_number} · {b.vendor_name}</option>)}
-          </select>
+          </SelectField>
         </Fld>
       </div>
       <Tbl empty={sdT('none')} head={[sdT('number'), sdT('eoDue'), sdT('done'), sdT('daysLeft'), sdT('atRisk'), sdT('status'), '']} rows={data.rows.map((a) => {
@@ -95,7 +97,7 @@ export default function AuthorisationsView({ ctx }: { ctx: MfgContext }) {
         return [`${a.kind === 'aa' ? 'AA' : 'EPCG'} ${a.number}`, a.eo_extended_to || a.eo_due,
           a.kind === 'aa' ? `${rs(s.qtyDone)} / ${rs(s.qtyRequired)} · ₹${rs(s.valueDone)} / ${rs(s.valueRequired)}` : `₹${rs(s.valueDone)} / ${rs(s.valueRequired)} · ${s.blocks.map((b) => `${b.year}y ${b.met ? '✓' : '✗'}`).join(' ')}`,
           `${s.daysLeft}${s.bell ? ' !' : ''}`, <span key="r" title={shortfallNote(a)}>{rs(s.atRisk)}</span>,
-          <select key="s" className={controls.select} value={a.status} disabled={!ctx.canBooks} onChange={(e) => run(ctx, () => { authorisationsDb.save({ ...a, status: e.target.value as AuthorisationStatus }); return sdT('saved'); })}>{STATUSES.map((x) => <option key={x} value={x}>{x}</option>)}</select>,
+          <SelectField key="s" className={controls.select} value={a.status} disabled={!ctx.canBooks} onChange={(e) => run(ctx, () => { authorisationsDb.save({ ...a, status: e.target.value as AuthorisationStatus }); return sdT('saved'); })}>{STATUSES.map((x) => <option key={x} value={x}>{x}</option>)}</SelectField>,
           <span key="b">
             <button type="button" className={sm} disabled={!tag.inv || !ctx.canBooks} onClick={() => tagInvoice(a)} data-mfd-b="aa-tag-inv">{sdT('tagInv')}</button>{' '}
             <button type="button" className={sm} disabled={!tag.bill || !ctx.canBooks} onClick={() => tagBill(a)} data-mfd-b="aa-tag-bill">{sdT('tagBill')}</button>{' '}

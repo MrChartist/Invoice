@@ -24,6 +24,8 @@ import type { InvoiceItem, InvoiceRecord } from '../../types/invoice';
 import type { PosRx } from '../../types/retail-r9';
 import { NumberInput } from '../ui/NumberInput';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Rx = NonNullable<InvoiceRecord['rx']>;
 const EMPTY: Rx = { patient: '', prescriber: '' };
@@ -53,10 +55,10 @@ function RxFields({ rx, onRx, x, onImage }: { rx: Rx; onRx: (r: Rx) => void; x: 
   return (
     <div className={controls.row} style={{ flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }} data-rx-fields>
       <label className={controls.field}><span className={controls.label}>{rtbT('doctor')}</span>
-        <select className={controls.select} value={rx.doctor_id ?? ''} onChange={(e) => onRx(pickDoctor(rx, doctors.find((d) => d.id === e.target.value)))} data-rx-doctor>
+        <SelectField className={controls.select} value={rx.doctor_id ?? ''} onChange={(e) => onRx(pickDoctor(rx, doctors.find((d) => d.id === e.target.value)))} data-rx-doctor>
           <option value="">{rtbT('doctorTyped')}</option>
           {doctors.map((d) => <option key={d.id} value={d.id}>{d.name}{d.reg_no ? ` (${d.reg_no})` : ''}</option>)}
-        </select></label>
+        </SelectField></label>
       {!rx.doctor_id && (
         <>
           <label className={controls.field}><span className={controls.label}>{rtbT('prescriber')}</span>
@@ -70,15 +72,15 @@ function RxFields({ rx, onRx, x, onImage }: { rx: Rx; onRx: (r: Rx) => void; x: 
       <label className={controls.field} style={{ maxWidth: 80 }}><span className={controls.label}>{rtbT('age')}</span>
         <NumberInput className={controls.input} value={rx.age ?? 0} onChange={(age) => set({ age: age > 0 ? Math.round(age) : undefined })} /></label>
       <label className={controls.field} style={{ maxWidth: 110 }}><span className={controls.label}>{rtbT('gender')}</span>
-        <select className={controls.select} value={rx.gender ?? ''} onChange={(e) => set({ gender: (e.target.value || undefined) as Rx['gender'] })}>
+        <SelectField className={controls.select} value={rx.gender ?? ''} onChange={(e) => set({ gender: (e.target.value || undefined) as Rx['gender'] })}>
           <option value="">-</option><option value="F">{rtbT('g.F')}</option><option value="M">{rtbT('g.M')}</option><option value="O">{rtbT('g.O')}</option>
-        </select></label>
+        </SelectField></label>
       <label className={controls.field}><span className={controls.label}>{x ? rtbT('addressX') : rtbT('address')}</span>
         <input className={controls.input} value={rx.patient_address ?? ''} onChange={(e) => set({ patient_address: e.target.value })} data-rx-address /></label>
       <label className={controls.field} style={{ maxWidth: 120 }}><span className={controls.label}>{rtbT('rxNo')}</span>
         <input className={controls.input} value={rx.rx_no ?? ''} onChange={(e) => set({ rx_no: e.target.value || undefined })} /></label>
       <label className={controls.field} style={{ maxWidth: 150 }}><span className={controls.label}>{rtbT('rxDate')}</span>
-        <input type="date" className={controls.input} value={rx.rx_date ?? ''} onChange={(e) => set({ rx_date: e.target.value || undefined })} /></label>
+        <DateField className={controls.input} value={rx.rx_date ?? ''} onChange={(e) => set({ rx_date: e.target.value || undefined })} /></label>
       {x && <label className={controls.check}><input type="checkbox" checked={!!rx.retained} onChange={(e) => set({ retained: e.target.checked || undefined })} data-rx-retained /> {rtbT('retained')}</label>}
       {onImage && (
         <>

@@ -26,6 +26,7 @@ import books from '../books.module.css';
 import styles from './ledger.module.css';
 import { useT } from '../../../i18n';
 import { ledgerT } from '../../../i18n/areas/books-ledger';
+import { SelectField } from '../../ui/SelectField';
 
 interface Props {
   ledger: Ledger;
@@ -146,11 +147,11 @@ export function ChartTab({ ledger, asOf, onChanged, onOpenAccount, notify }: Pro
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor={`${uid}-group`}>{ledgerT('group')}</label>
-              <select id={`${uid}-group`} className={controls.select} value={form.group} onChange={(e) => setForm({ ...form, group: e.target.value as GroupId })}>
+              <SelectField id={`${uid}-group`} className={controls.select} value={form.group} onChange={(e) => setForm({ ...form, group: e.target.value as GroupId })}>
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>{'\u00a0\u00a0'.repeat(g.depth ?? 0)}{g.label}</option>
                 ))}
-              </select>
+              </SelectField>
             </div>
             <button type="button" className={controls.btnPrimary} onClick={add}>
               <Plus size={16} /> {ledgerT('addAccount')}

@@ -12,6 +12,8 @@ import { unitT } from '../../i18n/areas/units';
 import { cleanAltUnits, factorFor, roundTypedQty, unitChoices, unitsDb } from '../../lib/units';
 import controls from '../../styles/controls.module.css';
 import styles from './inventory.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 const REASONS = ['Stocktake correction', 'Damaged / expired', 'Lost / theft', 'Found stock', 'Internal use', 'Other'];
 
@@ -127,25 +129,25 @@ function AdjustForm({ open, position, onSave, onClose, tracking, godowns = [], d
           </div>
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-d`}>{invT('dateReq')}</label>
-            <input id={`${uid}-d`} type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateField id={`${uid}-d`} className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} />
           </div>
         </div>
 
         {alt && (
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-u`}>{unitT('lineUnit', { n: 1 })}</label>
-            <select id={`${uid}-u`} className={controls.select} value={unit} onChange={(e) => { setUnit(e.target.value); if (qty) setQty(String(roundTypedQty(qty, e.target.value, units))); }}>
+            <SelectField id={`${uid}-u`} className={controls.select} value={unit} onChange={(e) => { setUnit(e.target.value); if (qty) setQty(String(roundTypedQty(qty, e.target.value, units))); }}>
               {unitChoices(item).map((c) => <option key={c.unit} value={c.unit}>{c.unit}{c.factor !== 1 ? ` (${unitT('equals', { qty: c.factor, unit: item.unit })})` : ''}</option>)}
-            </select>
+            </SelectField>
           </div>
         )}
 
         {multi && (
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-g`}>{invT('godown')}</label>
-            <select id={`${uid}-g`} className={controls.select} value={godown} onChange={(e) => { setGodown(e.target.value); setPicked([]); setBatch(''); }}>
+            <SelectField id={`${uid}-g`} className={controls.select} value={godown} onChange={(e) => { setGodown(e.target.value); setPicked([]); setBatch(''); }}>
               {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
+            </SelectField>
           </div>
         )}
 
@@ -157,25 +159,25 @@ function AdjustForm({ open, position, onSave, onClose, tracking, godowns = [], d
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor={`${uid}-mfg`}>{invT('mfgDate')}</label>
-              <input id={`${uid}-mfg`} type="date" className={controls.input} value={mfg} onChange={(e) => setMfg(e.target.value)} />
+              <DateField id={`${uid}-mfg`} className={controls.input} value={mfg} onChange={(e) => setMfg(e.target.value)} />
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor={`${uid}-exp`}>{invT('expiryDate')}</label>
-              <input id={`${uid}-exp`} type="date" className={controls.input} value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+              <DateField id={`${uid}-exp`} className={controls.input} value={expiry} onChange={(e) => setExpiry(e.target.value)} />
             </div>
           </div>
         )}
         {byBatch && direction === 'remove' && removable.length > 0 && (
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-rb`}>{invT('batch')}</label>
-            <select id={`${uid}-rb`} className={controls.select} value={batch} onChange={(e) => setBatch(e.target.value)}>
+            <SelectField id={`${uid}-rb`} className={controls.select} value={batch} onChange={(e) => setBatch(e.target.value)}>
               <option value="">{invT('choose')}</option>
               {removable.map((b) => (
                 <option key={b.batch} value={b.batch}>
                   {b.batch}{b.expiry ? ` · ${invT('exp', { date: b.expiry })}` : ''} · {b.qty} {item.unit}{b.expired ? ` · ${invT('expired')}` : ''}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </div>
         )}
         {bySerial && direction === 'add' && (
@@ -198,9 +200,9 @@ function AdjustForm({ open, position, onSave, onClose, tracking, godowns = [], d
 
         <div className={controls.field}>
           <label className={controls.label} htmlFor={`${uid}-why`}>{invT('reason')}</label>
-          <select id={`${uid}-why`} className={controls.select} value={reason} onChange={(e) => setReason(e.target.value)}>
+          <SelectField id={`${uid}-why`} className={controls.select} value={reason} onChange={(e) => setReason(e.target.value)}>
             {REASONS.map((r) => <option key={r} value={r}>{invT(`reason.${r}` as 'reason.Other')}</option>)}
-          </select>
+          </SelectField>
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor={`${uid}-n`}>{invT('note')}</label>

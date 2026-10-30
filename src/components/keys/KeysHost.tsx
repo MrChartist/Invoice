@@ -22,6 +22,7 @@ import { keysLayout, keysMode, setKeysLayout, setKeysMode, type KeysLayout } fro
 import { useKeyActions, useKeysState } from '../../lib/keys/use-key-actions';
 import { Modal } from '../ui/Modal';
 import s from './keys.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const label = (r: KeyRow) => keysT(readRaw('mrchartist_tally_terms') === '1' && r.tally ? r.tally : r.plain);
 
@@ -161,10 +162,10 @@ export function KeysSwitch({ hint }: { hint?: boolean }) {
         {keysT('switch_')}
       </label>
       {on && (
-        <select className={s.select} aria-label={keysT('layout')} value={layout} onChange={(e) => setKeysLayout(e.target.value as KeysLayout)} data-testid="tally-keys-layout">
+        <SelectField className={s.select} aria-label={keysT('layout')} value={layout} onChange={(e) => setKeysLayout(e.target.value as KeysLayout)} data-testid="tally-keys-layout">
           <option value="prime">{keysT('prime')}</option>
           <option value="erp9">{keysT('erp9')}</option>
-        </select>
+        </SelectField>
       )}
       {hint && <span className={s.hint}>{keysT('switchHint')}</span>}
       <span className={s.sr} aria-live="polite">{said}</span>

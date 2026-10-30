@@ -20,6 +20,7 @@ import { readLogisticsSettings } from '../../lib/logistics/lg-settings';
 import controls from '../../styles/controls.module.css';
 import { Field, In, Pick, type Notify } from './lg-ui';
 import { numIn, row } from './lg-form';
+import { SelectField } from '../ui/SelectField';
 
 export type JobDraft = Omit<LgJob, 'id' | 'number' | 'updated_at'>;
 const LEGS: readonly LgLeg[] = ['road', 'rail', 'sea', 'air', 'inland_water'];
@@ -67,7 +68,7 @@ export default function JobForm({ job, draft, clients, notify, onDone }: { job?:
           {boxes.map((c, i) => (
             <div key={i} style={row}>
               <input className={controls.input} aria-label={lgT('container')} value={c.no} onChange={(e) => box(i, { no: e.target.value })} />
-              <select className={controls.select} aria-label={lgT('size')} value={c.size} onChange={(e) => box(i, { size: e.target.value as LgContainer['size'] })}>{LG_SIZES.map((s) => <option key={s}>{s}</option>)}</select>
+              <SelectField className={controls.select} aria-label={lgT('size')} value={c.size} onChange={(e) => box(i, { size: e.target.value as LgContainer['size'] })}>{LG_SIZES.map((s) => <option key={s}>{s}</option>)}</SelectField>
             </div>
           ))}
           <button type="button" className={sm} onClick={() => set({ containers: [...boxes, { no: '', size: '40HC' }] })}>{lgT('addRow')}</button>

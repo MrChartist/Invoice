@@ -9,6 +9,8 @@ import type { UdinRow } from '../../types/prof-r14';
 import { Fld, Tbl } from './ps-d-ui';
 import { sm, type PsDeskCtx, row } from './ps-desk';
 import controls from '../../styles/controls.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 export default function UdinView({ ctx }: { ctx: PsDeskCtx }) {
   const today = todayInput();
@@ -23,12 +25,12 @@ export default function UdinView({ ctx }: { ctx: PsDeskCtx }) {
     <>
       <div style={row}>
         <Fld l={caT('udin')}>{inp('udin', 200)}</Fld>
-        <Fld l={caT('date')}><input type="date" className={controls.input} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></Fld>
+        <Fld l={caT('date')}><DateField className={controls.input} value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} /></Fld>
         <Fld l={caT('client')}>
-          <select className={controls.select} value={f.client_id} onChange={(e) => setF({ ...f, client_id: e.target.value })} data-ps="u-client"><option value="">-</option>{d.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+          <SelectField className={controls.select} value={f.client_id} onChange={(e) => setF({ ...f, client_id: e.target.value })} data-ps="u-client"><option value="">-</option>{d.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</SelectField>
         </Fld>
         <Fld l={caT('kind')}>
-          <select className={controls.select} value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as UdinRow['kind'] })}>{UDIN_KINDS.map((k) => <option key={k} value={k}>{caT(`k.${k}`)}</option>)}</select>
+          <SelectField className={controls.select} value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as UdinRow['kind'] })}>{UDIN_KINDS.map((k) => <option key={k} value={k}>{caT(`k.${k}`)}</option>)}</SelectField>
         </Fld>
         <Fld l={caT('desc')}>{inp('description', 220)}</Fld>
         <Fld l={caT('member')}>{inp('member_no', 110)}</Fld>

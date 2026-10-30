@@ -16,6 +16,8 @@ import { loadPartyRates, parseBulkRates, removePartyRate, savePartyRate } from '
 import { discountLabel, parseChain } from '../../lib/trade/tr-discounts';
 import controls from '../../styles/controls.module.css';
 import own from '../distribution/dist.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 export default function PartyRatesEditor({ onDone }: { onDone: (msg: string, error?: boolean) => void }) {
   useT();
@@ -77,14 +79,14 @@ export default function PartyRatesEditor({ onDone }: { onDone: (msg: string, err
         </details>
       )}
       <div className={own.row}>
-        <select className={controls.select} value={side} onChange={(e) => { setSide(e.target.value as PartyRate['side']); setParty(''); }} aria-label={aT('side')}>
+        <SelectField className={controls.select} value={side} onChange={(e) => { setSide(e.target.value as PartyRate['side']); setParty(''); }} aria-label={aT('side')}>
           <option value="sale">{aT('side.sale')}</option>
           <option value="purchase">{aT('side.purchase')}</option>
-        </select>
-        <select className={controls.select} value={party} onChange={(e) => setParty(e.target.value)} aria-label={aT('party')} data-party-rate-party>
+        </SelectField>
+        <SelectField className={controls.select} value={party} onChange={(e) => setParty(e.target.value)} aria-label={aT('party')} data-party-rate-party>
           <option value="">{aT('party')}: -</option>
           {parties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
+        </SelectField>
         {client && (
           <label className={controls.field}>
             <span className={controls.label}>{aT('cdDefault')}</span>
@@ -104,8 +106,8 @@ export default function PartyRatesEditor({ onDone }: { onDone: (msg: string, err
             <input className={controls.input} type="number" min={0} placeholder={aT('rate')} value={f.rate} onChange={(e) => setF({ ...f, rate: e.target.value })} data-party-rate-rate />
             <input className={controls.input} placeholder={aT('chain')} value={f.chain} onChange={(e) => setF({ ...f, chain: e.target.value })} />
             <input className={controls.input} type="number" min={0} placeholder={aT('perUnit')} value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })} />
-            <input className={controls.input} type="date" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} aria-label={aT('from')} />
-            <input className={controls.input} type="date" value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} aria-label={aT('to')} />
+            <DateField className={controls.input} value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} aria-label={aT('from')} />
+            <DateField className={controls.input} value={f.to} onChange={(e) => setF({ ...f, to: e.target.value })} aria-label={aT('to')} />
             <button type="button" className={controls.btnPrimary} onClick={add} data-party-rate-save>{aT('save')}</button>
           </div>
           <div className={own.tableWrap}>

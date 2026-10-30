@@ -11,6 +11,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Security.module.css';
 import { errText } from '../../i18n/lib-msg';
+import { SelectField } from '../ui/SelectField';
 
 interface Props {
   notify: (message: string, tone?: 'success' | 'error' | 'info') => void;
@@ -112,7 +113,7 @@ export function UsersPanel({ notify }: Props) {
               </div>
               {u.id !== OWNER_ID && (
                 <div className={styles.buttons}>
-                  <select
+                  <SelectField
                     className={controls.select}
                     aria-label={secT('roleFor', { name: u.name })}
                     value={u.role}
@@ -121,7 +122,7 @@ export function UsersPanel({ notify }: Props) {
                     {ASSIGNABLE_ROLES.map((r) => (
                       <option key={r} value={r}>{roleLabel(r)}</option>
                     ))}
-                  </select>
+                  </SelectField>
                   <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => setRightsFor(u)}>
                     <SlidersHorizontal size={14} /> {rightsT('button')}
                   </button>
@@ -171,11 +172,11 @@ export function UsersPanel({ notify }: Props) {
             </div>
             <div className={controls.field}>
               <label className={controls.label} htmlFor="user-role">{secT('role')}</label>
-              <select id="user-role" className={controls.select} value={role} onChange={(e) => setRole(e.target.value as AssignableRole)}>
+              <SelectField id="user-role" className={controls.select} value={role} onChange={(e) => setRole(e.target.value as AssignableRole)}>
                 {ASSIGNABLE_ROLES.map((r) => (
                   <option key={r} value={r}>{roleLabel(r)}</option>
                 ))}
-              </select>
+              </SelectField>
             </div>
           </div>
           <span className={controls.hint}>{secT(`hint.${role}`)}</span>

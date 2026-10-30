@@ -6,6 +6,7 @@ import type { ImportPreview, ImportTable, PreviewRow } from '../../../lib/import
 import type { WizardAction, WizardState } from '../wizard-state';
 import ctl from '../../../styles/controls.module.css';
 import styles from '../ImportWizard.module.css';
+import { SelectField } from '../../ui/SelectField';
 
 interface Props {
   state: WizardState;
@@ -49,10 +50,10 @@ export function ReviewStep({ state, table, preview, rows, writable, dispatch }: 
         {kind !== 'invoices' && (
           <label className={styles.inline}>
             <span className={ctl.label}>If it already exists</span>
-            <select className={cn(ctl.input, ctl.select)} value={duplicateMode} onChange={(e) => dispatch({ type: 'setDuplicateMode', mode: e.target.value as 'update' | 'skip' })}>
+            <SelectField className={cn(ctl.input, ctl.select)} value={duplicateMode} onChange={(e) => dispatch({ type: 'setDuplicateMode', mode: e.target.value as 'update' | 'skip' })}>
               <option value="update">Update (fill in blanks, keep the rest)</option>
               <option value="skip">Skip it</option>
-            </select>
+            </SelectField>
           </label>
         )}
         {(kind === 'clients' || kind === 'invoices' || kind === 'vendors' || kind === 'ledgers') && (

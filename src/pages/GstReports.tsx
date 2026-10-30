@@ -83,6 +83,7 @@ import { Term } from '../components/help/Term';
 import { EmptyState } from '../components/ui/EmptyState';
 import type { GlossaryId } from '../lib/help/glossary';
 import { printWhenReady } from '../lib/print-fonts';
+import { SelectField } from '../components/ui/SelectField';
 
 const TURNOVER_KEY = 'mrchartist_inv_gstr1_turnover';
 // Same table as `EINVOICE_META_TABLE` in einvoice.ts — read directly so the e-invoice builder stays out of this chunk.
@@ -805,12 +806,12 @@ export function GstReports() {
         <PeriodPicker value={period} onChange={setPeriod} fyOptions={fyOptions} />
         <label className={local.periodField}>
           <span className={controls.label}>{gstT('filerGstin')}</span>
-          <select className={controls.select} value={gstin} onChange={(e) => setGstin(e.target.value)}>
+          <SelectField className={controls.select} value={gstin} onChange={(e) => setGstin(e.target.value)}>
             <option value="">{gstT('allProfiles')}</option>
             {gstins.map((x) => (
               <option key={x} value={x}>{x}</option>
             ))}
-          </select>
+          </SelectField>
         </label>
         <label className={local.periodField}>
           <span className={controls.label}>{gstT('lastFyTurnover')}</span>
@@ -909,7 +910,7 @@ export function GstReports() {
         </div>
         <label className={filing.tabSelect}>
           <span className={controls.label}>{fiT('sectionSelect')}</span>
-          <select className={controls.select} value={tab} onChange={(e) => setTab(resolveGstTab(e.target.value) ?? 'overview')} data-gst-tab-select>
+          <SelectField className={controls.select} value={tab} onChange={(e) => setTab(resolveGstTab(e.target.value) ?? 'overview')} data-gst-tab-select>
             {GST_TAB_GROUPS.map((g) => (
               <optgroup key={g.id} label={fiT(GROUP_LABEL[g.id])}>
                 {g.tabs.filter(listed).map((id) => (
@@ -917,7 +918,7 @@ export function GstReports() {
                 ))}
               </optgroup>
             ))}
-          </select>
+          </SelectField>
         </label>
         <Suspense fallback={null}><AboutStrip /></Suspense>
         <div className={local.tabBody} role="tabpanel" id="gst-panel" aria-labelledby={`gst-tab-${tab}`}>

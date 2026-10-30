@@ -23,6 +23,8 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field } from './ps-ui';
 import { runWith, type PsDeskProps } from './ps-run';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const BUCKETS = ['0–30', '31–60', '61–90', '90+'];
 
@@ -60,8 +62,8 @@ export default function DisbView({ notify }: Pick<PsDeskProps, 'notify'>) {
     <div className={surface.card} data-disb-view>
       <div className={surface.cardBody}>
         <div className={controls.row3}>
-          <Field label={psT('client')}><select className={controls.select} value={f.client ?? ''} onChange={(e) => setF({ ...f, client: e.target.value || undefined })} data-disb-client><option value="">-</option>{ids('clientId').map((id) => <option key={id} value={id}>{clients.get(id) ?? id.replace(/^name:/, '')}</option>)}</select></Field>
-          <Field label={psT('matter')}><select className={controls.select} value={f.matter ?? ''} onChange={(e) => setF({ ...f, matter: e.target.value || undefined })}><option value="">-</option>{ids('matterId').map((id) => <option key={id} value={id}>{centres.get(id) ?? id}</option>)}</select></Field>
+          <Field label={psT('client')}><SelectField className={controls.select} value={f.client ?? ''} onChange={(e) => setF({ ...f, client: e.target.value || undefined })} data-disb-client><option value="">-</option>{ids('clientId').map((id) => <option key={id} value={id}>{clients.get(id) ?? id.replace(/^name:/, '')}</option>)}</SelectField></Field>
+          <Field label={psT('matter')}><SelectField className={controls.select} value={f.matter ?? ''} onChange={(e) => setF({ ...f, matter: e.target.value || undefined })}><option value="">-</option>{ids('matterId').map((id) => <option key={id} value={id}>{centres.get(id) ?? id}</option>)}</SelectField></Field>
         </div>
         <div className={surface.tableWrap}>
           <table className={surface.table} data-disb-buckets>
@@ -70,7 +72,7 @@ export default function DisbView({ notify }: Pick<PsDeskProps, 'notify'>) {
           </table>
         </div>
         <div className={controls.row3}>
-          <Field label={r16bT('woDate')}><input type="date" className={controls.input} value={wo.date} onChange={(e) => setWo({ ...wo, date: e.target.value })} /></Field>
+          <Field label={r16bT('woDate')}><DateField className={controls.input} value={wo.date} onChange={(e) => setWo({ ...wo, date: e.target.value })} /></Field>
           <Field label={psT('reason')}><input className={controls.input} value={wo.reason} onChange={(e) => setWo({ ...wo, reason: e.target.value })} data-disb-reason /></Field>
         </div>
         {!v.rows.length && <p className={controls.hint}>{r16bT('none')}</p>}
@@ -98,7 +100,7 @@ export default function DisbView({ notify }: Pick<PsDeskProps, 'notify'>) {
         )}
         {notes.length > 0 && (
           <div className={controls.row}>
-            <Field label={r16bT('sched')}><select className={controls.select} value={note} onChange={(e) => setNote(e.target.value)}><option value="">-</option>{notes.map((i) => <option key={i.id} value={i.id}>{i.invoice_number} · {i.client?.name}</option>)}</select></Field>
+            <Field label={r16bT('sched')}><SelectField className={controls.select} value={note} onChange={(e) => setNote(e.target.value)}><option value="">-</option>{notes.map((i) => <option key={i.id} value={i.id}>{i.invoice_number} · {i.client?.name}</option>)}</SelectField></Field>
             <button type="button" className={controls.btnOutline} disabled={!note} onClick={print}>{psT('print')}</button>
           </div>
         )}

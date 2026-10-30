@@ -18,6 +18,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from '../pos/pos.module.css';
 import own from './returns.module.css';
+import { SelectField } from '../ui/SelectField';
 
 interface Props {
   open: boolean;
@@ -135,7 +136,7 @@ export function PosReturnModal({ open, onClose, notify, onExchange }: Props) {
           <button type="submit" className={controls.btnOutline}><Search size={16} /> {returnsT('find')}</button>
           <label className={controls.field}>
             <span className={controls.label}>{returnsT('recent')}</span>
-            <select
+            <SelectField
               id="ret-recent"
               className={controls.select}
               value={billId}
@@ -145,7 +146,7 @@ export function PosReturnModal({ open, onClose, notify, onExchange }: Props) {
               {recent.map((i) => (
                 <option key={i.id} value={i.id}>{`${i.invoice_number} · ${formatDate(i.issue_date)} · ${formatCurrency(i.total)}`}</option>
               ))}
-            </select>
+            </SelectField>
           </label>
         </form>
 

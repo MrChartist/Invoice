@@ -11,6 +11,8 @@ import { inr, type PsDeskCtx, row, sm } from './ps-desk';
 import { can } from '../../lib/access';
 import { r16bT } from '../../i18n/areas/prof-r16b';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const num = (v: number, on: (n: number) => void, k: string) => <NumberInput className={controls.input} style={{ maxWidth: 110 }} value={v} onChange={on} data-ps={k} />;
 
@@ -32,16 +34,16 @@ export default function PartnersView({ ctx }: { ctx: PsDeskCtx }) {
         <Fld l={fdT('name')}><input className={controls.input} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} data-ps="p-name" /></Fld>
         <Fld l={fdT('pan')}><input className={controls.input} style={{ maxWidth: 130 }} value={f.pan} onChange={(e) => setF({ ...f, pan: e.target.value.toUpperCase() })} data-ps="p-pan" /></Fld>
         <Fld l={fdT('kind')}>
-          <select className={controls.select} value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as 'working' })} data-ps="p-kind">
+          <SelectField className={controls.select} value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as 'working' })} data-ps="p-kind">
             <option value="working">{fdT('working')}</option><option value="non_working">{fdT('nonWorking')}</option>
-          </select>
+          </SelectField>
         </Fld>
-        <Fld l={fdT('joined')}><input type="date" className={controls.input} value={f.joined} onChange={(e) => setF({ ...f, joined: e.target.value })} data-ps="p-joined" /></Fld>
+        <Fld l={fdT('joined')}><DateField className={controls.input} value={f.joined} onChange={(e) => setF({ ...f, joined: e.target.value })} data-ps="p-joined" /></Fld>
         <Fld l={fdT('share')}>{num(f.share, (v) => setF({ ...f, share: v }), 'p-share')}</Fld>
         <Fld l={fdT('remMode')}>
-          <select className={controls.select} value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value as PartnerRemuneration['mode'] })} data-ps="p-mode">
+          <SelectField className={controls.select} value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value as PartnerRemuneration['mode'] })} data-ps="p-mode">
             <option value="max_allowable">{fdT('maxAllow')}</option><option value="fixed">{fdT('fixed')}</option><option value="pct_book_profit">{fdT('pctBp')}</option>
-          </select>
+          </SelectField>
         </Fld>
         {f.mode !== 'max_allowable' && <Fld l={f.mode === 'fixed' ? fdT('amount') : fdT('pctBp')}>{num(f.amount, (v) => setF({ ...f, amount: v }), 'p-amount')}</Fld>}
         <Fld l={fdT('interestPct')}>{num(f.interest, (v) => setF({ ...f, interest: v }), 'p-interest')}</Fld>
@@ -58,23 +60,23 @@ export default function PartnersView({ ctx }: { ctx: PsDeskCtx }) {
       })} />
       {partners.length > 1 && (
         <div style={row}>
-          <Fld l={fdT('ratioFrom')}><input type="date" className={controls.input} value={ratio.from} onChange={(e) => setRatio({ ...ratio, from: e.target.value })} /></Fld>
+          <Fld l={fdT('ratioFrom')}><DateField className={controls.input} value={ratio.from} onChange={(e) => setRatio({ ...ratio, from: e.target.value })} /></Fld>
           <button type="button" className={controls.btnOutline} onClick={() => ctx.run(() => saveRatio(ratio.from, Object.fromEntries(partners.map((p) => [p.id, ratio.shares[p.id] ?? termOn(p, ratio.from)?.share_pct ?? 0]))))}>{fdT('newRatio')}</button>
         </div>
       )}
       <p className={controls.label}>{fdT('drawings')}</p>
       <div style={row}>
         <Fld l={fdT('kind')}>
-          <select className={controls.select} value={dr.partner} onChange={(e) => setDr({ ...dr, partner: e.target.value })} data-ps="d-partner">
+          <SelectField className={controls.select} value={dr.partner} onChange={(e) => setDr({ ...dr, partner: e.target.value })} data-ps="d-partner">
             <option value="">-</option>{partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+          </SelectField>
         </Fld>
         <Fld l={fdT('amount')}>{num(dr.amount, (v) => setDr({ ...dr, amount: v }), 'd-amount')}</Fld>
-        <Fld l={fdT('date')}><input type="date" className={controls.input} value={dr.date} onChange={(e) => setDr({ ...dr, date: e.target.value })} /></Fld>
+        <Fld l={fdT('date')}><DateField className={controls.input} value={dr.date} onChange={(e) => setDr({ ...dr, date: e.target.value })} /></Fld>
         <Fld l={fdT('paidFrom')}>
-          <select className={controls.select} value={dr.from} onChange={(e) => setDr({ ...dr, from: e.target.value })}>
+          <SelectField className={controls.select} value={dr.from} onChange={(e) => setDr({ ...dr, from: e.target.value })}>
             <option value={A.cash}>{fdT('cash')}</option><option value={A.bank}>{fdT('bank')}</option>
-          </select>
+          </SelectField>
         </Fld>
         <button type="button" className={controls.btnOutline} onClick={() => ctx.run(() => postDrawings(dr.partner, dr.amount, dr.date, dr.from))} data-ps-b="d-post">{fdT('post')}</button>
       </div>

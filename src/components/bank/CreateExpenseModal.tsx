@@ -14,6 +14,7 @@ import { bankT } from '../../i18n/areas/bank';
 import { purCategory } from '../../i18n/areas/purchases';
 import controls from '../../styles/controls.module.css';
 import styles from './reconcile.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export interface CreateExpenseModalProps {
   line: BankLine | null;
@@ -104,9 +105,9 @@ function NewExpense({ line, onError, onChanged, onSettled, onClose }: PartProps)
       <div className={controls.row}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="ex-cat">{bankT('category')}</label>
-          <select id="ex-cat" className={controls.select} value={category} onChange={(e) => setCategory(e.target.value)}>
+          <SelectField id="ex-cat" className={controls.select} value={category} onChange={(e) => setCategory(e.target.value)}>
             {PURCHASE_CATEGORIES.map((c) => <option key={c} value={c}>{purCategory(c)}</option>)}
-          </select>
+          </SelectField>
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="ex-vendor">{bankT('paidTo')}</label>
@@ -116,9 +117,9 @@ function NewExpense({ line, onError, onChanged, onSettled, onClose }: PartProps)
       <div className={controls.row}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="ex-gst">{bankT('gstIncluded', { amount: `₹${formatMoney(line.debit)}` })}</label>
-          <select id="ex-gst" className={controls.select} value={rate} onChange={(e) => setRate(+e.target.value)}>
+          <SelectField id="ex-gst" className={controls.select} value={rate} onChange={(e) => setRate(+e.target.value)}>
             {gstRateOptions(line.date, rate).map((r) => <option key={r} value={r}>{r === 0 ? bankT('noGst') : `${r}%`}</option>)}
-          </select>
+          </SelectField>
         </div>
         <label className={controls.check} style={{ alignSelf: 'end', minHeight: 40 }}>
           <input type="checkbox" checked={itc} disabled={rate === 0} onChange={(e) => setItc(e.target.checked)} />

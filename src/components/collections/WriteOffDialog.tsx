@@ -9,6 +9,7 @@ import { useT } from '../../i18n';
 import { colT } from '../../i18n/areas/collections';
 import controls from '../../styles/controls.module.css';
 import styles from './collections.module.css';
+import { DateField } from '../ui/DateField';
 
 export interface WriteOffDialogProps {
   invoiceId: string;
@@ -74,7 +75,7 @@ export function WriteOffDialog({ invoiceId, number, party, outstanding, onClose,
             </label>
             <label className={controls.field}>
               <span className={controls.label}>{colT('woDate')}</span>
-              <input className={controls.input} type="date" value={date} max={todayInput()} onChange={(e) => setDate(e.target.value)} />
+              <DateField className={controls.input} value={date} max={todayInput()} onChange={(e) => setDate(e.target.value)} />
             </label>
           </div>
           {error && <p className={controls.error} role="alert">{error}</p>}

@@ -5,6 +5,7 @@ import { useT } from '../../i18n';
 import { fldT } from '../../i18n/areas/fields';
 import controls from '../../styles/controls.module.css';
 import styles from './custom-fields.module.css';
+import { TypedInput } from '../ui/TypedInput';
 
 interface Props {
   scope: CustomFieldScope;
@@ -35,7 +36,7 @@ export function CustomFieldInputs({ scope, value, onChange, idPrefix }: Props) {
                 {d.label}
                 {d.print && <Printer size={12} className={styles.printIcon} aria-label={fldT('printed')} />}
               </label>
-              <input
+              <TypedInput
                 id={id}
                 className={d.type === 'number' ? controls.inputNumeric : controls.input}
                 type={d.type === 'date' ? 'date' : 'text'}

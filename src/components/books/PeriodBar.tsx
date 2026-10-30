@@ -13,6 +13,7 @@ import { useT } from '../../i18n';
 import { booksT, presetLabel } from '../../i18n/areas/books';
 import { useReportKeys } from '../../lib/keys/report-keys';
 import { stepPeriod } from '../../lib/keys/report-actions';
+import { DateField } from '../ui/DateField';
 
 // R20-C: Ctrl+H / Ctrl+L saved-views sheet (lazy).
 const ViewsSheet = lazy(() => import('../keys/ReportSheets').then((m) => ({ default: m.ViewsSheet })));
@@ -97,25 +98,25 @@ export function PeriodBar({ preset, period, onChange }: PeriodBarProps) {
         <div className={styles.dateRow}>
           <div className={`${controls.field} ${styles.dateField}`}>
             <label className={controls.label} htmlFor={startId}>{booksT('from')}</label>
-            <input
+            <DateField
               ref={startRef}
               id={startId}
-              type="date"
               className={controls.input}
               value={period.start}
               max={period.end}
               onChange={(e) => e.target.value && onChange('custom', { ...period, start: e.target.value })}
+              range={{ from: period.start, to: period.end, edge: 'from', onRange: (start, end) => start && end && onChange('custom', { start, end }) }}
             />
           </div>
           <div className={`${controls.field} ${styles.dateField}`}>
             <label className={controls.label} htmlFor={endId}>{booksT('to')}</label>
-            <input
+            <DateField
               id={endId}
-              type="date"
               className={controls.input}
               value={period.end}
               min={period.start}
               onChange={(e) => e.target.value && onChange('custom', { ...period, end: e.target.value })}
+              range={{ from: period.start, to: period.end, edge: 'to', onRange: (start, end) => start && end && onChange('custom', { start, end }) }}
             />
           </div>
         </div>

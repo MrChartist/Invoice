@@ -8,6 +8,7 @@ import { cn } from '../../lib/utils';
 import { useT } from '../../i18n';
 import { retailT } from '../../i18n/areas/retail';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 /**
  * A scanned / typed code that no item has (8.149, the Tally Alt+C / myBillBook habit): create the item
@@ -74,9 +75,9 @@ export function QuickItemSheet({ code, onClose, onSaved, onSearch, defaultTax = 
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{retailT('qiGst')}</span>
-            <select className={controls.select} value={tax} onChange={(e) => setTax(Number(e.target.value))}>
+            <SelectField className={controls.select} value={tax} onChange={(e) => setTax(Number(e.target.value))}>
               {gstRateOptions(undefined, tax).map((r) => <option key={r} value={r}>{r}%</option>)}
-            </select>
+            </SelectField>
           </label>
         </div>
         <div className={controls.row}>
@@ -86,9 +87,9 @@ export function QuickItemSheet({ code, onClose, onSaved, onSearch, defaultTax = 
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{retailT('qiUnit')}</span>
-            <select className={controls.select} value={unit} onChange={(e) => setUnit(e.target.value)}>
+            <SelectField className={controls.select} value={unit} onChange={(e) => setUnit(e.target.value)}>
               {UNITS.map((u) => <option key={u}>{u}</option>)}
-            </select>
+            </SelectField>
           </label>
         </div>
         {error && <p className={controls.error} role="alert">{error}</p>}

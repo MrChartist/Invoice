@@ -25,6 +25,7 @@ import { purCategory } from '../../../i18n/areas/purchases';
 import controls from '../../../styles/controls.module.css';
 import surface from '../../../styles/surface.module.css';
 import css from '../../capture/capture.module.css';
+import { SelectField } from '../../ui/SelectField';
 
 export type RuleDraft = Omit<BankRule, 'id' | 'created_at'> & { id?: string };
 
@@ -96,10 +97,10 @@ function RuleForm({ initial, onClose, onSaved }: { initial: RuleDraft; onClose: 
       <div className={css.grid}>
         <label className={controls.field}><span className={controls.label}>{capT('ruleName')}</span><input className={controls.input} value={r.name} maxLength={80} onChange={(e) => setR({ ...r, name: e.target.value })} /></label>
         <label className={controls.field}><span className={controls.label}>{capT('ruleMatch')}</span>
-          <select className={controls.select} value={r.match} onChange={(e) => setR({ ...r, match: e.target.value === 'any' ? 'any' : 'all' })}>
+          <SelectField className={controls.select} value={r.match} onChange={(e) => setR({ ...r, match: e.target.value === 'any' ? 'any' : 'all' })}>
             <option value="all">{capT('matchAll')}</option>
             <option value="any">{capT('matchAny')}</option>
-          </select>
+          </SelectField>
         </label>
         <label className={controls.field}><span className={controls.label}>{capT('rulePriority')}</span><NumberInput className={cn(controls.input, controls.inputNumeric)} value={r.priority} onChange={(v) => setR({ ...r, priority: Math.round(v) })} /></label>
       </div>
@@ -108,9 +109,9 @@ function RuleForm({ initial, onClose, onSaved }: { initial: RuleDraft; onClose: 
         <legend className={controls.label}>{capT('conditions')}</legend>
         {r.conditions.map((c, i) => (
           <div key={i} className={css.cond}>
-            <select className={controls.select} aria-label={capT('condKind')} value={c.kind} onChange={(e) => setC(i, blankCondition(e.target.value as RuleCondition['kind']))}>
+            <SelectField className={controls.select} aria-label={capT('condKind')} value={c.kind} onChange={(e) => setC(i, blankCondition(e.target.value as RuleCondition['kind']))}>
               {KINDS.map((k) => <option key={k} value={k}>{capT(`c_${k}`)}</option>)}
-            </select>
+            </SelectField>
             {(c.kind === 'contains' || c.kind === 'starts') && <input className={controls.input} aria-label={capT('condText')} maxLength={120} value={c.text} onChange={(e) => setC(i, { ...c, text: e.target.value })} />}
             {c.kind === 'regex' && <input className={cn(controls.input, controls.inputMono)} aria-label={capT('condText')} maxLength={120} value={c.pattern} onChange={(e) => setC(i, { ...c, pattern: e.target.value })} />}
             {c.kind === 'counterparty' && <input className={controls.input} aria-label={capT('condText')} maxLength={60} value={c.token} onChange={(e) => setC(i, { ...c, token: e.target.value.toUpperCase() })} />}
@@ -121,15 +122,15 @@ function RuleForm({ initial, onClose, onSaved }: { initial: RuleDraft; onClose: 
               </>
             )}
             {c.kind === 'direction' && (
-              <select className={controls.select} aria-label={capT('c_direction')} value={c.dir} onChange={(e) => setC(i, { ...c, dir: e.target.value === 'credit' ? 'credit' : 'debit' })}>
+              <SelectField className={controls.select} aria-label={capT('c_direction')} value={c.dir} onChange={(e) => setC(i, { ...c, dir: e.target.value === 'credit' ? 'credit' : 'debit' })}>
                 <option value="debit">{capT('debit')}</option>
                 <option value="credit">{capT('credit')}</option>
-              </select>
+              </SelectField>
             )}
             {c.kind === 'account' && (
-              <select className={controls.select} aria-label={capT('c_account')} value={c.bankAccountId} onChange={(e) => setC(i, { ...c, bankAccountId: e.target.value })}>
+              <SelectField className={controls.select} aria-label={capT('c_account')} value={c.bankAccountId} onChange={(e) => setC(i, { ...c, bankAccountId: e.target.value })}>
                 {banks.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
+              </SelectField>
             )}
             <button type="button" className={cn(controls.btnGhost, controls.btnSm)} aria-label={capT('removeCond')} disabled={r.conditions.length < 2} onClick={() => setR({ ...r, conditions: r.conditions.filter((_, j) => j !== i) })}><Trash2 size={14} /></button>
           </div>
@@ -143,54 +144,54 @@ function RuleForm({ initial, onClose, onSaved }: { initial: RuleDraft; onClose: 
         <legend className={controls.label}>{capT('then')}</legend>
         <div className={css.grid}>
           <label className={controls.field}><span className={controls.label}>{capT('actionKind')}</span>
-            <select className={controls.select} value={a.kind} onChange={(e) => setR({ ...r, action: { kind: e.target.value as RuleAction['kind'], ...(e.target.value === 'expense' ? { category: 'Other', gst_rate: 0 } : {}) } })}>
+            <SelectField className={controls.select} value={a.kind} onChange={(e) => setR({ ...r, action: { kind: e.target.value as RuleAction['kind'], ...(e.target.value === 'expense' ? { category: 'Other', gst_rate: 0 } : {}) } })}>
               {ACTIONS.map((k) => <option key={k} value={k}>{capT(`a_${k}`)}</option>)}
-            </select>
+            </SelectField>
           </label>
           {a.kind === 'expense' && (
             <>
               <label className={controls.field}><span className={controls.label}>{capT('head')}</span>
-                <select className={controls.select} value={a.category ?? ''} onChange={(e) => setA({ category: e.target.value })}>
+                <SelectField className={controls.select} value={a.category ?? ''} onChange={(e) => setA({ category: e.target.value })}>
                   {PURCHASE_CATEGORIES.map((c) => <option key={c} value={c}>{purCategory(c)}</option>)}
-                </select>
+                </SelectField>
               </label>
               <label className={controls.field}><span className={controls.label}>{capT('gstRate')}</span>
-                <select className={controls.select} value={a.gst_rate ?? 0} onChange={(e) => setA({ gst_rate: Number(e.target.value) })}>
+                <SelectField className={controls.select} value={a.gst_rate ?? 0} onChange={(e) => setA({ gst_rate: Number(e.target.value) })}>
                   {gstRateOptions(undefined, a.gst_rate ?? 0).map((s) => <option key={s} value={s}>{s}%</option>)}
-                </select>
+                </SelectField>
               </label>
             </>
           )}
           {(a.kind === 'voucher' || a.kind === 'contra') && (
             <label className={controls.field}><span className={controls.label}>{a.kind === 'contra' ? capT('otherAccount') : capT('ledger')}</span>
-              <select className={controls.select} value={a.ledger_id ?? ''} onChange={(e) => setA({ ledger_id: e.target.value })}>
+              <SelectField className={controls.select} value={a.ledger_id ?? ''} onChange={(e) => setA({ ledger_id: e.target.value })}>
                 <option value="">-</option>
                 {ledgers.map((x) => <option key={x.id} value={x.id}>{x.code} · {x.name}</option>)}
-              </select>
+              </SelectField>
             </label>
           )}
           {(a.kind === 'expense' || a.kind === 'voucher') && (
             <label className={controls.field}><span className={controls.label}>{capT('supplier')}</span>
-              <select className={controls.select} value={a.vendor_id ?? ''} onChange={(e) => { const v = vendors.find((x) => x.id === e.target.value); setA({ vendor_id: v?.id, vendor_name: v?.name }); }}>
+              <SelectField className={controls.select} value={a.vendor_id ?? ''} onChange={(e) => { const v = vendors.find((x) => x.id === e.target.value); setA({ vendor_id: v?.id, vendor_name: v?.name }); }}>
                 <option value="">-</option>
                 {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-              </select>
+              </SelectField>
             </label>
           )}
           {a.kind === 'receipt' && (
             <label className={controls.field}><span className={controls.label}>{capT('customer')}</span>
-              <select className={controls.select} value={a.client_id ?? ''} onChange={(e) => setA({ client_id: e.target.value })}>
+              <SelectField className={controls.select} value={a.client_id ?? ''} onChange={(e) => setA({ client_id: e.target.value })}>
                 <option value="">-</option>
                 {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              </SelectField>
             </label>
           )}
           {a.kind !== 'ignore' && a.kind !== 'contra' && (
             <label className={controls.field}><span className={controls.label}>{capT('mode')}</span>
-              <select className={controls.select} value={a.mode ?? ''} onChange={(e) => setA({ mode: (e.target.value || undefined) as RuleAction['mode'] })}>
+              <SelectField className={controls.select} value={a.mode ?? ''} onChange={(e) => setA({ mode: (e.target.value || undefined) as RuleAction['mode'] })}>
                 <option value="">{capT('modeAuto')}</option>
                 {['UPI', 'NEFT', 'IMPS', 'RTGS', 'Cheque', 'Card', 'ACH', 'Cash'].map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
+              </SelectField>
             </label>
           )}
           {(a.kind === 'expense' || a.kind === 'voucher') && (

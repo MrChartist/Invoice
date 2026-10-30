@@ -18,6 +18,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field } from './tv-ui';
 import { runWith, type Notify } from './tv-run';
+import { DateField } from '../ui/DateField';
 
 export default function CancelDialog({ targets, notify, onDone }: { targets: TravelBooking[]; notify: Notify; onDone: () => void }) {
   useT();
@@ -35,7 +36,7 @@ export default function CancelDialog({ targets, notify, onDone }: { targets: Tra
     <div className={surface.card} style={{ marginTop: '0.75rem', padding: '0.75rem' }} role="group" aria-label={tvT('cancellation')} data-tv-cancel-dialog>
       <strong>{tvT('cancellation')}: {targets.map((b) => b.ref || b.component).join(', ')} · {tvT('cost')} {formatCurrency(cost)}</strong>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'flex-end' }}>
-        <Field label={tvT('from')}><input type="date" className={controls.input} value={f.date} onChange={(e) => setF((x) => ({ ...x, date: e.target.value }))} /></Field>
+        <Field label={tvT('from')}><DateField className={controls.input} value={f.date} onChange={(e) => setF((x) => ({ ...x, date: e.target.value }))} /></Field>
         {num('supplier_charge', cvT('sc'))}{num('fee', cvT('ourFee'))}{num('refund_in', cvT('rin'))}
       </div>
       {typeof plan === 'string' ? <p className={controls.hint} role="alert">{plan}</p> : (

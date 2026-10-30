@@ -10,6 +10,7 @@ import { useT } from '../../i18n';
 import { trT } from '../../i18n/areas/trade-trust-r4';
 import controls from '../../styles/controls.module.css';
 import styles from './trade.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export default function ExportDetailsFields() {
   useT();
@@ -37,10 +38,10 @@ export default function ExportDetailsFields() {
   const country = (k: 'country_of_origin' | 'country_of_destination', label: string) => (
     <label className={`${controls.field} ${styles.grow}`}>
       <span className={controls.label}>{label}</span>
-      <select className={controls.select} value={countryCode(s[k])} onChange={(e) => set(k, e.target.value)}>
+      <SelectField className={controls.select} value={countryCode(s[k])} onChange={(e) => set(k, e.target.value)}>
         <option value="">{k === 'country_of_origin' ? 'IN: India' : trT('countryPick')}</option>
         {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.code} : {c.name}</option>)}
-      </select>
+      </SelectField>
     </label>
   );
   return (
@@ -49,10 +50,10 @@ export default function ExportDetailsFields() {
       <div className={styles.inline}>
         <label className={`${controls.field} ${styles.narrow}`}>
           <span className={controls.label}>{trT('incoterm')}</span>
-          <select className={controls.select} value={s.incoterm ?? ''} onChange={(e) => set('incoterm', e.target.value)}>
+          <SelectField className={controls.select} value={s.incoterm ?? ''} onChange={(e) => set('incoterm', e.target.value)}>
             <option value="">{trT('incotermNone')}</option>
             {INCOTERMS.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
+          </SelectField>
         </label>
         {text('pre_carriage', trT('preCarriage'))}
         {text('vessel_flight', trT('vessel'))}

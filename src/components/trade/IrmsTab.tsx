@@ -16,6 +16,8 @@ import { trErr, trT, type TrKey } from '../../i18n/areas/trade-trust-r4';
 import controls from '../../styles/controls.module.css';
 import styles from './trade.module.css';
 import { money, type Notify } from './desk-shared';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 const IrmImport = lazy(() => import('./IrmImport'));
 
@@ -109,7 +111,7 @@ function IrmForm({ initial, rows, onClose, onSaved }: { initial: Partial<ExportI
       <div className={styles.stack}>
         <div className={styles.inline}>
           {field('irm_no', trT('irmNo'))}
-          <label className={`${controls.field} ${styles.narrow}`}><span className={controls.label}>{trT('irmDate')}</span><input className={controls.input} type="date" value={f.date ?? ''} onChange={(e) => set({ date: e.target.value })} /></label>
+          <label className={`${controls.field} ${styles.narrow}`}><span className={controls.label}>{trT('irmDate')}</span><DateField className={controls.input} value={f.date ?? ''} onChange={(e) => set({ date: e.target.value })} /></label>
           <label className={`${controls.field} ${styles.narrow}`}><span className={controls.label}>{trT('irmCurrency')}</span><input className={`${controls.input} ${controls.inputMono}`} maxLength={3} value={f.currency ?? ''} onChange={(e) => set({ currency: e.target.value.toUpperCase() })} /></label>
           <label className={`${controls.field} ${styles.narrow}`}><span className={controls.label}>{trT('irmAmount')}</span><NumberInput className={`${controls.input} ${controls.inputNumeric}`} value={Number(f.fcy) || 0} onChange={(n) => set({ fcy: n })} /></label>
         </div>
@@ -142,13 +144,13 @@ function IrmForm({ initial, rows, onClose, onSaved }: { initial: Partial<ExportI
         </div>
         <div className={styles.inline}>
           {field('ebrc_no', trT('ebrcNo'))}
-          <label className={`${controls.field} ${styles.narrow}`}><span className={controls.label}>{trT('ebrcDate')}</span><input className={controls.input} type="date" value={f.ebrc_date ?? ''} onChange={(e) => set({ ebrc_date: e.target.value || undefined })} /></label>
+          <label className={`${controls.field} ${styles.narrow}`}><span className={controls.label}>{trT('ebrcDate')}</span><DateField className={controls.input} value={f.ebrc_date ?? ''} onChange={(e) => set({ ebrc_date: e.target.value || undefined })} /></label>
           <label className={`${controls.field} ${styles.narrow}`}>
             <span className={controls.label}>{trT('ebrcStatus')}</span>
-            <select className={controls.select} value={f.ebrc_status ?? 'pending'} onChange={(e) => set({ ebrc_status: e.target.value as EbrcStatus })}>
+            <SelectField className={controls.select} value={f.ebrc_status ?? 'pending'} onChange={(e) => set({ ebrc_status: e.target.value as EbrcStatus })}>
               <option value="pending">{trT('ebrc_pending')}</option>
               <option value="self_certified">{trT('ebrc_self_certified')}</option>
-            </select>
+            </SelectField>
           </label>
         </div>
         {error && <p className={controls.error} role="alert">{error}</p>}

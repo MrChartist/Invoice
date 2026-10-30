@@ -11,6 +11,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from '../audit/audit.module.css';
 import { libMsg } from '../../i18n/lib-msg';
+import { DateField } from '../ui/DateField';
 
 interface Props {
   settings: AppSettings;
@@ -71,7 +72,7 @@ export function LockBooksCard({ settings, onChange }: Props) {
         <div className={controls.row}>
           <label className={controls.field}>
             <span className={controls.label}>{setT('lockUpTo')}</span>
-            <input className={controls.input} type="date" value={draft} onChange={(e) => apply(e.target.value)} />
+            <DateField className={controls.input} value={draft} onChange={(e) => apply(e.target.value)} />
             <span className={controls.hint}>{setT('lockDateHint')}</span>
           </label>
         </div>

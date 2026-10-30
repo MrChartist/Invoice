@@ -14,6 +14,7 @@ import { useReportKeys } from '../../../lib/keys/report-keys';
 import controls from '../../../styles/controls.module.css';
 import books from '../books.module.css';
 import styles from './ledger.module.css';
+import { SelectField } from '../../ui/SelectField';
 
 type OptionKey = 'showZero' | 'showOpening' | 'showTransactions' | 'showNarration';
 
@@ -87,11 +88,11 @@ export function ReportOptions({
         <label className={styles.inlineField}>
           <Columns3 size={16} aria-hidden="true" />
           <span className={styles.srOnlyish}>{reportsT('columns')}</span>
-          <select id={`${uid}-cols`} className={controls.select} value={prefs.columns} onChange={(e) => onChange({ columns: e.target.value as ColumnMode })} aria-label={reportsT('columns')}>
+          <SelectField id={`${uid}-cols`} className={controls.select} value={prefs.columns} onChange={(e) => onChange({ columns: e.target.value as ColumnMode })} aria-label={reportsT('columns')}>
             {modes.map((m) => (
               <option key={m} value={m}>{modeLabel[m]}</option>
             ))}
-          </select>
+          </SelectField>
         </label>
       )}
       {options.length > 0 && (

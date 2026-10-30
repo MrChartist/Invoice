@@ -19,6 +19,8 @@ import { runWith, type PsDeskProps } from './ps-run';
 import { Tbl } from '../mfg/mfd-ui';
 import { row, rs, sm } from '../mfg/mfd-util';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const blank = (): StagePlan => ({ fee_pct: 0, cost_basis: 'estimate', revisions: [{ date: todayInput(), cost: 0 }], stages: exampleStages(), property: { country: 'India' } });
 
@@ -47,9 +49,9 @@ export default function StagesView({ notify }: Pick<PsDeskProps, 'notify'>) {
   return (
     <div data-ps-stages>
       <div style={row}>
-        <Field label={psbT('st.eng')}><select className={controls.select} value={id} onChange={(e) => pick(e.target.value)}>{engs.map((e) => <option key={e.id} value={e.id}>{e.number} · {e.title}</option>)}</select></Field>
+        <Field label={psbT('st.eng')}><SelectField className={controls.select} value={id} onChange={(e) => pick(e.target.value)}>{engs.map((e) => <option key={e.id} value={e.id}>{e.number} · {e.title}</option>)}</SelectField></Field>
         <Field label={psbT('st.fee')}><NumberInput className={controls.input} style={{ maxWidth: 90 }} value={p.fee_pct} onChange={(v) => setP({ ...p, fee_pct: v })} data-ps-st="fee" /></Field>
-        <Field label={psbT('st.basis')}><select className={controls.select} value={p.cost_basis} onChange={(e) => setP({ ...p, cost_basis: e.target.value as StagePlan['cost_basis'] })}>{(['estimate', 'tender', 'actual'] as const).map((b) => <option key={b} value={b}>{psbT(`st.b.${b}`)}</option>)}</select></Field>
+        <Field label={psbT('st.basis')}><SelectField className={controls.select} value={p.cost_basis} onChange={(e) => setP({ ...p, cost_basis: e.target.value as StagePlan['cost_basis'] })}>{(['estimate', 'tender', 'actual'] as const).map((b) => <option key={b} value={b}>{psbT(`st.b.${b}`)}</option>)}</SelectField></Field>
         <Field label={psbT('st.extra')}><NumberInput className={controls.input} style={{ maxWidth: 90 }} value={p.extra_pct ?? 0} onChange={(v) => setP({ ...p, extra_pct: v || undefined })} /></Field>
         <Field label={psbT('st.state')}><input className={controls.input} value={p.property.state ?? ''} onChange={(e) => setP({ ...p, property: { ...p.property, state: e.target.value } })} data-ps-st="state" /></Field>
         <Field label={psbT('st.country')}><input className={controls.input} value={p.property.country ?? ''} onChange={(e) => setP({ ...p, property: { ...p.property, country: e.target.value } })} /></Field>
@@ -58,7 +60,7 @@ export default function StagesView({ notify }: Pick<PsDeskProps, 'notify'>) {
         {p.revisions.map((r, k) => (
           <Field key={k} label={`${psbT('st.cost')} · ${r.date}`}><NumberInput className={controls.input} style={{ maxWidth: 140 }} value={r.cost} onChange={(v) => setP({ ...p, revisions: p.revisions.map((x, j) => (j === k ? { ...x, cost: v } : x)) })} data-ps-st={`cost-${k}`} /></Field>
         ))}
-        <Field label={psbT('st.date')}><input type="date" className={controls.input} value={rev.date} onChange={(e) => setRev({ ...rev, date: e.target.value })} data-ps-st="rev-date" /></Field>
+        <Field label={psbT('st.date')}><DateField className={controls.input} value={rev.date} onChange={(e) => setRev({ ...rev, date: e.target.value })} data-ps-st="rev-date" /></Field>
         <Field label={psbT('st.cost')}><NumberInput className={controls.input} style={{ maxWidth: 140 }} value={rev.cost} onChange={(v) => setRev({ ...rev, cost: v })} data-ps-st="rev-cost" /></Field>
         <button type="button" className={sm} disabled={!(rev.cost > 0)} onClick={() => { setP({ ...p, revisions: [...p.revisions, rev] }); setRev({ ...rev, cost: 0 }); }} data-ps-st-b="revise">{psbT('st.revise')}</button>
         <button type="button" className={controls.btnPrimary} onClick={save} data-ps-st-b="save">{psbT('st.save')}</button>

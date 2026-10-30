@@ -10,6 +10,7 @@ import { purchasesDb } from '../../lib/purchases';
 import { authorisationsDb, dutyForegone } from '../../lib/mfg/mf-authorisations';
 import { rs, sm } from './mfd-util';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export default function AaBoeSwitch({ bill, duty }: { bill?: PurchaseRecord; duty: BoeDuty | null }) {
   const open = authorisationsDb.all().filter((a) => a.status === 'open');
@@ -29,10 +30,10 @@ export default function AaBoeSwitch({ bill, duty }: { bill?: PurchaseRecord; dut
   return (
     <div data-mfd-boe>
       <label className={controls.field}><span className={controls.label}>{sdT('underAa')}</span>
-        <select className={controls.select} value={id} onChange={(e) => setId(e.target.value)} data-mfd="boe-aa">
+        <SelectField className={controls.select} value={id} onChange={(e) => setId(e.target.value)} data-mfd="boe-aa">
           <option value="">-</option>
           {open.map((a) => <option key={a.id} value={a.id}>{a.kind === 'aa' ? 'AA' : 'EPCG'} {a.number}</option>)}
-        </select>
+        </SelectField>
       </label>
       {id && <p className={controls.hint}>{sdT('foregone', { v: rs(memo.total) })}</p>}
       {bill && <button type="button" className={sm} onClick={tag} data-mfd-b="boe-tag">{sdT('tagBill')}</button>}

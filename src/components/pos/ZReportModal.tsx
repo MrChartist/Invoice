@@ -19,6 +19,7 @@ import { cashWithRiders } from '../../lib/pos'; // R9 (RT-A3)
 import { peekTable } from '../../lib/storage';
 import { defineArea } from '../../i18n/area';
 import { printWhenReady } from '../../lib/print-fonts';
+import { DateField } from '../ui/DateField';
 
 const zrT = defineArea({ riders: 'Cash with riders' } as const, { riders: 'राइडरों के पास कैश' });
 
@@ -105,7 +106,7 @@ export function ZReportModal({ open, onClose, notify }: { open: boolean; onClose
       <div className={styles.zGrid}>
         <label className={controls.field}>
           <span className={controls.label}>{posT('zDay')}</span>
-          <input id="z-day" type="date" className={controls.input} value={day} onChange={(e) => e.target.value && setDay(e.target.value)} />
+          <DateField id="z-day" className={controls.input} value={day} onChange={(e) => e.target.value && setDay(e.target.value)} />
         </label>
 
         <table className={cn(surface.table, styles.zTable)} aria-label={posT('zTotals')}>

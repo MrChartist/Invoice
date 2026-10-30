@@ -12,6 +12,7 @@ import surface from '../../styles/surface.module.css';
 import styles from './masters.module.css';
 import { depthClass } from './tree-indent';
 import { errText } from '../../i18n/lib-msg';
+import { SelectField } from '../ui/SelectField';
 
 /** Stock groups and stock categories (WP-8): two nested trees, add / rename / move / delete. */
 export function StockGroupsModal({ open, items, onClose, onChanged }: {
@@ -115,10 +116,10 @@ export function StockGroupsModal({ open, items, onClose, onChanged }: {
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="sg-parent">{imT('under')}</label>
-                <select id="sg-parent" className={controls.select} value={editing.parent_id} onChange={(e) => setEditing({ ...editing, parent_id: e.target.value })}>
+                <SelectField id="sg-parent" className={controls.select} value={editing.parent_id} onChange={(e) => setEditing({ ...editing, parent_id: e.target.value })}>
                   <option value="">{kind === 'group' ? imT('primary') : imT('notCategorised')}</option>
                   {rows.filter((r) => !blocked.has(r.node.id)).map((r) => <option key={r.node.id} value={r.node.id}>{r.path}</option>)}
-                </select>
+                </SelectField>
               </div>
             </div>
             <div className={surface.pageActions}>

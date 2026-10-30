@@ -19,6 +19,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { farmers, milkCentres, sm, useRun, wrap, type Done } from './dairy-kit';
 import { CentrePick, F, Sel } from './dairy-ui';
+import { DateField } from '../ui/DateField';
 
 export default function MilkBillsView({ onDone }: { onDone: Done }) {
   const [tick, run] = useRun(onDone);
@@ -38,7 +39,7 @@ export default function MilkBillsView({ onDone }: { onDone: Done }) {
     <>
       <div className={controls.row} style={wrap}>
         <CentrePick v={centreId} set={setCentre} />
-        <F l={bT('dayInCycle')} w={160}><input type="date" className={controls.input} value={day} onChange={(e) => setDay(e.target.value)} data-dairy="cycle-day" /></F>
+        <F l={bT('dayInCycle')} w={160}><DateField className={controls.input} value={day} onChange={(e) => setDay(e.target.value)} data-dairy="cycle-day" /></F>
         <span className={controls.hint}>{per.from} → {per.to}</span>
         <button type="button" className={controls.btnPrimary} data-dairy="make-bills" onClick={() => run(() => bT('billsMade', { no: makeMilkCycle(centreId, per.from, per.to, cycles.find((c) => c.period_from === per.from && c.status === 'draft')?.id).number }))}>{bT('makeBills')}</button>
         <Link className={sm} to="/inventory?tab=farm&view=cycles">{bT('payCycles')}</Link>

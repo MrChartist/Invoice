@@ -9,6 +9,8 @@ import { useT } from '../../i18n';
 import { rT } from '../../i18n/areas/restaurant';
 import controls from '../../styles/controls.module.css';
 import styles from './restaurant.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 export interface KotRegisterProps {
   orders: readonly TableOrder[];
@@ -49,21 +51,21 @@ export function KotRegisterModal({ orders, day, whereOf, onClose }: KotRegisterP
     >
       <div className={styles.panel}>
         <div className={styles.editRow}>
-          <label className={controls.field}><span className={controls.label}>{rT('regFrom')}</span><input type="date" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-          <label className={controls.field}><span className={controls.label}>{rT('regTo')}</span><input type="date" className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></label>
+          <label className={controls.field}><span className={controls.label}>{rT('regFrom')}</span><DateField className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+          <label className={controls.field}><span className={controls.label}>{rT('regTo')}</span><DateField className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></label>
           <label className={controls.field}>
             <span className={controls.label}>{rT('regStation')}</span>
-            <select className={controls.select} value={station} onChange={(e) => setStation(e.target.value)}>
+            <SelectField className={controls.select} value={station} onChange={(e) => setStation(e.target.value)}>
               <option value="">{rT('regAll')}</option>
               {Object.keys(full.byStation).map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+            </SelectField>
           </label>
           <label className={controls.field}>
             <span className={controls.label}>{rT('regCaptain')}</span>
-            <select className={controls.select} value={captain} onChange={(e) => setCaptain(e.target.value)}>
+            <SelectField className={controls.select} value={captain} onChange={(e) => setCaptain(e.target.value)}>
               <option value="">{rT('regAll')}</option>
               {Object.keys(full.byCaptain).map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+            </SelectField>
           </label>
         </div>
         <p className={styles.muted} data-kot-totals>{rT('regTotals', { kots: reg.totals.kots, cancels: reg.totals.cancels, value: formatCurrency(reg.totals.cancelValue), moves: reg.totals.moves })}</p>

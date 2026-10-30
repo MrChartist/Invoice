@@ -14,6 +14,8 @@ import type { InvoiceRecord } from '../../types/invoice';
 import { Fld, Tbl } from './ps-d-ui';
 import { sm, type PsDeskCtx, row } from './ps-desk';
 import controls from '../../styles/controls.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 export default function CaEventsView({ ctx }: { ctx: PsDeskCtx }) {
   const [month, setMonth] = useState(todayInput().slice(0, 7));
@@ -38,15 +40,15 @@ export default function CaEventsView({ ctx }: { ctx: PsDeskCtx }) {
     <>
       {!settings.company_clients?.length && <p className={controls.hint}>{caT('linkFirst')}</p>}
       <div style={row}>
-        <Fld l={caT('month')}><input type="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} data-ps="ev-month" /></Fld>
+        <Fld l={caT('month')}><DateField mode="month" className={controls.input} value={month} onChange={(e) => setMonth(e.target.value)} data-ps="ev-month" /></Fld>
         <label className={controls.check}><input type="checkbox" checked={disb} onChange={(e) => setDisb(e.target.checked)} /> {caT('disb')}</label>
       </div>
       <div style={row}>
         <Fld l={caT('client')}>
-          <select className={controls.select} value={t.client} onChange={(e) => setT({ ...t, client: e.target.value })}><option value="">-</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+          <SelectField className={controls.select} value={t.client} onChange={(e) => setT({ ...t, client: e.target.value })}><option value="">-</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</SelectField>
         </Fld>
         <Fld l={caT('event')}>
-          <select className={controls.select} value={t.kind} onChange={(e) => setT({ ...t, kind: e.target.value as CaFeeEvent })}>{CA_FEE_EVENTS.map((k) => <option key={k} value={k}>{caT(`e.${k}`)}</option>)}</select>
+          <SelectField className={controls.select} value={t.kind} onChange={(e) => setT({ ...t, kind: e.target.value as CaFeeEvent })}>{CA_FEE_EVENTS.map((k) => <option key={k} value={k}>{caT(`e.${k}`)}</option>)}</SelectField>
         </Fld>
         <Fld l={caT('label')}><input className={controls.input} value={t.label} onChange={(e) => setT({ ...t, label: e.target.value })} /></Fld>
         <button type="button" className={sm} disabled={!t.client || !t.label} onClick={() => setTyped([...typed, typedEvent(t.client, t.kind, `${month}:${typed.length + 1}`, t.label)])}>{caT('typed')}</button>

@@ -35,6 +35,8 @@ import { r7T } from '../../i18n/areas/gst-tds-7r';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import books from '../books/books.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 type Notify = (m: string, tone?: 'success' | 'error') => void;
 const inr = (n: number) => `₹${formatMoney(n)}`;
@@ -173,7 +175,7 @@ export function Form27qTab({ data, fy, quarter, canEdit, onChanged, notify }: { 
             </>
           ) : (
             <div className={books.toolbarGroup}>
-              <input aria-label={tdsT('date')} type="date" className={controls.input} value={filedOn} onChange={(e) => setFiledOn(e.target.value)} />
+              <DateField aria-label={tdsT('date')} className={controls.input} value={filedOn} onChange={(e) => setFiledOn(e.target.value)} />
               <input aria-label={tdsT('token')} placeholder={tdsT('token')} className={controls.input} value={token} onChange={(e) => setToken(e.target.value)} />
               <button type="button" className={controls.btnOutline} onClick={() => setMark(filedOn)}>{tdsT('markFiled')}</button>
             </div>
@@ -241,9 +243,9 @@ export function TracesTab({ data, canEdit, notify }: { data: TdsData; canEdit: b
       {imports.length > 1 && (
         <label className={controls.field}>
           <span className={controls.label}>{r7T('jImport')}</span>
-          <select className={controls.select} value={open?.id ?? ''} onChange={(e) => setOpenId(e.target.value)}>
+          <SelectField className={controls.select} value={open?.id ?? ''} onChange={(e) => setOpenId(e.target.value)}>
             {imports.map((x) => <option key={x.id} value={x.id}>{x.file_name} · {formatDate(x.imported_on)}{x.meta.form ? ` · ${x.meta.form}` : ''}</option>)}
-          </select>
+          </SelectField>
         </label>
       )}
       {open && summary && (

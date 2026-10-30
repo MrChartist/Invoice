@@ -15,6 +15,7 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import type { LgViewProps } from './lg-ui';
 import { numIn, row } from './lg-form';
+import { SelectField } from '../ui/SelectField';
 
 export default function RatesView({ notify }: LgViewProps) {
   useT();
@@ -23,7 +24,7 @@ export default function RatesView({ notify }: LgViewProps) {
   const setH = (i: number, p: Partial<LgHead>) => setHeads(heads.map((h, k) => (k === i ? { ...h, ...p } : h)));
   const cell = (i: number, k: 'name' | 'currency' | 'sac', w: string) => <input className={controls.input} style={{ width: w }} aria-label={lgT(k)} value={heads[i][k] ?? ''} placeholder={k === 'sac' ? sacFor(heads[i].kind, todayInput()) : undefined} onChange={(e) => setH(i, { [k]: e.target.value })} />;
   const sel = <K extends 'kind' | 'role' | 'unit'>(i: number, k: K, ids: readonly LgHead[K][], list: 'kinds' | 'roles' | 'units') => (
-    <select className={controls.select} aria-label={lgT(k)} value={heads[i][k]} onChange={(e) => setH(i, { [k]: e.target.value })}>{ids.map((x) => <option key={x} value={x}>{lgList(list, ids, x)}</option>)}</select>
+    <SelectField className={controls.select} aria-label={lgT(k)} value={heads[i][k]} onChange={(e) => setH(i, { [k]: e.target.value })}>{ids.map((x) => <option key={x} value={x}>{lgList(list, ids, x)}</option>)}</SelectField>
   );
   return (
     <>

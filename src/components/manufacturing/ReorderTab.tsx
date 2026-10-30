@@ -19,6 +19,7 @@ import { qtyText, money, type MfgContext } from './context';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './manufacturing.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const rowKey = (itemId: string, godown?: string) => `${itemId}|${godown ?? ''}`;
 
@@ -74,10 +75,10 @@ export function ReorderTab({ ctx }: { ctx: MfgContext }) {
         <Link to="/expenses?tab=orders" className={cn(controls.btnGhost, controls.btnSm)}>{mfgT('openPos')}</Link>
         {ctx.canBooks && (
           <span style={{ display: 'inline-flex', gap: '0.5rem', alignItems: 'center' }}>
-            <select className={controls.select} aria-label={mfgT('vendor')} value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
+            <SelectField className={controls.select} aria-label={mfgT('vendor')} value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
               <option value="">{mfgT('vendor')}: {selected[0]?.vendor ?? mfgT('choose')}</option>
               {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-            </select>
+            </SelectField>
             <button type="button" className={cn(controls.btnPrimary, controls.btnSm)} disabled={selected.length === 0} onClick={createPo}>
               <ShoppingCart size={14} aria-hidden="true" /> {mfgT('createPo')}{selected.length ? ` (${selected.length})` : ''}
             </button>

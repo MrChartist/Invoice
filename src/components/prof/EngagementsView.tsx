@@ -15,6 +15,8 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import { Field } from './ps-ui';
 import { runWith, type PsDeskProps } from './ps-run';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const blank = (): EngagementInput => ({ client_id: '', matter_ids: [], title: '', model: 'hourly', currency: 'INR', disb_policy: 'agent', start: todayInput(), status: 'draft' });
 const n = (v: string) => (v === '' ? undefined : Number(v));
@@ -55,18 +57,18 @@ export default function EngagementsView({ notify }: Pick<PsDeskProps, 'notify'>)
         {f && (
           <div data-engagement-form>
             <div className={controls.row3}>
-              <Field label={psT('client')}><select className={controls.select} value={f.client_id} onChange={(e) => set({ client_id: e.target.value })} data-eng-client><option value="">{psT('none')}</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
+              <Field label={psT('client')}><SelectField className={controls.select} value={f.client_id} onChange={(e) => set({ client_id: e.target.value })} data-eng-client><option value="">{psT('none')}</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</SelectField></Field>
               <Field label={pmT('title')}><input className={controls.input} value={f.title} onChange={(e) => set({ title: e.target.value })} data-eng-title /></Field>
-              <Field label={psT('model')}><select className={controls.select} value={f.model} onChange={(e) => set({ model: e.target.value as EngagementModel })} data-eng-model>{MODELS.map((m) => <option key={m} value={m}>{psT(`m.${m}`)}</option>)}</select></Field>
+              <Field label={psT('model')}><SelectField className={controls.select} value={f.model} onChange={(e) => set({ model: e.target.value as EngagementModel })} data-eng-model>{MODELS.map((m) => <option key={m} value={m}>{psT(`m.${m}`)}</option>)}</SelectField></Field>
               {(f.model === 'fixed' || f.model === 'milestone' || f.model === 'retainer' || f.model === 'hourly') && num('fee', psT('fee'))}
               {f.model === 'capped' && num('cap', pmT('capField'))}
               {f.model === 'blended' && num('blended_rate', pmT('blended'))}
-              {f.model === 'retainer' && <Field label={pmT('retainer')}><select className={controls.select} value={f.retainer_id ?? ''} onChange={(e) => set({ retainer_id: e.target.value || undefined })}><option value="">{psT('none')}</option>{retainers.map((r) => <option key={r.id} value={r.id}>{r.client_name ?? r.client_key} · {r.hours_per_period} h</option>)}</select></Field>}
+              {f.model === 'retainer' && <Field label={pmT('retainer')}><SelectField className={controls.select} value={f.retainer_id ?? ''} onChange={(e) => set({ retainer_id: e.target.value || undefined })}><option value="">{psT('none')}</option>{retainers.map((r) => <option key={r.id} value={r.id}>{r.client_name ?? r.client_key} · {r.hours_per_period} h</option>)}</SelectField></Field>}
               <Field label={pmT('currency')}><input className={controls.input} value={f.currency} onChange={(e) => set({ currency: e.target.value.toUpperCase() })} /></Field>
-              <Field label={pmT('disb')}><select className={controls.select} value={f.disb_policy} onChange={(e) => set({ disb_policy: e.target.value as Engagement['disb_policy'] })}>{(['agent', 'markup', 'included'] as const).map((d) => <option key={d} value={d}>{pmT(`d.${d}`)}</option>)}</select></Field>
-              <Field label={pmT('start')}><input type="date" className={controls.input} value={f.start} onChange={(e) => set({ start: e.target.value })} /></Field>
-              <Field label={pmT('end')}><input type="date" className={controls.input} value={f.end ?? ''} onChange={(e) => set({ end: e.target.value || undefined })} /></Field>
-              <Field label={pmT('renew')}><input type="date" className={controls.input} value={f.renew_on ?? ''} onChange={(e) => set({ renew_on: e.target.value || undefined })} /></Field>
+              <Field label={pmT('disb')}><SelectField className={controls.select} value={f.disb_policy} onChange={(e) => set({ disb_policy: e.target.value as Engagement['disb_policy'] })}>{(['agent', 'markup', 'included'] as const).map((d) => <option key={d} value={d}>{pmT(`d.${d}`)}</option>)}</SelectField></Field>
+              <Field label={pmT('start')}><DateField className={controls.input} value={f.start} onChange={(e) => set({ start: e.target.value })} /></Field>
+              <Field label={pmT('end')}><DateField className={controls.input} value={f.end ?? ''} onChange={(e) => set({ end: e.target.value || undefined })} /></Field>
+              <Field label={pmT('renew')}><DateField className={controls.input} value={f.renew_on ?? ''} onChange={(e) => set({ renew_on: e.target.value || undefined })} /></Field>
             </div>
             {f.model === 'success' && (
               <div className={controls.row3}>
@@ -74,7 +76,7 @@ export default function EngagementsView({ notify }: Pick<PsDeskProps, 'notify'>)
                 <Field label={pmT('pct')}><input type="number" className={controls.input} value={f.success?.pct ?? ''} onChange={(e) => set({ success: { basis: '', event: '', ...f.success, pct: n(e.target.value) } })} /></Field>
                 <Field label={psT('amount')}><input type="number" className={controls.input} value={f.success?.amount ?? ''} onChange={(e) => set({ success: { basis: '', event: '', ...f.success, amount: n(e.target.value) } })} /></Field>
                 <Field label={pmT('base')}><input type="number" className={controls.input} value={f.success?.base_amount ?? ''} onChange={(e) => set({ success: { basis: '', event: '', ...f.success, base_amount: n(e.target.value) } })} /></Field>
-                <Field label={pmT('done')}><input type="date" className={controls.input} value={f.success?.done_on ?? ''} onChange={(e) => set({ success: { basis: '', event: '', ...f.success, done_on: e.target.value || undefined } })} /></Field>
+                <Field label={pmT('done')}><DateField className={controls.input} value={f.success?.done_on ?? ''} onChange={(e) => set({ success: { basis: '', event: '', ...f.success, done_on: e.target.value || undefined } })} /></Field>
                 <Field label={pmT('ref')}><input className={controls.input} value={f.success?.ref ?? ''} onChange={(e) => set({ success: { basis: '', event: '', ...f.success, ref: e.target.value } })} /></Field>
               </div>
             )}
@@ -84,7 +86,7 @@ export default function EngagementsView({ notify }: Pick<PsDeskProps, 'notify'>)
                   <div key={m.id || i} className={controls.row3}>
                     <input className={controls.input} aria-label={pmT('label')} placeholder={pmT('label')} value={m.label} onChange={(e) => ms(i, { label: e.target.value })} />
                     <input type="number" className={controls.input} aria-label={pmT('pct')} placeholder={pmT('pct')} value={m.pct ?? ''} onChange={(e) => ms(i, { pct: n(e.target.value) })} />
-                    <input type="date" className={controls.input} aria-label={pmT('done')} value={m.done_on ?? ''} onChange={(e) => ms(i, { done_on: e.target.value || undefined })} />
+                    <DateField className={controls.input} aria-label={pmT('done')} value={m.done_on ?? ''} onChange={(e) => ms(i, { done_on: e.target.value || undefined })} />
                   </div>
                 ))}
                 <button type="button" className={controls.btnGhost} onClick={() => set({ milestones: [...(f.milestones ?? []), { id: '', label: '' }] })}>{pmT('milestones')} +</button>

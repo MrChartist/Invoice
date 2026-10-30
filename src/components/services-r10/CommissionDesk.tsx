@@ -21,6 +21,9 @@ import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './services.module.css';
 import { isPackOn } from '../../lib/industry-packs';
+import { SelectField } from '../ui/SelectField';
+import { TimeField } from '../ui/TimeField';
+import { DateField } from '../ui/DateField';
 // R14 (PS-A): professional rows, only while the `practice` pack is on (one small lazy chunk).
 const StaffPsRow = lazy(() => import('../prof/ProfRows').then((m) => ({ default: m.StaffPsRow })));
 
@@ -82,15 +85,15 @@ function StaffView({ staff, plans, run }: { staff: ServiceStaff[]; plans: Commis
       <div className={styles.form} data-staff-form>
         <Field k="name"><input className={controls.input} value={f.name} onChange={(e) => set({ name: e.target.value })} data-staff-name /></Field>
         <Field k="phone"><input className={controls.input} type="tel" value={f.phone ?? ''} onChange={(e) => set({ phone: e.target.value })} /></Field>
-        <Field k="role"><select className={controls.select} value={f.role} onChange={(e) => set({ role: e.target.value as StaffRole })}>{ROLES.map((r) => <option key={r} value={r}>{svT(`role.${r}`)}</option>)}</select></Field>
-        <Field k="employment"><select className={controls.select} value={f.employment} onChange={(e) => set({ employment: e.target.value as ServiceStaff['employment'] })}><option value="employee">{svT('emp.employee')}</option><option value="freelance">{svT('emp.freelance')}</option></select></Field>
-        {f.employment === 'employee' && !!employees.length && <Field k="employee"><select className={controls.select} value={f.employee_id ?? ''} onChange={(e) => set({ employee_id: e.target.value || undefined })}><option value="">-</option>{employees.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></Field>}
-        {f.employment === 'freelance' && <Field k="vendor"><select className={controls.select} value={f.vendor_id ?? ''} onChange={(e) => set({ vendor_id: e.target.value || undefined })}><option value="">-</option>{vendors.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></Field>}
-        {f.employment === 'freelance' && <Field k="tds"><select className={controls.select} value={f.tds_section ?? ''} onChange={(e) => set({ tds_section: e.target.value || undefined })}><option value="">{f.role === 'doctor' ? '194J' : '194H'}</option>{['194H', '194J', '194C'].map((x) => <option key={x}>{x}</option>)}</select></Field>}
-        <Field k="plan"><select className={controls.select} value={f.plan_id ?? ''} onChange={(e) => set({ plan_id: e.target.value || undefined })} data-staff-plan><option value="">-</option>{plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
-        <Field k="breakFrom"><input className={controls.input} type="time" value={brk.from} onChange={(e) => set({ hours: { ...f.hours, breaks: e.target.value ? [{ from: e.target.value, to: brk.to || e.target.value }] : [] } })} /></Field>
+        <Field k="role"><SelectField className={controls.select} value={f.role} onChange={(e) => set({ role: e.target.value as StaffRole })}>{ROLES.map((r) => <option key={r} value={r}>{svT(`role.${r}`)}</option>)}</SelectField></Field>
+        <Field k="employment"><SelectField className={controls.select} value={f.employment} onChange={(e) => set({ employment: e.target.value as ServiceStaff['employment'] })}><option value="employee">{svT('emp.employee')}</option><option value="freelance">{svT('emp.freelance')}</option></SelectField></Field>
+        {f.employment === 'employee' && !!employees.length && <Field k="employee"><SelectField className={controls.select} value={f.employee_id ?? ''} onChange={(e) => set({ employee_id: e.target.value || undefined })}><option value="">-</option>{employees.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</SelectField></Field>}
+        {f.employment === 'freelance' && <Field k="vendor"><SelectField className={controls.select} value={f.vendor_id ?? ''} onChange={(e) => set({ vendor_id: e.target.value || undefined })}><option value="">-</option>{vendors.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</SelectField></Field>}
+        {f.employment === 'freelance' && <Field k="tds"><SelectField className={controls.select} value={f.tds_section ?? ''} onChange={(e) => set({ tds_section: e.target.value || undefined })}><option value="">{f.role === 'doctor' ? '194J' : '194H'}</option>{['194H', '194J', '194C'].map((x) => <option key={x}>{x}</option>)}</SelectField></Field>}
+        <Field k="plan"><SelectField className={controls.select} value={f.plan_id ?? ''} onChange={(e) => set({ plan_id: e.target.value || undefined })} data-staff-plan><option value="">-</option>{plans.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</SelectField></Field>
+        <Field k="breakFrom"><TimeField className={controls.input} value={brk.from} onChange={(e) => set({ hours: { ...f.hours, breaks: e.target.value ? [{ from: e.target.value, to: brk.to || e.target.value }] : [] } })} /></Field>
         {isPackOn(localDb.settings.get(), 'practice') && <Suspense fallback={null}><StaffPsRow value={f.ps} onChange={(ps) => set({ ps })} /></Suspense>}
-        <Field k="breakTo"><input className={controls.input} type="time" value={brk.to} onChange={(e) => set({ hours: { ...f.hours, breaks: brk.from ? [{ from: brk.from, to: e.target.value }] : [] } })} /></Field>
+        <Field k="breakTo"><TimeField className={controls.input} value={brk.to} onChange={(e) => set({ hours: { ...f.hours, breaks: brk.from ? [{ from: brk.from, to: e.target.value }] : [] } })} /></Field>
       </div>
       <div className={styles.actions}>
         <span className={controls.label}>{svT('offDays')}</span>
@@ -131,7 +134,7 @@ function PlansView({ plans, run }: { plans: CommissionPlan[]; run: Run }) {
     <>
       <div className={styles.form}>
         <Field k="name"><input className={controls.input} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} data-plan-name /></Field>
-        <Field k="basis"><select className={controls.select} value={f.basis} onChange={(e) => setF({ ...f, basis: e.target.value as CommissionPlan['basis'] })}><option value="invoice">{svT('basis.invoice')}</option><option value="receipt">{svT('basis.receipt')}</option></select></Field>
+        <Field k="basis"><SelectField className={controls.select} value={f.basis} onChange={(e) => setF({ ...f, basis: e.target.value as CommissionPlan['basis'] })}><option value="invoice">{svT('basis.invoice')}</option><option value="receipt">{svT('basis.receipt')}</option></SelectField></Field>
       </div>
       <p className={controls.label}>{svT('rules')}</p>
       <table className={styles.lines}>
@@ -139,10 +142,10 @@ function PlansView({ plans, run }: { plans: CommissionPlan[]; run: Run }) {
           {f.rules.map((r, i) => (
             <tr key={i}>
               <td>
-                <select className={controls.select} value={target(r)} onChange={(e) => setTarget(i, e.target.value)} aria-label={svT('ruleKind')}>
+                <SelectField className={controls.select} value={target(r)} onChange={(e) => setTarget(i, e.target.value)} aria-label={svT('ruleKind')}>
                   <optgroup label={svT('ruleKind')}>{KINDS.map((k) => <option key={k} value={`k:${k}`}>{svT(`k.${k}`)}</option>)}</optgroup>
                   <optgroup label={svT('ruleItem')}>{catalog.map((c) => <option key={c.id} value={`i:${c.id}`}>{c.name}</option>)}</optgroup>
-                </select>
+                </SelectField>
               </td>
               <td><input className={controls.input} type="number" min={0} step="0.5" placeholder={svT('pct')} value={r.pct ?? ''} onChange={(e) => setRule(i, { pct: e.target.value ? Number(e.target.value) : undefined, per_unit: undefined })} aria-label={svT('pct')} data-rule-pct={i} /></td>
               <td><input className={controls.input} type="number" min={0} placeholder={svT('perUnit')} value={r.per_unit ?? ''} onChange={(e) => setRule(i, { per_unit: e.target.value ? Number(e.target.value) : undefined, pct: undefined })} aria-label={svT('perUnit')} /></td>
@@ -156,8 +159,8 @@ function PlansView({ plans, run }: { plans: CommissionPlan[]; run: Run }) {
       <div className={styles.form}>
         <Field k="slabTarget"><input className={controls.input} type="number" min={0} value={f.slab?.target ?? ''} onChange={(e) => setF({ ...f, slab: e.target.value ? { base: 'service', pct: 2, mode: 'add', ...f.slab, target: Number(e.target.value) } : undefined })} /></Field>
         {f.slab && <Field k="pct"><input className={controls.input} type="number" min={0} step="0.5" value={f.slab.pct} onChange={(e) => setF({ ...f, slab: { ...f.slab!, pct: Number(e.target.value) } })} /></Field>}
-        {f.slab && <Field k="slabBase"><select className={controls.select} value={f.slab.base} onChange={(e) => setF({ ...f, slab: { ...f.slab!, base: e.target.value as 'service' | 'all' } })}><option value="service">{svT('sb.service')}</option><option value="all">{svT('sb.all')}</option></select></Field>}
-        {f.slab && <Field k="slabMode"><select className={controls.select} value={f.slab.mode} onChange={(e) => setF({ ...f, slab: { ...f.slab!, mode: e.target.value as 'add' | 'replace' } })}><option value="add">{svT('sm.add')}</option><option value="replace">{svT('sm.replace')}</option></select></Field>}
+        {f.slab && <Field k="slabBase"><SelectField className={controls.select} value={f.slab.base} onChange={(e) => setF({ ...f, slab: { ...f.slab!, base: e.target.value as 'service' | 'all' } })}><option value="service">{svT('sb.service')}</option><option value="all">{svT('sb.all')}</option></SelectField></Field>}
+        {f.slab && <Field k="slabMode"><SelectField className={controls.select} value={f.slab.mode} onChange={(e) => setF({ ...f, slab: { ...f.slab!, mode: e.target.value as 'add' | 'replace' } })}><option value="add">{svT('sm.add')}</option><option value="replace">{svT('sm.replace')}</option></SelectField></Field>}
       </div>
       <div className={styles.actions}><button type="button" className={controls.btnPrimary} onClick={() => run(() => savePlan(f)) && setF(blankPlan())} data-plan-save>{f.id ? svT('save') : svT('add')}</button></div>
       <ul className={styles.list}>
@@ -189,8 +192,8 @@ function StatementView({ staff, plans, run, tick }: { staff: ServiceStaff[]; pla
   return (
     <>
       <div className={styles.bar}>
-        <select className={controls.select} value={staffId} onChange={(e) => setStaffId(e.target.value)} aria-label={svT('staff')} style={{ maxWidth: '14rem' }} data-statement-staff>{staff.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
-        <input className={controls.input} type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} aria-label={svT('month')} style={{ maxWidth: '11rem' }} />
+        <SelectField className={controls.select} value={staffId} onChange={(e) => setStaffId(e.target.value)} aria-label={svT('staff')} style={{ maxWidth: '14rem' }} data-statement-staff>{staff.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</SelectField>
+        <DateField className={controls.input} mode="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} aria-label={svT('month')} style={{ maxWidth: '11rem' }} />
         {st && <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => downloadText(`commission-${s!.name}-${month}.csv`, `\uFEFF${toCsv(statementRows(st))}`, 'text/csv')}>{svT('csv')}</button>}
       </div>
       {st && (
@@ -210,7 +213,7 @@ function StatementView({ staff, plans, run, tick }: { staff: ServiceStaff[]; pla
         <div className={styles.actions}>
           {done ? <span className={styles.muted}>{svT('paidOut')}</span> : (
             <>
-              <input className={controls.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label={svT('payoutDate')} style={{ maxWidth: '11rem' }} />
+              <DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} aria-label={svT('payoutDate')} style={{ maxWidth: '11rem' }} />
               {s.employment === 'freelance' && <label className={controls.check}><input type="checkbox" checked={tds} onChange={(e) => setTds(e.target.checked)} /> {svT('payoutTds')}</label>}
               <button type="button" className={controls.btnPrimary} disabled={!(st.total > 0)} onClick={() => run(() => postPayout(s, month, st, { date, payrollOn, tds }))}>{svT('payout')} · {svT(`route.${payoutRoute(s, payrollOn)}`)}</button>
             </>

@@ -15,6 +15,7 @@ import { distT } from '../i18n/areas/distribution';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import own from '../components/distribution/dist.module.css';
+import { SelectField } from '../components/ui/SelectField';
 
 interface ItemRow { id: string; name: string; unit?: string; sale_rate?: number; rate?: number }
 
@@ -98,24 +99,24 @@ export function OrderPad() {
           <div className={own.row}>
             {agents.length > 0 ? (
               <label className={controls.field}><span className={controls.label}>{distT('salesman')}</span>
-                <select className={controls.select} value={agentId} onChange={(e) => setAgentId(e.target.value)}>
+                <SelectField className={controls.select} value={agentId} onChange={(e) => setAgentId(e.target.value)}>
                   <option value="">{distT('choose')}</option>
                   {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select></label>
+                </SelectField></label>
             ) : (
               <label className={controls.field}><span className={controls.label}>{distT('salesman')}</span>
                 <input className={controls.input} value={salesman} onChange={(e) => setSalesman(e.target.value)} /></label>
             )}
             <label className={controls.field}><span className={controls.label}>{distT('beat')}</span>
-              <select className={controls.select} value={beat} onChange={(e) => setBeat(e.target.value)}>
+              <SelectField className={controls.select} value={beat} onChange={(e) => setBeat(e.target.value)}>
                 <option value="">{distT('allBeats')}</option>
                 {beats.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select></label>
+              </SelectField></label>
             <label className={controls.field}><span className={controls.label}>{distT('party')}</span>
-              <select className={controls.select} value={client} onChange={(e) => setClient(e.target.value)} data-pad-party>
+              <SelectField className={controls.select} value={client} onChange={(e) => setClient(e.target.value)} data-pad-party>
                 <option value="">{distT('choose')}</option>
                 {partyList.map((c) => <option key={c.id ?? c.name} value={c.id ?? c.name}>{c.name}</option>)}
-              </select></label>
+              </SelectField></label>
           </div>
           <datalist id="pad-items">{items.map((i) => <option key={i.id ?? i.name} value={i.name} />)}</datalist>
           {lines.map((l, i) => (

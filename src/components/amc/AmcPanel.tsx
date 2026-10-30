@@ -9,6 +9,7 @@ import { amcT } from '../../i18n/areas/extras';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import own from '../dashboard/tiles.module.css';
+import { DateField } from '../ui/DateField';
 
 /** AMC / service contracts (WP-9): reminders, visit log, renewal and a quick "new contract" form. */
 export function AmcPanel({ notify, icon }: { notify: (m: string, tone?: 'success' | 'error' | 'info') => void; icon?: ReactNode }) {
@@ -83,7 +84,7 @@ export function AmcPanel({ notify, icon }: { notify: (m: string, tone?: 'success
               <input className={controls.input} value={form.client_name} onChange={(e) => setForm({ ...form, client_name: e.target.value })} placeholder={amcT('customer')} aria-label={amcT('customer')} />
               <input className={controls.input} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder={amcT('contractTitle')} aria-label={amcT('contractTitle')} />
               <div className={controls.row}>
-                <label className={controls.field}><span className={controls.label}>{amcT('start')}</span><input type="date" className={controls.input} value={form.start} onChange={(e) => e.target.value && setForm({ ...form, start: e.target.value })} /></label>
+                <label className={controls.field}><span className={controls.label}>{amcT('start')}</span><DateField className={controls.input} value={form.start} onChange={(e) => e.target.value && setForm({ ...form, start: e.target.value })} /></label>
                 <label className={controls.field}><span className={controls.label}>{amcT('months')}</span><NumberInput className={cn(controls.input, controls.inputNumeric)} value={form.months} onChange={(v) => setForm({ ...form, months: v })} /></label>
               </div>
               <div className={controls.row}>

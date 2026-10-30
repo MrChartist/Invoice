@@ -4,6 +4,8 @@ import { useT } from '../../../i18n';
 import { tallyT } from '../../../i18n/areas/tally';
 import controls from '../../../styles/controls.module.css';
 import styles from './tally.module.css';
+import { SelectField } from '../../ui/SelectField';
+import { DateField } from '../../ui/DateField';
 
 export type VariantValue = Pick<ManualVoucher, 'variant' | 'post_dated' | 'reverse_on' | 'voucher_class'>;
 
@@ -17,16 +19,16 @@ export function VoucherVariantFields({ type, value, onChange }: { type: ManualVo
       <div className={styles.grid}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor={`${uid}-var`}>{tallyT('variantLabel')}</label>
-          <select id={`${uid}-var`} className={controls.select} value={value.variant ?? ''} onChange={(e) => set({ variant: (e.target.value || undefined) as VariantValue['variant'] })}>
+          <SelectField id={`${uid}-var`} className={controls.select} value={value.variant ?? ''} onChange={(e) => set({ variant: (e.target.value || undefined) as VariantValue['variant'] })}>
             <option value="">{tallyT('vRegular')}</option>
             <option value="OPTIONAL">{tallyT('vOptional')}</option>
             <option value="MEMO">{tallyT('vMemo')}</option>
-          </select>
+          </SelectField>
         </div>
         {type === 'JOURNAL' && (
           <div className={controls.field}>
             <label className={controls.label} htmlFor={`${uid}-rev`}>{tallyT('reverseOn')}</label>
-            <input id={`${uid}-rev`} type="date" className={controls.input} value={value.reverse_on ?? ''} onChange={(e) => set({ reverse_on: e.target.value || undefined })} />
+            <DateField id={`${uid}-rev`} className={controls.input} value={value.reverse_on ?? ''} onChange={(e) => set({ reverse_on: e.target.value || undefined })} />
           </div>
         )}
         <div className={controls.field}>

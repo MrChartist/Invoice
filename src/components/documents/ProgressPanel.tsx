@@ -13,6 +13,7 @@ import { useT } from '../../i18n';
 import { s2T } from '../../i18n/areas/sales-r2';
 import controls from '../../styles/controls.module.css';
 import styles from './sales-r2.module.css';
+import { DateField } from '../ui/DateField';
 
 const ProgressInvoiceDialog = lazy(() => import('./ProgressInvoiceDialog').then((m) => ({ default: m.ProgressInvoiceDialog })));
 
@@ -103,7 +104,7 @@ export function ProgressPanel({ source, refreshKey }: { source: InvoiceRecord; r
             <div key={m.id} className={styles.planRow}>
               <input className={controls.input} value={m.name} onChange={(e) => setPlan(plan.map((x) => (x.id === m.id ? { ...x, name: e.target.value } : x)))} placeholder={s2T('p.mName')} aria-label={`${s2T('p.mName')} ${i + 1}`} />
               <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={m.percent || ''} onChange={(e) => setPlan(plan.map((x) => (x.id === m.id ? { ...x, percent: Number(e.target.value.replace(/[^0-9.]/g, '')) || 0 } : x)))} placeholder={s2T('p.mPct')} aria-label={`${s2T('p.mPct')} ${i + 1}`} />
-              <input className={controls.input} type="date" value={m.expected_date ?? ''} onChange={(e) => setPlan(plan.map((x) => (x.id === m.id ? { ...x, expected_date: e.target.value || undefined } : x)))} aria-label={`${s2T('p.mDate')} ${i + 1}`} />
+              <DateField className={controls.input} value={m.expected_date ?? ''} onChange={(e) => setPlan(plan.map((x) => (x.id === m.id ? { ...x, expected_date: e.target.value || undefined } : x)))} aria-label={`${s2T('p.mDate')} ${i + 1}`} />
               {inv ? <span className={styles.muted}>✓ {s2T('p.ticked', { number: inv.invoice_number })}</span> : (
                 <button type="button" className={controls.btnIcon} onClick={() => setPlan(plan.filter((x) => x.id !== m.id))} aria-label={`${s2T('remove')} ${i + 1}`}><Trash2 size={14} /></button>
               )}

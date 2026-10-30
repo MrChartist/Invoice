@@ -12,6 +12,8 @@ import { useT } from '../../i18n';
 import { distT } from '../../i18n/areas/distribution';
 import controls from '../../styles/controls.module.css';
 import own from './dist.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 type Measure = 'sales' | 'outstanding' | 'collections' | 'returns';
 
@@ -43,7 +45,7 @@ export default function DistReports({ view }: { view: 'reports' | 'plan' }) {
       <div className={own.stack} data-beat-plan>
         <p className={own.muted}>{distT('planIntro')}</p>
         <label className={controls.field}><span className={controls.label}>{distT('day')}</span>
-          <input type="date" className={controls.input} value={day} onChange={(e) => setDay(e.target.value)} /></label>
+          <DateField className={controls.input} value={day} onChange={(e) => setDay(e.target.value)} /></label>
         {plan.length === 0 && <p className={own.muted}>{distT('noBeatsDay')}</p>}
         {plan.map((p) => (
           <div key={p.beat.id} className={own.day} data-plan-beat={p.beat.name}>
@@ -68,22 +70,22 @@ export default function DistReports({ view }: { view: 'reports' | 'plan' }) {
     <div className={own.stack} data-dist-reports>
       <div className={own.row}>
         <label className={controls.field}><span className={controls.label}>{distT('report')}</span>
-          <select className={controls.select} value={measure} onChange={(e) => setMeasure(e.target.value as Measure)} data-dist-measure>
+          <SelectField className={controls.select} value={measure} onChange={(e) => setMeasure(e.target.value as Measure)} data-dist-measure>
             <option value="sales">{distT('mSales')}</option>
             <option value="outstanding">{distT('mOutstanding')}</option>
             <option value="collections">{distT('mCollections')}</option>
             <option value="returns">{distT('mReturns')}</option>
-          </select></label>
+          </SelectField></label>
         <label className={controls.field}><span className={controls.label}>{distT('groupBy')}</span>
-          <select className={controls.select} value={by} onChange={(e) => setBy(e.target.value as DistGroupBy)} data-dist-by>
+          <SelectField className={controls.select} value={by} onChange={(e) => setBy(e.target.value as DistGroupBy)} data-dist-by>
             <option value="salesman">{distT('salesman')}</option>
             <option value="beat">{distT('beat')}</option>
             <option value="area">{distT('area')}</option>
-          </select></label>
+          </SelectField></label>
         {measure !== 'outstanding' && (
           <>
-            <label className={controls.field}><span className={controls.label}>{distT('from')}</span><input type="date" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-            <label className={controls.field}><span className={controls.label}>{distT('to')}</span><input type="date" className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></label>
+            <label className={controls.field}><span className={controls.label}>{distT('from')}</span><DateField className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+            <label className={controls.field}><span className={controls.label}>{distT('to')}</span><DateField className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></label>
           </>
         )}
         <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => downloadText(`${measure}-by-${by}.csv`, distCsv(`${distT(measure === 'sales' ? 'mSales' : measure === 'returns' ? 'mReturns' : measure === 'collections' ? 'mCollections' : 'mOutstanding')}: ${groupLabel}${measure !== 'outstanding' ? ` ${period.from} – ${period.to}` : ''}`, rows, groupLabel, distT('notAssigned')), 'text/csv')}>

@@ -11,6 +11,7 @@ import { B, printHtml, today } from '../transport/shared';
 import { Num, Sel, Table, Txt } from './mill-ui';
 import { T, W, n, opt, row, useRun, type Done } from './mill-kit';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 const KINDS: readonly WbsPartyKind[] = ['farmer', 'trader', 'agency', 'other'];
 const USES: readonly WbsUse[] = ['purchase', 'cmr', 'job', 'sale', 'other'];
@@ -93,7 +94,7 @@ export default function IntakeView({ onDone }: { onDone: Done }) {
               <input className={controls.input} style={{ maxWidth: 90 }} type="number" placeholder={T('bagTare')} aria-label={T('bagTare')} value={vr[s.id]?.tare ?? ''} onChange={(e) => setVr({ ...vr, [s.id]: { rate: vr[s.id]?.rate ?? '', tare: e.target.value } })} />
               <button type="button" className={B.os} data-ml-voucher onClick={() => run(() => T('voucherMade', { n: voucherFromSlip(s.id, { vendor: d.vendors.find((v) => v.id === s.party_id)!, rate: n(vr[s.id]?.rate ?? ''), tare_per_bag: n(vr[s.id]?.tare ?? ''), params: qualityTableFor(s.commodity)?.params }).bill_number ?? '' }))}>{T('makeVoucher')}</button>
             </>}
-            {d.agreements.length > 0 && <><select className={controls.select} style={{ maxWidth: 170 }} aria-label={T('forCmr')} value={cmr[s.id] ?? ''} onChange={(e) => setCmr({ ...cmr, [s.id]: e.target.value })}>{opt(d.agreements, (a) => a.id, (a) => `${a.agency_name} · ${a.season}`).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+            {d.agreements.length > 0 && <><SelectField className={controls.select} style={{ maxWidth: 170 }} aria-label={T('forCmr')} value={cmr[s.id] ?? ''} onChange={(e) => setCmr({ ...cmr, [s.id]: e.target.value })}>{opt(d.agreements, (a) => a.id, (a) => `${a.agency_name} · ${a.season}`).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</SelectField>
               <button type="button" className={B.os} disabled={!cmr[s.id]} onClick={() => run(() => { addPaddyLot(cmr[s.id], { date: s.date, wbs_id: s.id }); return T('lotAdded'); })}>{T('forCmr')}</button></>}
             <input className={controls.input} style={{ maxWidth: 150 }} placeholder={W('principal')} aria-label={W('principal')} value={job[s.id] ?? name(s)} onChange={(e) => setJob({ ...job, [s.id]: e.target.value })} />
             <button type="button" className={B.os} onClick={() => run(() => T('jobReceived', { n: receiveForJob(s.id, { name: job[s.id] ?? s.party_name ?? '' }).jwpNumber }))}>{T('forJob')}</button>

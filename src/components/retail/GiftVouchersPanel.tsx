@@ -20,6 +20,8 @@ import { printGiftVoucherSlips } from './GiftVoucherSlip';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import css from './retail-r4.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 const SALE_METHODS = ['Cash', 'UPI', 'Card', 'Cheque', 'Bank transfer'];
 
@@ -83,21 +85,21 @@ export default function GiftVouchersPanel() {
             <div className={css.bar}>
               <label className={controls.field}><span className={controls.label}>{sT('gvCount')}</span><NumberInput className={cn(controls.input, controls.inputNumeric, css.gridInput)} value={sell.count} onChange={(v) => setSell({ ...sell, count: v })} data-gv-count /></label>
               <label className={controls.field}><span className={controls.label}>{sT('gvFace')}</span><NumberInput className={cn(controls.input, controls.inputNumeric, css.gridInput)} value={sell.face} onChange={(v) => setSell({ ...sell, face: v })} data-gv-face /></label>
-              <label className={controls.field}><span className={controls.label}>{sT('date')}</span><input type="date" className={controls.input} value={sell.date} onChange={(e) => setSell({ ...sell, date: e.target.value })} /></label>
-              <label className={controls.field}><span className={controls.label}>{sT('gvExpires')}</span><input type="date" className={controls.input} value={sell.expires || (sell.date ? expiryFrom(sell.date, settings.validity_months) : '')} onChange={(e) => setSell({ ...sell, expires: e.target.value })} /></label>
+              <label className={controls.field}><span className={controls.label}>{sT('date')}</span><DateField className={controls.input} value={sell.date} onChange={(e) => setSell({ ...sell, date: e.target.value })} /></label>
+              <label className={controls.field}><span className={controls.label}>{sT('gvExpires')}</span><DateField className={controls.input} value={sell.expires || (sell.date ? expiryFrom(sell.date, settings.validity_months) : '')} onChange={(e) => setSell({ ...sell, expires: e.target.value })} /></label>
               <label className={cn(controls.field, css.grow)}><span className={controls.label}>{sT('gvBuyer')}</span><input className={controls.input} value={sell.buyer} onChange={(e) => setSell({ ...sell, buyer: e.target.value })} /></label>
               {branches.length > 0 && (
                 <label className={controls.field}><span className={controls.label}>{sT('branch')}</span>
-                  <select className={controls.select} value={sell.branch} onChange={(e) => setSell({ ...sell, branch: e.target.value })}>
+                  <SelectField className={controls.select} value={sell.branch} onChange={(e) => setSell({ ...sell, branch: e.target.value })}>
                     <option value="">-</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </select>
+                  </SelectField>
                 </label>
               )}
               {!sell.promo && (
                 <label className={controls.field}><span className={controls.label}>{sT('gvPaidBy')}</span>
-                  <select className={controls.select} value={sell.method} onChange={(e) => setSell({ ...sell, method: e.target.value })}>
+                  <SelectField className={controls.select} value={sell.method} onChange={(e) => setSell({ ...sell, method: e.target.value })}>
                     {SALE_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
+                  </SelectField>
                 </label>
               )}
             </div>
@@ -117,13 +119,13 @@ export default function GiftVouchersPanel() {
         )}
 
         <div className={css.bar}>
-          <label className={controls.field}><span className={controls.label}>{sT('from')}</span><input type="date" className={controls.input} value={period.from} onChange={(e) => setPeriod({ ...period, from: e.target.value })} /></label>
-          <label className={controls.field}><span className={controls.label}>{sT('to')}</span><input type="date" className={controls.input} value={period.to} onChange={(e) => setPeriod({ ...period, to: e.target.value })} /></label>
+          <label className={controls.field}><span className={controls.label}>{sT('from')}</span><DateField className={controls.input} value={period.from} onChange={(e) => setPeriod({ ...period, from: e.target.value })} /></label>
+          <label className={controls.field}><span className={controls.label}>{sT('to')}</span><DateField className={controls.input} value={period.to} onChange={(e) => setPeriod({ ...period, to: e.target.value })} /></label>
           {branches.length > 0 && (
             <label className={controls.field}><span className={controls.label}>{sT('branch')}</span>
-              <select className={controls.select} value={period.branch} onChange={(e) => setPeriod({ ...period, branch: e.target.value })}>
+              <SelectField className={controls.select} value={period.branch} onChange={(e) => setPeriod({ ...period, branch: e.target.value })}>
                 <option value="">{sT('allBranches')}</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
+              </SelectField>
             </label>
           )}
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => downloadText(`gift-vouchers-${today}.csv`, gvRegisterCsv(reg, branchName), 'text/csv')}>

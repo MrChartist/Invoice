@@ -26,6 +26,8 @@ import { epayAmountsOverLimit, saveEpayBatch, type EpayBatch } from '../../../li
 import controls from '../../../styles/controls.module.css';
 import surface from '../../../styles/surface.module.css';
 import styles from './bankdocs.module.css';
+import { SelectField } from '../../ui/SelectField';
+import { DateField } from '../../ui/DateField';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 // 7U: forex bank ledgers and e-payment confirmation, loaded only when opened.
@@ -84,11 +86,11 @@ function AccountSelect({ id, label, accounts, value, onChange }: { id: string; l
   return (
     <label className={controls.field} htmlFor={id}>
       <span className={controls.label}>{label}</span>
-      <select id={id} className={controls.select} value={value} onChange={(e) => onChange(e.target.value)}>
+      <SelectField id={id} className={controls.select} value={value} onChange={(e) => onChange(e.target.value)}>
         {accounts.map((a) => (
           <option key={a.id} value={a.id}>{a.name}{a.account_no ? ` (${maskAccountNo(a.account_no)})` : ''}</option>
         ))}
-      </select>
+      </SelectField>
     </label>
   );
 }
@@ -176,7 +178,7 @@ function DepositSlipPanel({ notify }: { notify: Notify }) {
     <div className={styles.stack}>
       <div className={styles.grid}>
         <label className={controls.field}><span className={controls.label}>{bnkT('date')}</span>
-          <input className={controls.input} type="date" max={today} value={date} onChange={(e) => setDate(e.target.value)} /></label>
+          <DateField className={controls.input} max={today} value={date} onChange={(e) => setDate(e.target.value)} /></label>
         <AccountSelect id="slip-account" label={bnkT('account')} accounts={accounts} value={accountId} onChange={setAccountId} />
         <label className={controls.field}><span className={controls.label}>{bnkT('depositor')}</span>
           <input className={controls.input} value={depositor} onChange={(e) => setDepositor(e.target.value)} /></label>
@@ -282,12 +284,12 @@ function PaymentAdvicePanel() {
       <div className={styles.toolbar}>
         <label className={controls.field} style={{ minWidth: 320 }}>
           <span className={controls.label}>{bnkT('payment')}</span>
-          <select className={controls.select} value={key} onChange={(e) => setKey(e.target.value)}>
+          <SelectField className={controls.select} value={key} onChange={(e) => setKey(e.target.value)}>
             <option value="">{bnkT('pickPayment')}</option>
             {refs.slice(0, 300).map((r) => (
               <option key={r.key} value={r.key}>{formatDate(r.date)} · {r.vendor} · {rupees(r.amount)}{r.reference ? ` · ${r.reference}` : ''}</option>
             ))}
-          </select>
+          </SelectField>
         </label>
         {advice && <button type="button" className={controls.btnOutline} onClick={print}><Printer size={16} /> {bnkT('print')}</button>}
       </div>
@@ -393,11 +395,11 @@ function EPaymentsPanel({ notify }: { notify: Notify }) {
       <p className={styles.warn} role="note">{bnkT('epayIntro')}</p>
       <div className={styles.grid}>
         <label className={controls.field}><span className={controls.label}>{bnkT('preset')}</span>
-          <select className={controls.select} value={preset} onChange={(e) => setPreset(e.target.value as UploadPreset)}>
+          <SelectField className={controls.select} value={preset} onChange={(e) => setPreset(e.target.value as UploadPreset)}>
             {UPLOAD_PRESETS.map((p) => <option key={p} value={p}>{bnkT(presetLabel[p])}</option>)}
-          </select></label>
+          </SelectField></label>
         <label className={controls.field}><span className={controls.label}>{bnkT('date')}</span>
-          <input className={controls.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+          <DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></label>
         <AccountSelect id="epay-account" label={bnkT('paidFrom')} accounts={accounts} value={accountId} onChange={setAccountId} />
       </div>
       {rows.map((r, i) => {
@@ -406,16 +408,16 @@ function EPaymentsPanel({ notify }: { notify: Notify }) {
           <div key={i} className={styles.stack} style={{ gap: '0.375rem' }}>
             <div className={styles.rowEdit}>
               <label className={controls.field}><span className={controls.label}>{bnkT('vendor')}</span>
-                <select className={controls.select} value={r.vendorId} onChange={(e) => setRow(i, { vendorId: e.target.value })}>
+                <SelectField className={controls.select} value={r.vendorId} onChange={(e) => setRow(i, { vendorId: e.target.value })}>
                   <option value="">-</option>
                   {vendors.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-                </select></label>
+                </SelectField></label>
               <label className={controls.field}><span className={controls.label}>{bnkT('amount')}</span>
                 <input className={`${controls.input} ${controls.inputNumeric}`} inputMode="decimal" value={r.amount} onChange={(e) => setRow(i, { amount: e.target.value.replace(/[^0-9.]/g, '') })} /></label>
               <label className={controls.field}><span className={controls.label}>{bnkT('mode')}</span>
-                <select className={controls.select} value={r.mode} onChange={(e) => setRow(i, { mode: e.target.value as UploadMode })}>
+                <SelectField className={controls.select} value={r.mode} onChange={(e) => setRow(i, { mode: e.target.value as UploadMode })}>
                   {(['NEFT', 'RTGS', 'IMPS', 'IFT'] as const).map((m) => <option key={m} value={m}>{m}</option>)}
-                </select></label>
+                </SelectField></label>
               <label className={controls.field}><span className={controls.label}>{bnkT('reference')}</span>
                 <input className={controls.input} maxLength={30} value={r.reference} onChange={(e) => setRow(i, { reference: e.target.value })} /></label>
               <button type="button" className={controls.btnGhost} onClick={() => setRows(rows.filter((_, k) => k !== i))}>{bnkT('remove')}</button>
@@ -469,7 +471,7 @@ function CashTallyPanel({ notify }: { notify: Notify }) {
       <p className={styles.muted}>{bnkT('cashIntro')}</p>
       <div className={styles.grid}>
         <label className={controls.field}><span className={controls.label}>{bnkT('date')}</span>
-          <input className={controls.input} type="date" max={todayInput()} value={date} onChange={(e) => setDate(e.target.value)} /></label>
+          <DateField className={controls.input} max={todayInput()} value={date} onChange={(e) => setDate(e.target.value)} /></label>
         <label className={controls.field}><span className={controls.label}>{bnkT('note')}</span>
           <input className={controls.input} value={note} onChange={(e) => setNote(e.target.value)} /></label>
       </div>

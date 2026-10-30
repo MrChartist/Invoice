@@ -33,6 +33,8 @@ import { downloadFile, downloadSequentially } from './download';
 import { useT } from '../../i18n';
 import { expT } from '../../i18n/areas/exports';
 import { nodes } from '../../i18n/areas/nodes';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 /** Screen names of the datasets (the CSV files and their headers stay English). */
 const DATASET_KEYS = {
@@ -249,7 +251,7 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
             <div className={styles.filters}>
               <div className={`${controls.field} ${styles.wide}`}>
                 <label className={controls.label} htmlFor="ex-period-sel">{expT('period')}</label>
-                <select
+                <SelectField
                   id="ex-period-sel"
                   className={controls.select}
                   value={prefs.period}
@@ -260,26 +262,26 @@ export function ExportCenter({ companyName }: ExportCenterProps) {
                   ))}
                   <option value="all">{expT('allTime')}</option>
                   <option value="custom">{expT('customRange')}</option>
-                </select>
+                </SelectField>
               </div>
               {prefs.period === 'custom' && (
                 <>
                   <div className={controls.field}>
                     <label className={controls.label} htmlFor="ex-from">{expT('from')}</label>
-                    <input id="ex-from" type="date" className={controls.input} value={prefs.from} onChange={(e) => update({ from: e.target.value })} />
+                    <DateField id="ex-from" className={controls.input} value={prefs.from} onChange={(e) => update({ from: e.target.value })} />
                   </div>
                   <div className={controls.field}>
                     <label className={controls.label} htmlFor="ex-to">{expT('to')}</label>
-                    <input id="ex-to" type="date" className={controls.input} value={prefs.to} onChange={(e) => update({ to: e.target.value })} />
+                    <DateField id="ex-to" className={controls.input} value={prefs.to} onChange={(e) => update({ to: e.target.value })} />
                   </div>
                 </>
               )}
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="ex-datefmt">{expT('dateFormat')}</label>
-                <select id="ex-datefmt" className={controls.select} value={prefs.dateFormat} onChange={(e) => update({ dateFormat: e.target.value as DateFormat })}>
+                <SelectField id="ex-datefmt" className={controls.select} value={prefs.dateFormat} onChange={(e) => update({ dateFormat: e.target.value as DateFormat })}>
                   <option value="iso">{expT('isoOption')}</option>
                   <option value="dmy">15-04-2025 (DD-MM-YYYY)</option>
-                </select>
+                </SelectField>
               </div>
             </div>
             <div className={styles.checks}>

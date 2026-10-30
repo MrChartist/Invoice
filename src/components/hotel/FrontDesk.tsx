@@ -41,7 +41,9 @@ import styles from './hotel.module.css';
 import FormCView from './FormCView';
 import ReportsView from './ReportsView';
 import { escHtml as esc } from '../../lib/html-esc';
-import FolioView from './FolioView'; // R7-B: in this chunk (a lazy view chunk cost ~2.8 kB gz of split overhead)
+import FolioView from './FolioView'; import { SelectField } from '../ui/SelectField';
+import { TypedInput } from '../ui/TypedInput';
+// R7-B: in this chunk (a lazy view chunk cost ~2.8 kB gz of split overhead)
 
 /* ── Small kit ─────────────────────────────────────────────────── */
 
@@ -61,11 +63,11 @@ export function Fields({ v, set, spec, off }: { v: Rec; set: (p: Rec) => void; s
         <label key={k} className={controls.field}>
           <span className={controls.label}>{lab(l)}</span>
           {Array.isArray(t) ? (
-            <select className={controls.select} value={String(v[k] ?? '')} disabled={off} onChange={(e) => set({ [k]: e.target.value })} data-f={k}>
+            <SelectField className={controls.select} value={String(v[k] ?? '')} disabled={off} onChange={(e) => set({ [k]: e.target.value })} data-f={k}>
               {(t as Opt).map((o) => (typeof o === 'string' ? <option key={o} value={o}>{lab(o)}</option> : <option key={o[0]} value={o[0]}>{o[1]}</option>))}
-            </select>
+            </SelectField>
           ) : (
-            <input className={controls.input} type={t === 'n' ? 'number' : t === 'd' ? 'date' : t === 't' ? 'time' : 'text'} value={String(v[k] ?? '')} disabled={off}
+            <TypedInput className={controls.input} type={t === 'n' ? 'number' : t === 'd' ? 'date' : t === 't' ? 'time' : 'text'} value={String(v[k] ?? '')} disabled={off}
               onChange={(e) => set({ [k]: t === 'n' ? (e.target.value === '' ? undefined : Number(e.target.value)) : e.target.value })} data-f={k} />
           )}
         </label>
@@ -198,9 +200,9 @@ function Board({ ctx, hk }: { ctx: Ctx; hk: boolean }) {
               <div key={room.id} className={cn(styles.tile, styles[st], res && styles.occ)} data-hk-room={room.number}>
                 {body}
                 {room.ooo ? <button type="button" className={B.gs} onClick={() => ctx.run(() => setOoo(room.id, null))}>{hT('hk.clean')}</button> : <Row>
-                  <select className={controls.select} value={st} onChange={(e) => ctx.run(() => setHk([room.id], e.target.value as 'clean'))} aria-label={hT('status')} data-hk-set>
+                  <SelectField className={controls.select} value={st} onChange={(e) => ctx.run(() => setHk([room.id], e.target.value as 'clean'))} aria-label={hT('status')} data-hk-set>
                     {HK_STATUSES.filter((s) => s !== 'ooo').map((s) => <option key={s} value={s}>{hT(`hk.${s}`)}</option>)}
-                  </select>
+                  </SelectField>
                   <button type="button" className={B.gs} onClick={() => setO({ id: room.id, from: day, to: day, reason: '' })} aria-label={hT('ooo')}><Ban size={14} aria-hidden="true" /></button>
                 </Row>}
               </div>

@@ -16,6 +16,7 @@ import { useT } from '../../i18n';
 import { salesT } from '../../i18n/areas/sales';
 import controls from '../../styles/controls.module.css';
 import styles from './documents.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export interface CreditNoteModalProps {
   invoice: InvoiceRecord;
@@ -185,7 +186,7 @@ function CreditNoteForm({ invoice, onClose, onCreated }: CreditNoteModalProps) {
               <label className={controls.label} htmlFor="cn-reason">
                 {salesT('reason')}
               </label>
-              <select
+              <SelectField
                 id="cn-reason"
                 className={controls.select}
                 value={reason}
@@ -199,7 +200,7 @@ function CreditNoteForm({ invoice, onClose, onCreated }: CreditNoteModalProps) {
                     {salesT(`reason.${r}`)}
                   </option>
                 ))}
-              </select>
+              </SelectField>
               <span className={controls.hint}>
                 {salesT('cr.taxHint')}
               </span>

@@ -8,6 +8,8 @@ import { cn, formatCurrency, todayInput } from '../../lib/utils';
 import controls from '../../styles/controls.module.css';
 import styles from './service-r3.module.css';
 import { svcT } from '../../i18n/areas/service-r3';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const STATUS_LABEL: Record<ProjectStatus, () => string> = {
   active: () => svcT('statusActive'),
@@ -35,10 +37,10 @@ export function ProjectForm({ value, clients, onChange }: { value: ProjectDraft;
       </div>
       <div className={controls.field}>
         <label className={controls.label} htmlFor="pj-client">{svcT('client')}</label>
-        <select id="pj-client" className={controls.select} value={value.client_id} onChange={(e) => set('client_id', e.target.value)}>
+        <SelectField id="pj-client" className={controls.select} value={value.client_id} onChange={(e) => set('client_id', e.target.value)}>
           <option value="">{svcT('none')}</option>
           {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        </SelectField>
       </div>
       <div className={controls.field}>
         <label className={controls.label} htmlFor="pj-hours">{svcT('budgetHours')}</label>
@@ -54,17 +56,17 @@ export function ProjectForm({ value, clients, onChange }: { value: ProjectDraft;
       </div>
       <div className={controls.field}>
         <label className={controls.label} htmlFor="pj-start">{svcT('start')}</label>
-        <input id="pj-start" type="date" className={controls.input} value={value.start} onChange={(e) => set('start', e.target.value)} />
+        <DateField id="pj-start" className={controls.input} value={value.start} onChange={(e) => set('start', e.target.value)} />
       </div>
       <div className={controls.field}>
         <label className={controls.label} htmlFor="pj-due">{svcT('due')}</label>
-        <input id="pj-due" type="date" className={controls.input} value={value.due} onChange={(e) => set('due', e.target.value)} />
+        <DateField id="pj-due" className={controls.input} value={value.due} onChange={(e) => set('due', e.target.value)} />
       </div>
       <div className={controls.field}>
         <label className={controls.label} htmlFor="pj-status">{svcT('status')}</label>
-        <select id="pj-status" className={controls.select} value={value.status} onChange={(e) => set('status', e.target.value as ProjectStatus)}>
+        <SelectField id="pj-status" className={controls.select} value={value.status} onChange={(e) => set('status', e.target.value as ProjectStatus)}>
           {PROJECT_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]()}</option>)}
-        </select>
+        </SelectField>
       </div>
     </div>
   );

@@ -17,6 +17,8 @@ import { money, qtyText, type MfgContext } from './context';
 import surface from '../../styles/surface.module.css';
 import controls from '../../styles/controls.module.css';
 import styles from './manufacturing.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 type Report = 'summary' | 'groups' | 'movement' | 'ageing' | 'negative';
 
@@ -90,9 +92,9 @@ function SummaryDrill({ positions, today }: { positions: Positions; today: strin
         <div className={styles.bar}>
           <button type="button" className={cn(controls.btnGhost, controls.btnSm)} onClick={() => setItemId('')}><ArrowLeft size={14} aria-hidden="true" /> {mfgT('back')}</button>
           <label className={styles.muted}>{mfgT('fy')}{' '}
-            <select className={controls.select} value={fy} onChange={(e) => setFy(Number(e.target.value))} aria-label={mfgT('fy')}>
+            <SelectField className={controls.select} value={fy} onChange={(e) => setFy(Number(e.target.value))} aria-label={mfgT('fy')}>
               {[thisFy - 2, thisFy - 1, thisFy, thisFy + 1].map((y) => <option key={y} value={y}>FY {String(y).slice(2)}-{String(y + 1).slice(2)}</option>)}
-            </select>
+            </SelectField>
           </label>
         </div>
         <h3 className={styles.section} style={{ margin: '0 0 0.75rem' }}>{p.item.name}</h3>
@@ -145,8 +147,8 @@ function Movement({ positions, today }: { positions: Positions; today: string })
   return (
     <>
       <div className={styles.bar} style={{ justifyContent: 'flex-start' }}>
-        <label className={styles.muted}>{mfgT('from')} <input type="date" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-        <label className={styles.muted}>{mfgT('to')} <input type="date" className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></label>
+        <label className={styles.muted}>{mfgT('from')} <DateField className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+        <label className={styles.muted}>{mfgT('to')} <DateField className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></label>
       </div>
       {data.length === 0 && <p className={styles.muted}>{mfgT('noData')}</p>}
       {data.map((d) => (
@@ -182,8 +184,8 @@ function GroupSummary({ positions, today }: { positions: Positions; today: strin
   return (
     <>
       <div className={styles.bar} style={{ justifyContent: 'flex-start' }}>
-        <label className={styles.muted}>{mfgT('from')} <input type="date" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-        <label className={styles.muted}>{mfgT('to')} <input type="date" className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></label>
+        <label className={styles.muted}>{mfgT('from')} <DateField className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+        <label className={styles.muted}>{mfgT('to')} <DateField className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></label>
       </div>
       {rows.length === 0 ? <p className={styles.muted}>{mfgT('noData')}</p> : (
         <div className={surface.tableWrap}>

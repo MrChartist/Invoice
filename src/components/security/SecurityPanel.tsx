@@ -13,6 +13,7 @@ import { roleLabel } from '../../i18n/labels';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './Security.module.css';
+import { SelectField } from '../ui/SelectField';
 
 interface Props {
   notify: (message: string, tone?: 'success' | 'error' | 'info') => void;
@@ -69,7 +70,7 @@ export function SecurityPanel({ notify, onLock }: Props) {
               <span>{secT('lockAfterText')}</span>
             </div>
             <div className={`${controls.field} ${styles.selectWrap}`}>
-              <select
+              <SelectField
                 className={controls.select}
                 aria-label={secT('autoLockAria')}
                 value={idle}
@@ -83,7 +84,7 @@ export function SecurityPanel({ notify, onLock }: Props) {
                 {IDLE_CHOICES.map((m) => (
                   <option key={m} value={m}>{idleLabel(m)}</option>
                 ))}
-              </select>
+              </SelectField>
             </div>
           </div>
           </>

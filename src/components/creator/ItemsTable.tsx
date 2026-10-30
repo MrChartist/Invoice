@@ -56,6 +56,7 @@ const LineFields = lazy(() => import('../custom-fields/LineFields')); // 6.23 (P
 import { impliedPacks } from '../../lib/shop-mode';
 import { customFieldsDb, fieldsFor } from '../../lib/custom-fields';
 import styles from './ItemsTable.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) => void }) {
   const { t } = useT();
@@ -279,7 +280,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                   const f = lineFactor(item);
                   return (
                     <>
-                      <select
+                      <SelectField
                         className={cn(controls.ghost, styles.unit)} data-field="unit" value={current}
                         onChange={(e) => (alt ? patchItem(item.id, lineUnitPatch(alt.item, item, e.target.value)) : item.unit_factor ? patchItem(item.id, { unit: e.target.value, unit_factor: undefined }) : updateItem(item.id, 'unit', e.target.value))}
                         aria-label={t('items.itemUnit', { n: index + 1 })}
@@ -287,7 +288,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                         {list.map((u) => (
                           <option key={u}>{u}</option>
                         ))}
-                      </select>
+                      </SelectField>
                       {f !== 1 && alt && <span className={styles.unitHint}>{unitT('equals', { qty: Math.round(item.quantity * f * 1000) / 1000, unit: alt.item.unit })}</span>}
                     </>
                   );
@@ -308,7 +309,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
 
               {priced && showTax && (
                 <div className={styles.cell} data-label={t('items.colGst')}>
-                  <select
+                  <SelectField
                     className={cn(controls.ghost, styles.rate)}
                     data-field="gst"
                     value={item.tax_rate ?? 0}
@@ -320,7 +321,7 @@ export function ItemsTable({ onPickCatalog }: { onPickCatalog: (itemId: string) 
                         {r}%
                       </option>
                     ))}
-                  </select>
+                  </SelectField>
                 </div>
               )}
 

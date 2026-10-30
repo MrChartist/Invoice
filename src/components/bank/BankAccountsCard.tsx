@@ -11,6 +11,7 @@ import { bankT } from '../../i18n/areas/bank';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import bank from './reconcile.module.css';
+import { DateField } from '../ui/DateField';
 
 type Notify = (message: string, tone?: 'success' | 'error' | 'info') => void;
 
@@ -167,7 +168,7 @@ export function BankAccountsCard({ accounts, statements, payments, onChange, not
               </div>
               <div className={controls.field}>
                 <label className={controls.label} htmlFor="ba-asof">{bankT('asOf')}</label>
-                <input id="ba-asof" type="date" className={controls.input} value={draft.opening_as_of} onChange={(e) => setDraft({ ...draft, opening_as_of: e.target.value })} />
+                <DateField id="ba-asof" className={controls.input} value={draft.opening_as_of} onChange={(e) => setDraft({ ...draft, opening_as_of: e.target.value })} />
               </div>
             </div>
             <div className={controls.row}>

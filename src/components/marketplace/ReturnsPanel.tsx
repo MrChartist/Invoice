@@ -10,6 +10,8 @@ import { errText, today, type PanelProps } from './file-read';
 import controls from '../../styles/controls.module.css';
 import surface from '../../styles/surface.module.css';
 import styles from './marketplace.module.css';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 const CONDITIONS: readonly ReturnCondition[] = ['good', 'damaged', 'wrong_item', 'missing'];
 const TYPES: readonly ReturnType[] = ['customer_return', 'rto', 'courier_lost'];
@@ -44,14 +46,14 @@ export function ReturnsPanel(props: PanelProps) {
       <div className={styles.toolbar}>
         <ChannelPicker {...props} />
         <label className={controls.field}><span className={controls.label}>{mT('rtCondition')}</span>
-          <select className={controls.select} value={cond} onChange={(e) => setCond(e.target.value as ReturnCondition)}>
+          <SelectField className={controls.select} value={cond} onChange={(e) => setCond(e.target.value as ReturnCondition)}>
             {CONDITIONS.map((c) => <option key={c} value={c}>{mT(`cond.${c}`)}</option>)}
-          </select></label>
+          </SelectField></label>
         <label className={controls.field}><span className={controls.label}>{mT('chGodown')}</span>
-          <select className={controls.select} value={godown} onChange={(e) => setGodown(e.target.value)}>
+          <SelectField className={controls.select} value={godown} onChange={(e) => setGodown(e.target.value)}>
             <option value="">{mT('defaultGodown')}</option>
             {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select></label>
+          </SelectField></label>
         <label className={controls.field}><span className={controls.label}>{mT('rtClaimId')}</span>
           <input className={controls.input} value={claim.id} onChange={(e) => setClaim({ ...claim, id: e.target.value })} /></label>
         <label className={controls.field}><span className={controls.label}>{mT('amount')}</span>
@@ -78,9 +80,9 @@ export function ReturnsPanel(props: PanelProps) {
                       {!r.credit_note_id && r.doc_id && st !== 'closed' && <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={() => restock(r.id)}>{mT('rtRestock')}</button>}
                       {!r.claim && st !== 'closed' && <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={() => act(() => raiseClaim(r.id, { id: claim.id || undefined, raised_on: today(), amount: Number(claim.amount) || undefined }))}>{mT('rtClaim')}</button>}
                       {r.claim && (
-                        <select className={controls.select} aria-label={mT('status')} value={r.claim.status} onChange={(e) => act(() => setClaimStatus(r.id, e.target.value as ClaimStatus))}>
+                        <SelectField className={controls.select} aria-label={mT('status')} value={r.claim.status} onChange={(e) => act(() => setClaimStatus(r.id, e.target.value as ClaimStatus))}>
                           {CLAIMS.map((c) => <option key={c} value={c}>{mT(`claim.${c}`)}</option>)}
-                        </select>
+                        </SelectField>
                       )}
                       {st !== 'closed' && <button type="button" className={`${controls.btn} ${controls.btnGhost} ${controls.btnSm}`} onClick={() => act(() => closeReturn(r.id, today()))}>{mT('rtClose')}</button>}
                     </td>
@@ -94,10 +96,10 @@ export function ReturnsPanel(props: PanelProps) {
       <fieldset className={styles.toolbar}>
         <legend className={controls.label}>{mT('rtAddHand')}</legend>
         <input className={controls.input} placeholder={mT('orderId')} value={hand.order} onChange={(e) => setHand({ ...hand, order: e.target.value })} />
-        <select className={controls.select} value={hand.type} onChange={(e) => setHand({ ...hand, type: e.target.value as ReturnType })}>
+        <SelectField className={controls.select} value={hand.type} onChange={(e) => setHand({ ...hand, type: e.target.value as ReturnType })}>
           {TYPES.map((x) => <option key={x} value={x}>{mT(`rt.${x}`)}</option>)}
-        </select>
-        <input type="date" className={controls.input} value={hand.expected} onChange={(e) => setHand({ ...hand, expected: e.target.value })} />
+        </SelectField>
+        <DateField className={controls.input} value={hand.expected} onChange={(e) => setHand({ ...hand, expected: e.target.value })} />
         <button type="button" className={`${controls.btn} ${controls.btnOutline}`} disabled={!hand.order.trim()} onClick={() => act(() => { addReturns([{ channel_id: channel.id, order_id: hand.order.trim(), type: hand.type, expected_on: hand.expected }]); setHand({ ...hand, order: '' }); })}>{mT('add')}</button>
       </fieldset>
     </div>

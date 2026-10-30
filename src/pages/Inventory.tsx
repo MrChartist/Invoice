@@ -86,6 +86,8 @@ const shortBookShown = (): boolean => {
 };
 import { trT } from '../i18n/areas/trade-r8c';
 import { errText } from '../i18n/lib-msg';
+import { SelectField } from '../components/ui/SelectField';
+import { DateField } from '../components/ui/DateField';
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 
@@ -291,14 +293,14 @@ export function Inventory() {
         <div className={styles.settingsBar}>
           <label className="inline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
             <span className={controls.label}>{invT('costing')}</span>
-            <select
+            <SelectField
               className={cn(controls.select, styles.methodSelect)} value={settings.method}
               onChange={(e) => updateSettings({ ...settings, method: e.target.value as CostingMethod })}
               aria-label={invT('costingMethod')} disabled={!canSettings}
             >
               <option value="WEIGHTED_AVG">{invT('weightedAvg')}</option>
               <option value="FIFO">FIFO</option>
-            </select>
+            </SelectField>
           </label>
           <label className={controls.check}>
             <input type="checkbox" checked={settings.includeChallans} disabled={!canSettings} onChange={(e) => updateSettings({ ...settings, includeChallans: e.target.checked })} />
@@ -317,13 +319,13 @@ export function Inventory() {
           {multi && (
             <label className="inline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
               <span className={controls.label}>{invT('defaultGodown')}</span>
-              <select
+              <SelectField
                 className={cn(controls.select, styles.methodSelect)} value={godowns.some((g) => g.id === settings.defaultGodown) ? settings.defaultGodown : MAIN_GODOWN_ID}
                 aria-label={invT('defaultGodownAria')} disabled={!canSettings}
                 onChange={(e) => updateSettings({ ...settings, defaultGodown: e.target.value === MAIN_GODOWN_ID ? undefined : e.target.value })}
               >
                 {godowns.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
+              </SelectField>
             </label>
           )}
           <button type="button" className={cn(controls.btnOutline, controls.btnSm)} onClick={() => setGodownsOpen(true)}>
@@ -360,33 +362,33 @@ export function Inventory() {
                   value={query} onChange={(e) => setQuery(e.target.value)} aria-label={invT('searchAria')}
                 />
               </div>
-              <select className={cn(controls.select, styles.methodSelect)} value={filter} onChange={(e) => setFilter(e.target.value as Filter)} aria-label={invT('filterStatus')}>
+              <SelectField className={cn(controls.select, styles.methodSelect)} value={filter} onChange={(e) => setFilter(e.target.value as Filter)} aria-label={invT('filterStatus')}>
                 <option value="all">{invT('allItems')}</option>
                 <option value="low">{invT('st.low')}</option>
                 <option value="out">{invT('st.out')}</option>
                 <option value="negative">{invT('st.negative')}</option>
                 <option value="untracked">{invT('st.untracked')}</option>
-              </select>
+              </SelectField>
               {groupList.length > 0 && (
-                <select className={cn(controls.select, styles.methodSelect)} value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} aria-label={imT('groupFilter')}>
+                <SelectField className={cn(controls.select, styles.methodSelect)} value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} aria-label={imT('groupFilter')}>
                   <option value="">{imT('allGroups')}</option>
                   {treeRows(groupList).map((r) => <option key={r.node.id} value={r.node.id}>{r.path}</option>)}
                   <option value="-">{imT('primary')}</option>
-                </select>
+                </SelectField>
               )}
               {categoryList.length > 0 && (
-                <select className={cn(controls.select, styles.methodSelect)} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} aria-label={imT('categoryFilter')}>
+                <SelectField className={cn(controls.select, styles.methodSelect)} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} aria-label={imT('categoryFilter')}>
                   <option value="">{imT('allCategories')}</option>
                   {treeRows(categoryList).map((r) => <option key={r.node.id} value={r.node.id}>{r.path}</option>)}
                   <option value="-">{imT('notCategorised')}</option>
-                </select>
+                </SelectField>
               )}
             </>
           )}
           {(activeTab === 'movement' || activeTab === 'analysis') && (
             <div className={styles.dateRange}>
-              <div className={controls.field}><label className={controls.label} htmlFor="inv-from">{invT('from')}</label><input id="inv-from" type="date" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-              <div className={controls.field}><label className={controls.label} htmlFor="inv-to">{invT('to')}</label><input id="inv-to" type="date" className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></div>
+              <div className={controls.field}><label className={controls.label} htmlFor="inv-from">{invT('from')}</label><DateField id="inv-from" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} /></div>
+              <div className={controls.field}><label className={controls.label} htmlFor="inv-to">{invT('to')}</label><DateField id="inv-to" className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></div>
             </div>
           )}
           {activeTab === 'dead' && (

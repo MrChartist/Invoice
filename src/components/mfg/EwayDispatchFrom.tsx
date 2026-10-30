@@ -11,6 +11,7 @@ import { vendorsDb } from '../../lib/vendors';
 import { useT } from '../../i18n';
 import { gT } from '../../i18n/areas/mfg-r13c';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export type BillFix = (b: EwayBill) => EwayBill;
 
@@ -24,10 +25,10 @@ export default function EwayDispatchFrom({ value, onChange }: { value: string; o
   return (
     <div data-eway-dispatch-from>
       <label className={controls.label} htmlFor="eway-dispatch-from">{gT('dispatchFromJw')}</label>
-      <select id="eway-dispatch-from" className={controls.select} value={value} onChange={(e) => pick(e.target.value)}>
+      <SelectField id="eway-dispatch-from" className={controls.select} value={value} onChange={(e) => pick(e.target.value)}>
         <option value="">{gT('ourPremises')}</option>
         {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-      </select>
+      </SelectField>
       {value && <p className={controls.hint}>{JW_EWAY_CA}</p>}
     </div>
   );

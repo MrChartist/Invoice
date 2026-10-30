@@ -46,7 +46,9 @@ import controls from '../styles/controls.module.css';
 import styles from './Receivables.module.css';
 import { defineArea } from '../i18n/area';
 import { visibleTabs, type PackId } from '../lib/industry-packs'; // R5-A
-import { RECEIVABLES_TABS, type ReceivablesTab } from './page-tabs'; // R6-B1
+import { RECEIVABLES_TABS, type ReceivablesTab } from './page-tabs'; import { SelectField } from '../components/ui/SelectField';
+import { DateField } from '../components/ui/DateField';
+// R6-B1
 
 // The TDS register, its 26AS parser and Form 16A tracking load only when opened.
 // Bulk statements / confirmation letters (WP-4): loaded with the PDF stack only when opened.
@@ -259,9 +261,9 @@ export function Receivables() {
           {currencies.length > 1 && (
             <label className={styles.inline}>
               <span className={controls.label}>{rcvT('currency')}</span>
-              <select className={controls.select} value={currency} onChange={(e) => setCurrencyPick(e.target.value)}>
+              <SelectField className={controls.select} value={currency} onChange={(e) => setCurrencyPick(e.target.value)}>
                 {currencies.map((c) => <option key={c}>{c}</option>)}
-              </select>
+              </SelectField>
             </label>
           )}
           <button type="button" className={`${controls.btn} ${controls.btnOutline}`}
@@ -533,9 +535,9 @@ function AgingTab({ report, currency, fmt, onStatement, lateFeeRules, onLateFee,
           <h2 className={styles.h2}>{rcvT('partyWise')}</h2>
           <div className={styles.ageingPrefs} data-ageing-prefs>
             <label className={styles.inline}><span className={controls.label}>{rcvT('ageBy')}</span>
-              <select className={controls.select} value={ageing.basis} onChange={(e) => onAgeing({ ...ageing, basis: e.target.value === 'bill' ? 'bill' : 'due' })} data-ageing-basis>
+              <SelectField className={controls.select} value={ageing.basis} onChange={(e) => onAgeing({ ...ageing, basis: e.target.value === 'bill' ? 'bill' : 'due' })} data-ageing-basis>
                 <option value="due">{rcvT('ageDue')}</option><option value="bill">{rcvT('ageBill')}</option>
-              </select></label>
+              </SelectField></label>
             <label className={styles.inline}><span className={controls.label}>{rcvT('ageSlabs')}</span>
               <input className={controls.input} size={10} value={slabText} onChange={(e) => setSlabText(e.target.value)} onBlur={applySlabs}
                 onKeyDown={(e) => { if (e.key === 'Enter') applySlabs(); }} data-ageing-slabs /></label>
@@ -778,19 +780,19 @@ function StatementsTab({ report, data, currency, now, partyKey, autoWeb, onPick,
       <div className={`${surface.card} ${styles.filters}`}>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="rcv-party">{rcvT('party')}</label>
-          <select id="rcv-party" className={controls.select} value={party.key} onChange={(e) => onPick(e.target.value)}>
+          <SelectField id="rcv-party" className={controls.select} value={party.key} onChange={(e) => onPick(e.target.value)}>
             {[...report.parties].sort((a, b) => a.name.localeCompare(b.name)).map((p) => (
               <option key={p.key} value={p.key}>{p.name}</option>
             ))}
-          </select>
+          </SelectField>
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="rcv-from">{rcvT('from')}</label>
-          <input id="rcv-from" type="date" className={controls.input} value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
+          <DateField id="rcv-from" className={controls.input} value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} />
         </div>
         <div className={controls.field}>
           <label className={controls.label} htmlFor="rcv-to">{rcvT('to')}</label>
-          <input id="rcv-to" type="date" className={controls.input} value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
+          <DateField id="rcv-to" className={controls.input} value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
         </div>
         <div className={styles.presets} role="group" aria-label={rcvT('presets')}>
           {([['fy', rcvT('thisFy')], ['lastfy', rcvT('lastFy')], ['q', rcvT('last90')], ['all', rcvT('allTime')]] as const).map(([k, l]) => (
@@ -850,9 +852,9 @@ function StatementsTab({ report, data, currency, now, partyKey, autoWeb, onPick,
             </button>
             <label className={styles.inline}>
               <span className={surface.srOnly}>{colT('stStyle')}</span>
-              <select className={controls.select} value={prefs.style} aria-label={colT('stStyle')} onChange={(e) => setStyle({ ...prefs, style: e.target.value as StatementStyle })} data-statement-style>
+              <SelectField className={controls.select} value={prefs.style} aria-label={colT('stStyle')} onChange={(e) => setStyle({ ...prefs, style: e.target.value as StatementStyle })} data-statement-style>
                 {STATEMENT_STYLES.map((st) => <option key={st} value={st}>{colT(`st.${st}`)}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label className={controls.check}>
               <input type="checkbox" checked={prefs.ageing} onChange={(e) => setStyle({ ...prefs, ageing: e.target.checked })} data-statement-ageing />

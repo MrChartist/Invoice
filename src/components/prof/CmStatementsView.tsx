@@ -12,6 +12,8 @@ import type { CmCtx } from './ClientMoneyDesk';
 import controls from '../../styles/controls.module.css';
 import { escHtml as esc } from '../../lib/html-esc';
 import { PRINT_FONT, PRINT_FONT_FACE, printWhenReady } from '../../lib/print-fonts';
+import { SelectField } from '../ui/SelectField';
+import { DateField } from '../ui/DateField';
 
 
 export default function CmStatementsView({ ctx }: { ctx: CmCtx }) {
@@ -37,13 +39,13 @@ export default function CmStatementsView({ ctx }: { ctx: CmCtx }) {
     <>
       <div style={row}>
         <Fld l={cmT('client')}>
-          <select className={controls.select} value={client} onChange={(e) => setClient(e.target.value)} data-cm="st-client">{ctx.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+          <SelectField className={controls.select} value={client} onChange={(e) => setClient(e.target.value)} data-cm="st-client">{ctx.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</SelectField>
         </Fld>
         <Fld l={cmT('matter')}>
-          <select className={controls.select} value={matter} onChange={(e) => setMatter(e.target.value)}><option value="">-</option>{ctx.matters.filter((m) => !m.client_id || m.client_id === client).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>
+          <SelectField className={controls.select} value={matter} onChange={(e) => setMatter(e.target.value)}><option value="">-</option>{ctx.matters.filter((m) => !m.client_id || m.client_id === client).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</SelectField>
         </Fld>
-        <Fld l={cmT('from')}><input type="date" className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} data-cm="st-from" /></Fld>
-        <Fld l={cmT('to')}><input type="date" className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></Fld>
+        <Fld l={cmT('from')}><DateField className={controls.input} value={from} onChange={(e) => setFrom(e.target.value)} data-cm="st-from" /></Fld>
+        <Fld l={cmT('to')}><DateField className={controls.input} value={to} onChange={(e) => setTo(e.target.value)} /></Fld>
         <button type="button" className={sm} onClick={print}>{cmT('print')}</button>
         <a className={sm} href={wa} target="_blank" rel="noreferrer">{cmT('share')}</a>
       </div>

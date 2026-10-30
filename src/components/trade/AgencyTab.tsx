@@ -21,6 +21,8 @@ import { cancelPatti, loadPattis, pattiText, postPatti, savePatti, unsettledLots
 import { billCommission, commissionOf, indentStatus, indentSummary, loadIndents, markIndent, saveIndent, type IndentInput } from '../../lib/trade/tr-indents';
 import controls from '../../styles/controls.module.css';
 import own from '../distribution/dist.module.css';
+import { DateField } from '../ui/DateField';
+import { SelectField } from '../ui/SelectField';
 
 const VIEWS = ['arrivals', 'pattis', 'indents'] as const;
 type View = (typeof VIEWS)[number];
@@ -104,17 +106,17 @@ function Arrivals({ data, run }: { data: Data; run: Run }) {
       <details className={own.stack} data-arrival-form>
         <summary>{trT('newArrival')}</summary>
         <div className={own.row}>
-          <F label={trT('date')}><input type="date" className={controls.input} value={a.date} onChange={(e) => set({ date: e.target.value })} /></F>
+          <F label={trT('date')}><DateField className={controls.input} value={a.date} onChange={(e) => set({ date: e.target.value })} /></F>
           <F label={trT('principal')}>
-            <select className={controls.select} value={a.principal_id} onChange={(e) => set({ principal_id: e.target.value, principal_kind: vendors.find((v) => v.id === e.target.value)?.principal_kind ?? a.principal_kind })} data-arrival-principal>
+            <SelectField className={controls.select} value={a.principal_id} onChange={(e) => set({ principal_id: e.target.value, principal_kind: vendors.find((v) => v.id === e.target.value)?.principal_kind ?? a.principal_kind })} data-arrival-principal>
               <option value="">{trT('pickPrincipal')}</option>
               {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-            </select>
+            </SelectField>
           </F>
           <F label={trT('principalKind')}>
-            <select className={controls.select} value={a.principal_kind} onChange={(e) => set({ principal_kind: e.target.value as PrincipalKind })}>
+            <SelectField className={controls.select} value={a.principal_kind} onChange={(e) => set({ principal_kind: e.target.value as PrincipalKind })}>
               {PRINCIPAL_KINDS.map((k) => <option key={k} value={k}>{trT(`kind.${k}`)}</option>)}
-            </select>
+            </SelectField>
           </F>
           <F label={trT('lot')}><input className={controls.input} value={a.lot_no} onChange={(e) => set({ lot_no: e.target.value })} data-arrival-lot /></F>
           <F label={trT('item')}><input className={controls.input} value={a.item_name} onChange={(e) => set({ item_name: e.target.value })} data-arrival-item /></F>
@@ -125,19 +127,19 @@ function Arrivals({ data, run }: { data: Data; run: Run }) {
           <F label={trT('netQty')}><input type="number" min={0} step="0.001" className={controls.input} value={a.qty || ''} onChange={(e) => set({ qty: numIn(e.target.value) })} data-arrival-qty /></F>
           <F label={trT('unit')}><input className={controls.input} value={a.unit} onChange={(e) => set({ unit: e.target.value })} data-arrival-unit /></F>
           <F label={trT('produce')}>
-            <select className={controls.select} value={a.produce} onChange={(e) => set({ produce: e.target.value as ArrivalInput['produce'] })}>
+            <SelectField className={controls.select} value={a.produce} onChange={(e) => set({ produce: e.target.value as ArrivalInput['produce'] })}>
               <option value="agricultural">{trT('produce.agricultural')}</option>
               <option value="other">{trT('produce.other')}</option>
-            </select>
+            </SelectField>
           </F>
           <F label={trT('vehicle')}><input className={controls.input} value={a.vehicle_no ?? ''} onChange={(e) => set({ vehicle_no: e.target.value })} /></F>
           <F label={trT('lr')}><input className={controls.input} value={a.lr_no ?? ''} onChange={(e) => set({ lr_no: e.target.value })} /></F>
           <F label={trT('advance')}><input type="number" min={0} className={controls.input} value={a.advance || ''} onChange={(e) => set({ advance: numIn(e.target.value) })} /></F>
           {(a.advance ?? 0) > 0 && (
             <F label={trT('paidFrom')}>
-              <select className={controls.select} value={a.advance_account_id} onChange={(e) => set({ advance_account_id: e.target.value })}>
+              <SelectField className={controls.select} value={a.advance_account_id} onChange={(e) => set({ advance_account_id: e.target.value })}>
                 {cashBank.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-              </select>
+              </SelectField>
             </F>
           )}
         </div>
@@ -192,12 +194,12 @@ function Pattis({ data, run }: { data: Data; run: Run }) {
   return (
     <>
       <div className={own.row}>
-        <F label={trT('date')}><input type="date" className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></F>
+        <F label={trT('date')}><DateField className={controls.input} value={date} onChange={(e) => setDate(e.target.value)} /></F>
         <F label={trT('principal')}>
-          <select className={controls.select} value={principal} onChange={(e) => { setPrincipal(e.target.value); setPicked([]); }} data-patti-principal>
+          <SelectField className={controls.select} value={principal} onChange={(e) => { setPrincipal(e.target.value); setPicked([]); }} data-patti-principal>
             <option value="">{trT('pickPrincipal')}</option>
             {principals.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-          </select>
+          </SelectField>
         </F>
       </div>
       {principal && (
@@ -217,9 +219,9 @@ function Pattis({ data, run }: { data: Data; run: Run }) {
                 <input type="number" min={0} step="0.01" className={controls.input} value={d.rate || ''} onChange={(e) => setDed((x) => x.map((y, j) => (j === i ? { ...y, rate: numIn(e.target.value) } : y)))} data-patti-rate={i} />
               </F>
               <F label={trT('commBasis')}>
-                <select className={controls.select} value={d.basis} onChange={(e) => setDed((x) => x.map((y, j) => (j === i ? { ...y, basis: e.target.value as DeductionInput['basis'] } : y)))}>
+                <SelectField className={controls.select} value={d.basis} onChange={(e) => setDed((x) => x.map((y, j) => (j === i ? { ...y, basis: e.target.value as DeductionInput['basis'] } : y)))}>
                   {(['percent', 'per_package', 'per_qty', 'fixed'] as const).map((b) => <option key={b} value={b}>{trT(`basis.${b}`)}</option>)}
-                </select>
+                </SelectField>
               </F>
             </div>
           ))}
@@ -282,26 +284,26 @@ function Indents({ data, run }: { data: Data; run: Run }) {
       <details className={own.stack}>
         <summary>{trT('newIndent')}</summary>
         <div className={own.row}>
-          <F label={trT('date')}><input type="date" className={controls.input} value={x.date} onChange={(e) => set({ date: e.target.value })} /></F>
+          <F label={trT('date')}><DateField className={controls.input} value={x.date} onChange={(e) => set({ date: e.target.value })} /></F>
           <F label={trT('buyer')}><input className={controls.input} value={x.buyer_name} onChange={(e) => set({ buyer_name: e.target.value })} /></F>
           <F label={trT('pickClient')}>
-            <select className={controls.select} value={x.principal_id} onChange={(e) => set({ principal_id: e.target.value })}>
+            <SelectField className={controls.select} value={x.principal_id} onChange={(e) => set({ principal_id: e.target.value })}>
               <option value="">-</option>
               {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </SelectField>
           </F>
           <F label={trT('item')}><input className={controls.input} value={x.item} onChange={(e) => set({ item: e.target.value })} /></F>
           <F label={trT('qty')}><input type="number" min={0} className={controls.input} value={x.qty || ''} onChange={(e) => set({ qty: numIn(e.target.value) })} /></F>
           <F label={trT('unit')}><input className={controls.input} value={x.unit ?? ''} onChange={(e) => set({ unit: e.target.value })} /></F>
           <F label={trT('rate')}><input type="number" min={0} className={controls.input} value={x.rate || ''} onChange={(e) => set({ rate: numIn(e.target.value) })} /></F>
           <F label={trT('commBasis')}>
-            <select className={controls.select} value={x.commission_basis} onChange={(e) => set({ commission_basis: e.target.value as IndentInput['commission_basis'] })}>
+            <SelectField className={controls.select} value={x.commission_basis} onChange={(e) => set({ commission_basis: e.target.value as IndentInput['commission_basis'] })}>
               <option value="percent">{trT('comm.percent')}</option>
               <option value="per_unit">{trT('comm.per_unit')}</option>
-            </select>
+            </SelectField>
           </F>
           <F label={trT('rate')}><input type="number" min={0} step="0.01" className={controls.input} value={x.commission_rate || ''} onChange={(e) => set({ commission_rate: numIn(e.target.value) })} /></F>
-          <F label={trT('delivery')}><input type="date" className={controls.input} value={x.delivery_date ?? ''} onChange={(e) => set({ delivery_date: e.target.value || undefined })} /></F>
+          <F label={trT('delivery')}><DateField className={controls.input} value={x.delivery_date ?? ''} onChange={(e) => set({ delivery_date: e.target.value || undefined })} /></F>
         </div>
         <div><button type="button" className={controls.btnPrimary} onClick={save}>{trT('save')}</button></div>
       </details>

@@ -9,6 +9,7 @@ import { defaultStaffFor, rateAt } from '../../lib/prof/ps-staff';
 import { currentActor } from '../../lib/access';
 import { psT } from '../../i18n/areas/prof-r14-common';
 import controls from '../../styles/controls.module.css';
+import { SelectField } from '../ui/SelectField';
 
 export default function WhoRow({ value, date, onChange }: { value?: string; date: string; onChange: (staffId: string | undefined, standardRate: number | undefined) => void }) {
   const staff = useMemo(() => loadStaff().filter((s) => s.active !== false), []);
@@ -22,10 +23,10 @@ export default function WhoRow({ value, date, onChange }: { value?: string; date
   return (
     <label className={controls.field}>
       <span className={controls.label}>{psT('who')}</span>
-      <select className={controls.select} value={value ?? ''} onChange={(e) => pick(e.target.value || undefined)} data-time-who>
+      <SelectField className={controls.select} value={value ?? ''} onChange={(e) => pick(e.target.value || undefined)} data-time-who>
         <option value="">{psT('none')}</option>
         {staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-      </select>
+      </SelectField>
     </label>
   );
 }
