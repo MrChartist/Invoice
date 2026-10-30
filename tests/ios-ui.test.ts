@@ -238,7 +238,7 @@ type Ceil = Record<Rule, number>;
 
 // ── Ceilings: today's counts (30 Oct 2026, P0). Each package lowers ONLY its own const. ──────────────────────────
 const P0: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 0 };
-const PL: Ceil = { colour: 0, radius: 2, border: 1, shadow: 1, zIndex: 0, motion: 1, media: 0, material: 0, frame: 26, weight: 1 };
+const PL: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 1 }; // weight: LoginPage h1 (full-screen route, outside the shell)
 const P1: Ceil = { colour: 4, radius: 19, border: 20, shadow: 5, zIndex: 9, motion: 4, media: 4, material: 2, frame: 1, weight: 10 };
 const P2: Ceil = { colour: 0, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 1 }; // weight: .inputMono keeps capitals (statutory identifiers as typed values)
 const P3: Ceil = { colour: 1, radius: 0, border: 0, shadow: 0, zIndex: 0, motion: 0, media: 0, material: 0, frame: 0, weight: 1 };
@@ -425,4 +425,26 @@ test('13. viewport-fit=cover and one pair of theme colours equal to --bg-grouped
   const hook = read('src/hooks/useTheme.ts');
   assert.ok(hook.includes(`light: '${light}'`) && hook.includes(`dark: '${dark}'`), `useTheme.ts writes ${light} / ${dark}`);
   assert.match(html, new RegExp(`<meta name="theme-color" content="${light}"`));
+});
+
+// ── PL. Page frame and shell (package PL) ─────────────────────────────────────────────────────────────────────
+
+test('PL: one frame (title before tips, tiers by name), the shell in em with dvh and safe areas, density before paint', () => {
+  // A one-time tip never sits above a page title: it is passed in the notices slot (or comes later in the body).
+  for (const f of TSX.filter((x) => /^src\/pages\/[^/]+\.tsx$/.test(x))) {
+    const s = read(f);
+    const tip = s.indexOf('<ScreenTip');
+    if (tip >= 0) assert.ok(s.indexOf('<Page') >= 0 && s.indexOf('<Page') < tip, `${f}: <ScreenTip> before <Page> (use notices=)`);
+    for (const m of s.matchAll(/\btier=\{?['"](\w+)['"]/g)) assert.ok(['page', 'form', 'bleed'].includes(m[1]), `${f}: tier ${m[1]}`);
+    assert.doesNotMatch(s, /<PageHeader[\s>]/, `${f}: the header is <Page title / head>, not <PageHeader>`);
+  }
+  const shell = read('src/layouts/DashboardLayout.module.css');
+  assert.doesNotMatch(shell, /\d+px\)\s*\{|max-width:\s*1280px/, 'shell breakpoints in em, no 1280px frame');
+  assert.match(shell, /\.content \{[^}]*max-width: var\(--page-max\)/, 'the frame is capped by --page-max');
+  assert.match(shell, /\.content:has\(\[data-tier='bleed'\]\)/, 'bleed pages drop the cap');
+  assert.match(shell, /height: 100dvh/);
+  for (const side of ['safe-l', 'safe-r', 'safe-t', 'safe-b']) assert.ok(shell.includes(`var(--${side})`), `shell honours --${side}`);
+  assert.match(read('src/layouts/DashboardLayout.tsx'), /PHONE_MEDIA = '\(width < 37\.5em\)/, 'phone shell under 37.5em only (D7)');
+  assert.match(read('public/theme-init.js'), /classList\.add\('density-compact'\)/, 'density class set before first paint');
+  assert.match(IOS, /html\.density-compact \{/);
 });

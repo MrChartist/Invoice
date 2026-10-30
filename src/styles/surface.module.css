@@ -6,45 +6,13 @@
    ================================================================ */
 
 /* ── Page scaffolding (owner: PL) ─────────────────────────────── */
-.page {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  padding-bottom: 2rem;
-  animation: fadeInUp 360ms ease both;
-}
-
-.pageHead {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.pageTitle {
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  margin: 0;
-}
-
-.pageSubtitle {
-  color: var(--muted-foreground);
-  font-size: var(--text-md);
-  margin: 0.25rem 0 0;
-}
-
-.pageActions {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  flex-wrap: wrap;
-}
+/* The frame lives in ./page.module.css (`<Page>`, src/components/ui/Page.tsx). These names stay for older
+   markup and compose the same rules, so a legacy `surface.page` looks exactly like `<Page>`. */
+.page { composes: page from './page.module.css'; }
+.pageHead { composes: head from './page.module.css'; }
+.pageTitle { composes: title from './page.module.css'; }
+.pageSubtitle { composes: subtitle from './page.module.css'; }
+.pageActions { composes: actions from './page.module.css'; }
 
 /* ── Cards (owner: P2) ────────────────────────────────────────── */
 /* IOS-UI.md 2.1: frameless inset card on the grouped page (D4: --card-edge is a frame only in high contrast). */
@@ -198,19 +166,14 @@
 
 /* ── Tables (owner: P2) ───────────────────────────────────────── */
 /*
- * IOS-UI.md 2.2 / 3.6. A table sits flush in its card: sticky head on the card colour with an opaque hairline, hairline
- * rows, tabular numbers. Column priority: put data-priority="2" or "3" on a column's <th> AND its <td>s; the wrap then
- * becomes a size container, p3 columns hide under 1195px of table width and p2 under 600px (where list screens switch
- * to row cards). Put the hidden value back as a second line with .foldP3 / .foldP2 inside a p1 cell. Without any
- * data-priority the table keeps its 640px minimum and scrolls inside the wrap.
+ * IOS-UI.md 2.2: the look. A table sits flush in its card: head on the card colour with an opaque hairline,
+ * sentence case; hairline rows; tabular numbers; 600 totals. Column priority, sticky head / totals and the scroller
+ * are PL's (page.module.css `.scroller` / `.pinned`, `data-priority="2|3"` on th and td). .foldP2 / .foldP3 put a
+ * hidden column back as a second line inside a p1 cell, in the same container band that hides it.
  */
 .tableWrap {
   width: 100%;
   overflow-x: auto;
-}
-
-.tableWrap:has([data-priority]) {
-  container-type: inline-size;
 }
 
 .table {
@@ -222,14 +185,7 @@
   min-width: 640px;
 }
 
-.tableWrap:has([data-priority]) > .table {
-  min-width: 0;
-}
-
 .table th {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-raised);
   padding: var(--cell-py) var(--cell-px);
   font-size: 0.78125rem;
   font-weight: 400;
@@ -264,23 +220,14 @@
   background-color: var(--tint-soft);
 }
 
-/* Totals: 600, an opaque hairline above, sticky to the bottom of a scroller. */
-.table tfoot td,
-.table tfoot th,
+.table tfoot :is(td, th),
 .table .totalRow td {
-  position: sticky;
-  top: auto;
-  bottom: 0;
   font-size: inherit;
   font-weight: 600;
   color: var(--label);
   border-top: var(--hairline) solid var(--sep-opaque);
   border-bottom: none;
   background-color: var(--bg-grouped-2);
-}
-
-.totalRow {
-  font-weight: 600;
 }
 
 .numeric {
@@ -298,13 +245,11 @@
   letter-spacing: -0.01em;
 }
 
-/* Identifiers (invoice numbers, GSTINs) never break mid-token: one line, ellipsis; give the element a title. */
+/* Identifiers (invoice numbers, GSTINs) never break mid-token; give the element a title. */
 .ident {
+  composes: nowrap from './page.module.css';
   display: inline-block;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   vertical-align: bottom;
 }
 
@@ -319,14 +264,13 @@
   display: none;
 }
 
-@container (max-width: 74.625em) {
-  .table [data-priority='3'] { display: none; }
-  .foldP3 { display: block; }
-}
-
-@container (max-width: 37.4375em) {
-  .table [data-priority='2'] { display: none; }
-  .foldP2 { display: block; }
+@media (min-width: 37.5em) {
+  @container table (width < 52.125em) {
+    .foldP3 { display: block; }
+  }
+  @container table (width < 37.5em) {
+    .foldP2 { display: block; }
+  }
 }
 
 /* ── Empty state (owner: P4) ──────────────────────────────────── */
@@ -595,8 +539,4 @@
   .statGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
   .stat { padding: 0.875rem; gap: 0.5rem; }
   .statValue { font-size: 1.1875rem; overflow-wrap: anywhere; }
-}
-
-@media (max-width: 52.0625em) {
-  .pageTitle { font-size: 1.25rem; }
 }

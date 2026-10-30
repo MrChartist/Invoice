@@ -2,7 +2,8 @@ import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { BellRing, Download, FileUp, Globe, Mail, MapPin, MessageCircle, Pencil, Phone, Plus, Scale, Search, Send, Trash2, UserPlus, Users } from 'lucide-react';
 import { ImportWizard } from '../components/import/ImportWizard';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
+import page from '../styles/page.module.css';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -160,28 +161,27 @@ export function Clients() {
   const list = useListKeys(filtered.length, (i) => edit && openEdit(filtered[i].client!), { del: (i) => edit && setDeleting(filtered[i].client!) });
 
   return (
-    <div className={surface.page}>
-      <Suspense fallback={null}><ScreenTip id="clients" /></Suspense>
-      <PageHeader
-        title={salesT('cl.title')}
-        subtitle={salesT('cl.subtitle', { n: clients.length })}
-        actions={
-          edit ? (
-            <>
-              <button type="button" className={controls.btnOutline} onClick={() => setImportOpen(true)}>
-                <FileUp size={16} /> {salesT('cl.import')}
-              </button>
-              {/* R2-B4: client list with the first contact / address columns (the import reads them back). */}
-              <button type="button" className={controls.btnOutline} disabled={!clients.length} onClick={() => downloadText('clients.csv', clientsCsv(clients, { headers: DOC_DEFAULT_COLUMNS, cells: (c) => docDefaultsToCells(c.doc_defaults) }), 'text/csv')} data-clients-csv>
-                <Download size={16} /> {s2T('exportCsv')}
-              </button>
-              <button type="button" className={controls.btnPrimary} onClick={openAdd}>
-                <Plus size={16} /> {salesT('cl.add')}
-              </button>
-            </>
-          ) : undefined
-        }
-      />
+    <Page
+      title={salesT('cl.title')}
+      subtitle={salesT('cl.subtitle', { n: clients.length })}
+      actions={
+        edit ? (
+          <>
+            <button type="button" className={controls.btnOutline} onClick={() => setImportOpen(true)}>
+              <FileUp size={16} /> {salesT('cl.import')}
+            </button>
+            {/* R2-B4: client list with the first contact / address columns (the import reads them back). */}
+            <button type="button" className={controls.btnOutline} disabled={!clients.length} onClick={() => downloadText('clients.csv', clientsCsv(clients, { headers: DOC_DEFAULT_COLUMNS, cells: (c) => docDefaultsToCells(c.doc_defaults) }), 'text/csv')} data-clients-csv>
+              <Download size={16} /> {s2T('exportCsv')}
+            </button>
+            <button type="button" className={controls.btnPrimary} onClick={openAdd}>
+              <Plus size={16} /> {salesT('cl.add')}
+            </button>
+          </>
+        ) : undefined
+      }
+      notices={<Suspense fallback={null}><ScreenTip id="clients" /></Suspense>}
+    >
 
       {clients.length > 0 && (
         <section className={`${surface.card} ${styles.khata}`} aria-label={khataT('colBalance')}>
@@ -259,14 +259,14 @@ export function Clients() {
         ) : filtered.length === 0 ? (
           <EmptyState icon={Users} title={t('common.noMatches')} text={t('common.tryOtherSearch')} />
         ) : (
-          <div className={surface.tableWrap}>
+          <div className={`${surface.tableWrap} ${page.scroller}`}>
             <table className={`${surface.table} ${styles.directory}`}>
               <thead>
                 <tr>
                   <th>{salesT('cl.colClient')}</th>
-                  <th data-priority={3}>{salesT('cl.colContact')}</th>
-                  <th data-priority={3}>{salesT('cl.colLocation')}</th>
-                  <th data-priority={2}>{salesT('cl.colGstin')}</th>
+                  <th data-priority="2">{salesT('cl.colContact')}</th>
+                  <th data-priority="3">{salesT('cl.colLocation')}</th>
+                  <th data-priority="3">{salesT('cl.colGstin')}</th>
                   <th className={surface.numeric}>{khataT('colBalance')}</th>
                   <th aria-label={salesT('actions')} />
                 </tr>
@@ -285,16 +285,14 @@ export function Clients() {
                           <div>
                             <div className={styles.name} title={c.name}>{c.name}</div>
                             {c.company && <div className={`${styles.sub} ${styles.oneLine}`}>{c.company}</div>}
-                            {(c.phone || c.city) && (
-                              <div className={`${surface.foldP3} ${styles.sub} ${styles.oneLine}`}>
-                                {[c.phone, c.city].filter(Boolean).join(' · ')}
-                              </div>
+                            {(c.phone || c.email) && <div className={`${surface.foldP2} ${styles.sub} ${styles.oneLine}`}>{c.phone || c.email}</div>}
+                            {(c.city || c.gstin) && (
+                              <div className={`${surface.foldP3} ${styles.sub} ${styles.oneLine}`}>{[c.city, c.gstin].filter(Boolean).join(' · ')}</div>
                             )}
-                            {c.gstin && <div className={`${surface.foldP2} ${styles.sub} ${styles.oneLine}`}>{c.gstin}</div>}
                           </div>
                         </div>
                       </td>
-                      <td className={styles.cContact} data-priority={3}>
+                      <td className={styles.cContact} data-priority="2" data-empty={!c.email && !c.phone ? 'true' : undefined}>
                         <div className={styles.contact}>
                           {c.email ? (
                             <span>
@@ -310,7 +308,7 @@ export function Clients() {
                           {c.contacts?.length ? <span className={styles.sub}>{s2T('c.nContacts', { n: c.contacts.length })}</span> : null}
                         </div>
                       </td>
-                      <td className={styles.cLoc} data-priority={3}>
+                      <td className={styles.cLoc} data-priority="3" data-empty={!c.city && !c.state ? 'true' : undefined}>
                         {c.city || c.state ? (
                           <span className={styles.contact}>
                             <span>
@@ -321,8 +319,8 @@ export function Clients() {
                           <span className={styles.sub}>-</span>
                         )}
                       </td>
-                      <td className={`${surface.mono} ${styles.cGst}`} data-priority={2}>
-                        {c.gstin ? <span className={styles.gstin}>{c.gstin}</span> : !c.pan && !c.tan && <span className={styles.sub}>-</span>}
+                      <td className={`${surface.mono} ${styles.cGst}`} data-priority="3" data-empty={!c.gstin && !c.pan && !c.tan ? 'true' : undefined}>
+                        {c.gstin || (!c.pan && !c.tan && <span className={styles.sub}>-</span>)}
                         {(c.pan || c.tan) && (
                           <div className={styles.sub}>{[c.pan && `PAN ${c.pan}`, c.tan && `TAN ${c.tan}`].filter(Boolean).join(' · ')}</div>
                         )}
@@ -469,6 +467,6 @@ export function Clients() {
       />
       {toastNode}
       <Suspense fallback={null}><UndoDeleted /></Suspense>
-    </div>
+    </Page>
   );
 }

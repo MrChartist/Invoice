@@ -30,7 +30,7 @@ import { shiftDay } from '../lib/dates';
 import { downloadText, toCsv } from '../lib/download';
 import { round2 } from '../lib/invoice-calc';
 import { cn, formatCurrency, formatDate, todayInput } from '../lib/utils';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { StatCard } from '../components/ui/StatCard';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -259,17 +259,16 @@ export function Time() {
   };
 
   return (
-    <div className={surface.page}>
-      <PageHeader
-        title={timeT('title')}
-        subtitle={timeT('subtitle')}
-        actions={
-          <>
-            <button type="button" className={controls.btnOutline} onClick={() => setEditTrip(null)}><Car size={16} /> {timeT('logTrip')}</button>
-            <button type="button" className={controls.btnPrimary} onClick={() => setEditEntry(null)}><Plus size={16} /> {timeT('addTime')}</button>
-          </>
-        }
-      />
+    <Page
+      title={timeT('title')}
+      subtitle={timeT('subtitle')}
+      actions={
+        <>
+          <button type="button" className={controls.btnOutline} onClick={() => setEditTrip(null)}><Car size={16} /> {timeT('logTrip')}</button>
+          <button type="button" className={controls.btnPrimary} onClick={() => setEditEntry(null)}><Plus size={16} /> {timeT('addTime')}</button>
+        </>
+      }
+    >
 
       {!clients.length && (
         <p className={surface.sectionNote}>{areaNodes(timeT('needClient'), { link: <Link to="/clients?new=1">{timeT('addClient')}</Link> })}</p>
@@ -540,7 +539,7 @@ export function Time() {
         onClose={() => setConfirm(null)}
       />
       {toastNode}
-    </div>
+    </Page>
   );
 }
 

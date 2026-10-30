@@ -140,8 +140,8 @@
 /* 8I quick win: phones show a visible label on the record-payment (Banknote) row button. */
 .payLabel { display: none; }
 
-/* ── Narrow table (under 600px of table width): each ledger row becomes a compact card ── */
-@container (max-width: 37.4375em) {
+/* ── Phones (page.module.css shows every cell under 37.5em): each ledger row becomes a compact card ── */
+@media (max-width: 37.4375em) {
   table.ledger { display: block; }
   table.ledger thead { display: none; }
   table.ledger tbody { display: block; }
@@ -152,6 +152,7 @@
     grid-template-areas:
       'doc status'
       'client total'
+      'date bal'
       'act act';
     gap: var(--sp-1) var(--sp-3);
     align-items: center;
@@ -170,12 +171,12 @@
   table.ledger td.cClient { grid-area: client; }
   table.ledger td.cStatus { grid-area: status; justify-self: end; }
   table.ledger td.cTotal { grid-area: total; font-weight: 600; }
+  table.ledger td.cDate { grid-area: date; white-space: normal; font-size: var(--text-base); }
+  table.ledger td.cBal { grid-area: bal; font-size: var(--text-base); color: var(--label-2); }
+  table.ledger td.cBal::before { content: 'Balance '; font-family: var(--font-body); font-size: var(--text-xs); }
   table.ledger td.cAct { grid-area: act; margin: 0 calc(-1 * var(--sp-2)); }
   table.ledger td.cAct > div { display: flex; justify-content: space-between; }
   .payLabel { display: inline; margin-left: var(--sp-1); font-weight: 600; white-space: nowrap; }
-}
-
-@media (max-width: 37.4375em) {
   .search { max-width: none; flex-basis: 100%; }
 }
 

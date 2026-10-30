@@ -1,0 +1,105 @@
+/* Package PL: master-detail panes (src/components/ui/SplitView.tsx). The split answers its own width
+   (container query), so it works the same in a full page, beside an expanded sidebar or in a sheet. */
+.split {
+  container: split / inline-size;
+  min-width: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--section-gap);
+  align-items: start;
+}
+
+.master,
+.detail {
+  min-width: 0;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.back {
+  composes: btn quiet sm from global;
+  align-self: flex-start;
+}
+
+.close {
+  composes: btn quiet icon sm from global;
+}
+
+/* `.bar >` outweighs the rulebook's `.btn` display, whatever order the stylesheets load in. */
+.bar > .close {
+  display: none;
+}
+
+.handle {
+  display: none;
+}
+
+/* Narrow: the detail is pushed over the list (iOS navigation); Back returns to the list. */
+@container split (width < 52.125em) {
+  .open > .master {
+    display: none;
+  }
+}
+
+/* Wide: list + detail side by side, the detail its own scroller pinned under the top bar. */
+@container split (min-width: 52.125em) {
+  .open {
+    grid-template-columns: minmax(22rem, var(--split-w, 1fr)) auto minmax(24rem, 1fr);
+    gap: 0;
+  }
+  .open > .master {
+    margin-inline-end: var(--sp-3);
+  }
+  /* Beside a detail the list is the compact one: p1 columns only (p2 / p3 are in the detail). */
+  .open > .master :is(th, td)[data-priority] {
+    display: none;
+  }
+  .open > .detail {
+    position: sticky;
+    top: calc(var(--bar-h) + var(--sp-4));
+    max-height: calc(100dvh - var(--bar-h) - var(--sp-8));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    margin-inline-start: var(--sp-3);
+  }
+  .bar > .back {
+    display: none;
+  }
+  .bar > .close {
+    display: inline-flex;
+    margin-inline-start: auto;
+  }
+  .handle {
+    display: block;
+    align-self: stretch;
+    width: var(--sp-2);
+    cursor: col-resize;
+    touch-action: none;
+    border-radius: var(--r-full);
+  }
+  .handle:hover,
+  .handle:focus-visible {
+    background: var(--fill-3);
+  }
+}
+
+/* Touch screens resize nothing: the handle is a pointer affordance only. */
+@media (pointer: coarse) {
+  .handle {
+    pointer-events: none;
+  }
+}

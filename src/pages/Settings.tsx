@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Building2, Check, Copy, Database, Layers, ListPlus, Package, Plus, Save, ScrollText, ShieldCheck, SlidersHorizontal, Star, Trash2 } from 'lucide-react';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { Avatar } from '../components/ui/Avatar';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/useToast';
@@ -191,17 +191,16 @@ export function Settings() {
   };
 
   return (
-    <div className={surface.page}>
-      <PageHeader
-        title={t('settings.title')}
-        subtitle={canDo('settings.manage') ? t('settings.subOwner') : t('settings.subOther')}
-        actions={
-          <div className={styles.langBox} title={t('settings.languageHint')}>
-            <span className={styles.langLabel}>{t('common.language')}</span>
-            <LanguageSwitch />
-          </div>
-        }
-      />
+    <Page
+      title={t('settings.title')}
+      subtitle={canDo('settings.manage') ? t('settings.subOwner') : t('settings.subOther')}
+      actions={
+        <div className={styles.langBox} title={t('settings.languageHint')}>
+          <span className={styles.langLabel}>{t('common.language')}</span>
+          <LanguageSwitch />
+        </div>
+      }
+    >
 
 
       <div className={tabs.tabStrip} role="tablist" aria-label={setT('sections')} onKeyDown={onTabKey}>
@@ -368,6 +367,6 @@ export function Settings() {
         onClose={() => setDeleting(null)}
       />
       {toastNode}
-    </div>
+    </Page>
   );
 }

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { FilePlus2, Truck } from 'lucide-react';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { useToast } from '../components/ui/useToast';
 import { useT } from '../i18n';
 import { distT } from '../i18n/areas/distribution';
@@ -54,12 +54,12 @@ export function Distribution() {
   const onDone = (msg: string, error?: boolean) => notify(msg, error ? 'error' : undefined);
   const shown = useMemo(() => visiblePackTabs(TABS, localDb.settings.get(), tab), [tab]);
   return (
-    <div className={surface.page} data-distribution>
-      <PageHeader
-        title={distT('title')}
-        subtitle={distT('subtitle')}
-        actions={<Link to="/order-pad" className={controls.btnOutline}><FilePlus2 size={16} aria-hidden="true" /> {distT('orderPad')}</Link>}
-      />
+    <Page
+      title={distT('title')}
+      subtitle={distT('subtitle')}
+      actions={<Link to="/order-pad" className={controls.btnOutline}><FilePlus2 size={16} aria-hidden="true" /> {distT('orderPad')}</Link>}
+      data-distribution
+    >
       <div className={own.stack}>
         <div className={controls.segment} role="tablist" aria-label={distT('title')}>
           {shown.map(({ id: t }) => (
@@ -103,6 +103,6 @@ export function Distribution() {
         </section>
       </div>
       {toastNode}
-    </div>
+    </Page>
   );
 }

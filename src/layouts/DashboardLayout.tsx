@@ -68,7 +68,24 @@ import { OPEN_HELP_EVENT } from '../lib/help-event';
 import { pushRoute } from '../lib/route-trail';
 import { realCompanies } from '../lib/companies';
 import { roleLabel } from '../i18n/labels';
+import { plT } from '../i18n/areas/layout-pl';
+import { ShellNoticesProvider } from '../components/ui/Page';
+import { useMedia } from '../hooks/useMedia';
 import styles from './DashboardLayout.module.css';
+
+// Device classes in em (docs/theme/IOS-UI.md 3.1), so a larger text size switches layouts earlier.
+// Phone shell: narrow, or a short landscape phone. Small tablet: the rail expands as an overlay.
+const PHONE_MEDIA = '(width < 37.5em), (height < 31.25em) and (width < 74.6875em)';
+const SMALL_TABLET_MEDIA = '(37.5em <= width < 52.125em)';
+/** Device-local: the sidebar collapsed to its icon rail on tablets and up ('rail'), else full. */
+const SIDEBAR_KEY = 'mrchartist_sidebar';
+const readRail = () => {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) === 'rail';
+  } catch {
+    return false;
+  }
+};
 
 // Overlays that only appear on demand are split out of the entry chunk and mounted on first use.
 const HelpModal = lazy(() => import('../components/layout/HelpModal').then((m) => ({ default: m.HelpModal })));
@@ -213,17 +230,24 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
 
   const asideRef = useRef<HTMLElement>(null);
   const menuBtnRef = useRef<HTMLButtonElement>(null);
-  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 900px)').matches);
-
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 900px)');
-    const onChange = () => {
-      setIsMobile(mq.matches);
-      if (!mq.matches) setMenuOpen(false);
-    };
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
+  const isMobile = useMedia(PHONE_MEDIA);
+  const smallTablet = useMedia(SMALL_TABLET_MEDIA) && !isMobile;
+  // D7: tablets and up keep a sidebar; the rail (icons only) is the small tablet's resting state and a remembered
+  // choice from 52.125em up. The phone drawer / rail overlay closes when the device class changes.
+  const [railPref, setRailPref] = useState(readRail);
+  useEffect(() => setMenuOpen(false), [isMobile, smallTablet]);
+  const overlay = smallTablet && menuOpen;
+  const rail = !isMobile && (smallTablet ? !menuOpen : railPref);
+  const toggleRail = () => {
+    if (smallTablet) return setMenuOpen((o) => !o);
+    const next = !railPref;
+    setRailPref(next);
+    try {
+      localStorage.setItem(SIDEBAR_KEY, next ? 'rail' : 'full');
+    } catch {
+      /* private mode: the choice lasts this visit */
+    }
+  };
 
   // Phones / small tablets: a bottom tab bar for the daily screens. The editor has its own
   // save bar, so the tabs step aside there. Its height is published for toasts and padding.
@@ -231,8 +255,8 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
   const showTabs = isMobile && !onEditor;
   useEffect(() => {
     const root = document.documentElement;
-    if (showTabs) root.style.setProperty('--tab-bar-h', '3.75rem');
-    else root.style.removeProperty('--tab-bar-h');
+    // The bar's size follows the device class in CSS (49px, 40px in phone landscape).
+    root.style.setProperty('--tab-bar-h', showTabs ? 'var(--tab-bar-size)' : '0px');
     return () => {
       root.style.removeProperty('--tab-bar-h');
     };
@@ -249,8 +273,8 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
     return () => window.removeEventListener(OPEN_HELP_EVENT, on);
   }, []);
 
-  // Mobile drawer: focus trap, Esc to close, scroll lock, focus restore.
-  const drawerActive = isMobile && menuOpen;
+  // Mobile drawer / expanded rail: focus trap, Esc to close, scroll lock, focus restore.
+  const drawerActive = (isMobile || smallTablet) && menuOpen;
   useEffect(() => {
     if (!drawerActive) return;
     const aside = asideRef.current;
@@ -390,7 +414,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
   );
 
   return (
-    <div className={styles.layout}>
+    <div className={cn(styles.layout, overlay && styles.overlayOpen)}>
       <a href="#main" className={cn(styles.skipLink, 'no-print')} onClick={(e) => { e.preventDefault(); document.getElementById('main')?.focus(); }}>
         {t('shell.skip')}
       </a>
@@ -421,12 +445,12 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         </div>
       </header>
 
-      {menuOpen && <div className={styles.scrim} onClick={() => setMenuOpen(false)} aria-hidden="true" />}
+      {drawerActive && <div className={styles.scrim} onClick={() => setMenuOpen(false)} aria-hidden="true" />}
 
       <aside
         id="app-sidebar"
         ref={asideRef}
-        className={cn(styles.sidebar, menuOpen && styles.sidebarOpen, 'no-print')}
+        className={cn(styles.sidebar, isMobile && menuOpen && styles.sidebarOpen, rail && styles.rail, overlay && styles.sidebarOverlay, 'no-print')}
         inert={isMobile && !menuOpen}
       >
         <div className={styles.brandRow}>
@@ -435,7 +459,9 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
           </Link>
           {beta}
         </div>
-        <CompanySwitcher />
+        <div className={styles.company}>
+          <CompanySwitcher />
+        </div>
 
         <nav className={styles.nav} aria-label={t('nav.primary')}>
           {navGroups.map((group, gi) => (
@@ -446,6 +472,7 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
                   key={item.path}
                   to={item.path}
                   end={item.end}
+                  title={rail ? t(item.label) : undefined}
                   className={({ isActive }) =>
                     cn(styles.navItem, (item.match ? item.match(location.pathname, location.search) : isActive) && styles.navItemActive)
                   }
@@ -467,12 +494,15 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
         <div className={styles.bottom}>
           <NavLink
             to={SETTINGS_ENTRY.path}
+            title={rail ? t(SETTINGS_ENTRY.label) : undefined}
             className={({ isActive }) => cn(styles.navItem, isActive && styles.navItemActive)}
           >
             <SETTINGS_ENTRY.icon className={styles.navIcon} size={18} />
             <span>{t(SETTINGS_ENTRY.label)}</span>
           </NavLink>
-          <InstallPrompt variant="button" />
+          <div className={styles.install}>
+            <InstallPrompt variant="button" />
+          </div>
           <button type="button" className={cn(styles.navItem, styles.mobileOnly)} onClick={toggle}>
             {theme === 'dark' ? <Sun className={styles.navIcon} size={18} /> : <Moon className={styles.navIcon} size={18} />}
             <span>{theme === 'dark' ? t('shell.lightMode') : t('shell.darkMode')}</span>
@@ -503,11 +533,25 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
 
       <main className={cn(styles.main, drawerActive && styles.mainLocked)} id="main" tabIndex={-1}>
         <div className={cn(styles.utilBar, 'no-print')}>
-          <button type="button" className={styles.searchBtn} onClick={() => openPalette()}>
-            <Search size={15} />
-            <span>{t('shell.searchPlaceholder')}</span>
-            <kbd>{formatCombo('mod+k')}</kbd>
-          </button>
+          <div className={styles.utilLead}>
+            <button
+              type="button"
+              className={styles.iconBtn}
+              onClick={toggleRail}
+              aria-label={rail ? plT('railShow') : plT('railHide')}
+              title={rail ? plT('railShow') : plT('railHide')}
+              aria-expanded={!rail}
+              aria-controls="app-sidebar"
+              data-rail-toggle
+            >
+              <Menu size={18} />
+            </button>
+            <button type="button" className={styles.searchBtn} onClick={() => openPalette()}>
+              <Search size={15} />
+              <span>{t('shell.searchPlaceholder')}</span>
+              <kbd>{formatCombo('mod+k')}</kbd>
+            </button>
+          </div>
           <div className={styles.utilActions}>
             <TimerPill />
             <button type="button" className={styles.iconBtn} onClick={() => openHelp()} aria-label={t('shell.helpAria')} title={t('shell.help')}>
@@ -523,9 +567,17 @@ export function DashboardLayout({ onLogout }: { onLogout?: () => void }) {
           </div>
         </div>
         <div className={styles.content} key={`${location.pathname.startsWith('/invoice') ? 'invoice' : location.pathname}#${refreshKey}`}>
-          <CrossTabNotice onRefresh={() => setRefreshKey((k) => k + 1)} />
-          {can('data.backup') && <BackupNudge onResult={(r) => notify(r.ok ? t('shell.backupSaved', { file: r.filename }) : r.message, r.ok ? 'success' : 'error')} />}
-          <Outlet />
+          {/* The shell's notices show in the page's notices slot, below its title (one title position everywhere). */}
+          <ShellNoticesProvider
+            value={
+              <>
+                <CrossTabNotice onRefresh={() => setRefreshKey((k) => k + 1)} />
+                {can('data.backup') && <BackupNudge onResult={(r) => notify(r.ok ? t('shell.backupSaved', { file: r.filename }) : r.message, r.ok ? 'success' : 'error')} />}
+              </>
+            }
+          >
+            <Outlet />
+          </ShellNoticesProvider>
         </div>
         {(tallyOn || location.pathname.startsWith('/gateway')) && <Suspense fallback={null}><KeysHost /></Suspense>}
       </main>

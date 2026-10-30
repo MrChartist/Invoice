@@ -1,12 +1,11 @@
 import { useMemo } from 'react';
 import { FileDown } from 'lucide-react';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { EmptyState } from '../components/ui/EmptyState';
 import { exportsState } from '../components/discover';
 import { peekTable } from '../lib/storage';
 import { discoverT } from '../i18n/areas/discover-r6';
 import controls from '../styles/controls.module.css';
-import surface from '../styles/surface.module.css';
 import { ExportCenter } from '../components/exports/ExportCenter';
 import { useT } from '../i18n';
 import { expT } from '../i18n/areas/exports';
@@ -17,11 +16,10 @@ export function Exports() {
   // R6-B3: nothing (or only drafts) to export yet — one line before the export cards.
   const state = useMemo(() => exportsState(peekTable<{ status?: string; issue_date?: string }>('invoices'), peekTable<{ date?: string }>('purchases')), []);
   return (
-    <div className={surface.page}>
-      <PageHeader
-        title={expT('title')}
-        subtitle={expT('subtitle')}
-      />
+    <Page
+      title={expT('title')}
+      subtitle={expT('subtitle')}
+    >
       {state !== 'ok' && (
         <EmptyState
           icon={FileDown}
@@ -35,7 +33,7 @@ export function Exports() {
         />
       )}
       <ExportCenter />
-    </div>
+    </Page>
   );
 }
 

@@ -4,7 +4,7 @@ import { Eye, FilePlus2, History, Palette, Save, X } from 'lucide-react';
 import { useInvoiceStore } from '../store/useInvoiceStore';
 import { pick } from '../store/pick';
 import { useShallow } from 'zustand/react/shallow';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { useToast } from '../components/ui/useToast';
 import { useHsnDefaultRate } from '../hooks/useHsnDefaultRate';
 import { ItemsTable } from '../components/creator/ItemsTable';
@@ -336,32 +336,37 @@ export function InvoiceCreator() {
 
   if (missing) {
     return (
-      <div className={surface.page}>
-        <PageHeader title={t('editor.notFound')} subtitle={t('editor.notFoundSub')} />
+      <Page title={t('editor.notFound')} subtitle={t('editor.notFoundSub')}>
         <button type="button" className={cn(controls.btnPrimary)} style={{ alignSelf: 'flex-start' }} onClick={() => navigate('/transactions')}>
           {t('editor.backToInvoices')}
         </button>
-      </div>
+      </Page>
     );
   }
 
   const label = docLabel(s.doc_type);
 
   return (
-    <div className={cn(surface.page, styles.page)}>
-      <CreatorHeader
-        label={label}
-        editing={editing}
-        invoiceNumber={s.invoice_number}
-        status={s.status}
-        dirty={s.dirty}
-        readOnly={readOnly}
-        onNew={() => startNew()}
-        onPreview={openPreview}
-        onSaveDraft={() => save(true)}
-        onSave={() => save()}
-        onClose={exitCreator}
-      />
+    <Page
+      className={styles.page}
+      tier={pane.on ? 'bleed' : 'page'}
+      head={
+        <CreatorHeader
+          label={label}
+          editing={editing}
+          invoiceNumber={s.invoice_number}
+          status={s.status}
+          dirty={s.dirty}
+          readOnly={readOnly}
+          onNew={() => startNew()}
+          onPreview={openPreview}
+          onSaveDraft={() => save(true)}
+          onSave={() => save()}
+          onClose={exitCreator}
+        />
+      }
+      notices={<Suspense fallback={null}><ScreenTip id="editor" /></Suspense>}
+    >
 
       {hasDraft && (
         <div className={styles.banner} role="status">
@@ -386,7 +391,6 @@ export function InvoiceCreator() {
         </Suspense>
       ) : null}
 
-      <Suspense fallback={null}><ScreenTip id="editor" /></Suspense>
       {s.approval && s.approval.state !== 'approved' && (
         <Suspense fallback={null}>
           <ApprovalBanner approval={s.approval} />
@@ -613,6 +617,6 @@ export function InvoiceCreator() {
         />
         </Suspense>
       )}
-    </div>
+    </Page>
   );
 }

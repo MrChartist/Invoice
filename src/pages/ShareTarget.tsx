@@ -7,6 +7,7 @@ import { readSharedFiles, routeShared, stashShared } from '../lib/share-inbox';
 import { useT } from '../i18n';
 import { phoneT } from '../i18n/areas/phone';
 import controls from '../styles/controls.module.css';
+import { Page } from '../components/ui/Page';
 import surface from '../styles/surface.module.css';
 import styles from '../components/pwa/PhoneBackup.module.css';
 
@@ -76,7 +77,7 @@ export function ShareTarget() {
   }, [navigate]);
 
   return (
-    <div className={surface.page}>
+    <Page>
       <section className={`${surface.card} ${styles.page}`} aria-live="polite">
         <div className={surface.cardHead}>
           <span className={surface.cardHeadIcon}><FileUp size={16} aria-hidden="true" /> {phoneT('inboxTitle')}</span>
@@ -92,6 +93,6 @@ export function ShareTarget() {
           <Link to="/" className={controls.btnOutline}>{phoneT('inboxHome')}</Link>
         </div>
       </section>
-    </div>
+    </Page>
   );
 }

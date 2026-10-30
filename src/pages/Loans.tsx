@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Download, HandCoins, Plus, Trash2, Undo2 } from 'lucide-react';
-import { PageHeader } from '../components/ui/PageHeader';
+import { Page } from '../components/ui/Page';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useToast } from '../components/ui/useToast';
 import {
@@ -114,12 +114,11 @@ export function Loans() {
   };
 
   return (
-    <div className={surface.page}>
-      <PageHeader
-        title={loansT('title')}
-        subtitle={loansT('subtitle')}
-        actions={editable && !draft ? <button type="button" className={controls.btnPrimary} onClick={() => setDraft(blank())}><Plus size={16} /> {loansT('add')}</button> : undefined}
-      />
+    <Page
+      title={loansT('title')}
+      subtitle={loansT('subtitle')}
+      actions={editable && !draft ? <button type="button" className={controls.btnPrimary} onClick={() => setDraft(blank())}><Plus size={16} /> {loansT('add')}</button> : undefined}
+    >
 
       {draft && (
         <section className={surface.card}>
@@ -243,6 +242,6 @@ export function Loans() {
         );
       })}
       {toastNode}
-    </div>
+    </Page>
   );
 }
