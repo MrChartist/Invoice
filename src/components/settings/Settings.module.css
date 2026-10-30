@@ -407,6 +407,11 @@
   color: var(--label-2);
 }
 
+/* The switch stays on one line in the page head (its icon wrapped above the select and pushed the title down);
+   the offline note still breaks onto its own line. */
+.langSwitch { flex-wrap: nowrap; }
+.langSwitch:has([data-lang-offline]) { flex-wrap: wrap; }
+
 @media (max-width: 52.0625em) {
   .layout {
     grid-template-columns: minmax(0, 1fr);

@@ -198,7 +198,7 @@ export function Settings() {
       actions={
         <div className={styles.langBox} title={t('settings.languageHint')}>
           <span className={styles.langLabel}>{t('common.language')}</span>
-          <LanguageSwitch />
+          <LanguageSwitch className={styles.langSwitch} />
         </div>
       }
     >

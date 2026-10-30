@@ -21,7 +21,7 @@ interface Props {
   onSaveDraft: () => void;
   onSave: () => void;
   onClose: () => void;
-  /** The live-preview Show / Hide toggle (wide screens only), first in the action row. */
+  /** The live-preview Show / Hide toggle (wide screens only), right after Preview. */
   paneToggle?: ReactNode;
 }
 
@@ -42,7 +42,6 @@ export function CreatorHeader({ label, editing, invoiceNumber, status, dirty, re
       subtitle={dirty ? t('editor.subDirty') : editing ? t('editor.subSaved') : t('editor.subNew')}
       actions={
         <>
-          {paneToggle}
           {editing && (
             <button type="button" className={controls.btnOutline} onClick={onNew}>
               <FilePlus2 size={16} /> {t('common.new')}
@@ -51,6 +50,7 @@ export function CreatorHeader({ label, editing, invoiceNumber, status, dirty, re
           <button type="button" className={controls.btnOutline} onClick={onPreview}>
             <Eye size={16} /> {t('common.preview')}
           </button>
+          {paneToggle}
           {!editing && (
             <button type="button" className={controls.btnOutline} onClick={onSaveDraft} disabled={readOnly}>
               {t('editor.saveDraft')}
