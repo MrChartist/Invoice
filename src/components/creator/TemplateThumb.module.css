@@ -4,9 +4,8 @@
   display: block;
   height: 96px;
   overflow: hidden;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--card);
+  border-radius: var(--r-4);
+  background: var(--bg-grouped-2);
   pointer-events: none;
 }
 

@@ -2,31 +2,30 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
-  margin-top: 0.25rem;
+  gap: var(--sp-3);
+  margin-top: var(--sp-1);
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .flags label {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: var(--sp-1);
 }
 
 .group {
   width: 4.5rem;
-  padding: 0.125rem 0.375rem;
-  border: 1px solid var(--input-border);
-  border-radius: var(--radius-sm);
-  background: var(--background);
-  color: var(--foreground);
+  padding: var(--sp-0-5) var(--sp-1);
+  border: var(--hairline) solid var(--field-edge);
+  border-radius: var(--r-6);
+  background: var(--bg-grouped-2);
+  color: var(--label);
   font-size: var(--text-xs);
-  text-transform: uppercase;
 }
 
 .excluded {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-style: italic;
   font-size: var(--text-xs);
 }

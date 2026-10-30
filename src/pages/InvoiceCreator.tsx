@@ -415,8 +415,9 @@ export function InvoiceCreator() {
 
       {pane.wide && (
         <div className={styles.paneBar}>
-          <button type="button" className={cn(controls.btnGhost, controls.btnSm)} aria-pressed={pane.on} onClick={pane.toggle} data-live-preview-toggle>
-            <Eye size={15} /> {pane.on ? pane.hideLabel : pane.showLabel}
+          {/* The label names the action (Show / Hide), so no aria-pressed: a pressed quiet button paints ink-on-ink. */}
+          <button type="button" className={cn(controls.btnGhost, controls.btnSm)} aria-expanded={pane.on} onClick={pane.toggle} data-live-preview-toggle>
+            <Eye size={16} /> {pane.on ? pane.hideLabel : pane.showLabel}
           </button>
         </div>
       )}
@@ -539,7 +540,7 @@ export function InvoiceCreator() {
               <span className={surface.cardHeadIcon}>
                 <Palette size={16} /> {t('editor.template')}
               </span>
-              <Link to="/design" className={styles.muted} style={{ color: 'var(--brand-text)', fontWeight: 600 }}>
+              <Link to="/design" className={controls.link}>
                 {t('editor.customise')}
               </Link>
             </div>
@@ -553,9 +554,9 @@ export function InvoiceCreator() {
             <LivePreviewPane />
           </Suspense>
         )}
+        {/* Last child of the grid: a fixed bar on one column, the form column's sticky footer beside the live preview. */}
+        <MobileSaveBar total={s.total} currency={s.currency} readOnly={readOnly} onPreview={openPreview} onSave={() => save()} />
       </div>
-
-      <MobileSaveBar total={s.total} currency={s.currency} readOnly={readOnly} onPreview={openPreview} onSave={() => save()} />
 
       {previewOpen && (
         <Suspense fallback={null}>

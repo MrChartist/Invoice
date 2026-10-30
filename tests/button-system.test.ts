@@ -100,7 +100,6 @@ const COLOUR_ALLOW: Record<string, string> = {
   'src/components/interest/interest.module.css .chip': 'interest note badge (span), not pressable',
   'src/components/inventory/inventory.module.css .chipLow': 'stock status badge (span, StockChip), not pressable',
   'src/components/inventory/inventory.module.css .serialChip': 'serial-number tag (span), not pressable',
-  'src/components/pos/pos.module.css .chip': 'POS status badge (span), not pressable',
   'src/components/services-r10/services.module.css .chip': 'appointment card on the front-desk board, coloured by its status',
 };
 

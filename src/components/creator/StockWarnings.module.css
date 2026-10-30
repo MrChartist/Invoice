@@ -1,22 +1,21 @@
 .wrap {
-  margin: 0 1rem 1rem;
-  padding: 0.625rem 0.875rem;
-  border: 1px solid color-mix(in srgb, var(--warning) 45%, var(--border));
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--warning) 9%, transparent);
+  margin: 0 var(--sp-4) var(--sp-4);
+  padding: var(--sp-3);
+  border-radius: var(--r-12);
+  background: var(--sys-orange-soft);
 }
 
 .line {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--sp-2);
   margin: 0;
   font-size: var(--text-base);
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .line svg {
-  color: var(--warning);
+  color: var(--sys-orange);
   flex-shrink: 0;
 }
 
@@ -25,7 +24,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--primary);
+  color: var(--tint);
   font: inherit;
   font-weight: 600;
   text-decoration: underline;

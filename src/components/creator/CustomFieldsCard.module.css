@@ -1,29 +1,27 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 0.75rem;
+  gap: var(--sp-3);
 }
 
 .manage {
   font-size: var(--text-xs);
   font-weight: 600;
-  color: var(--brand-text);
+  color: var(--tint);
 }
 
 .printIcon {
-  margin-left: 0.3rem;
+  margin-left: var(--sp-1);
   vertical-align: -1px;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .tag {
-  margin-left: 0.35rem;
+  margin-left: var(--sp-1);
   font-size: var(--text-2xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted-foreground);
-  background: var(--muted);
-  border-radius: var(--radius-full);
-  padding: 0 0.4rem;
+  font-weight: 500;
+  color: var(--label-2);
+  background: var(--fill-3);
+  border-radius: var(--r-full);
+  padding: 0 var(--sp-2);
 }
