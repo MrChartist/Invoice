@@ -233,8 +233,8 @@ export function Transactions() {
   const sortBy = (key: SortKey) =>
     setSort((prev) => ({ key, dir: prev.key === key ? (prev.dir === 'asc' ? 'desc' : 'asc') : key === 'client' || key === 'number' ? 'asc' : 'desc' }));
   const ariaSort = (key: SortKey) => (sort.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none');
-  const sortHead = (k: SortKey, label: string, numeric = false) => (
-    <th className={numeric ? surface.numeric : undefined} aria-sort={ariaSort(k)}>
+  const sortHead = (k: SortKey, label: string, numeric = false, priority?: 2 | 3) => (
+    <th className={numeric ? surface.numeric : undefined} aria-sort={ariaSort(k)} data-priority={priority}>
       <button type="button" className={styles.sortBtn} onClick={() => sortBy(k)}>
         {label}
         {sort.key === k && (sort.dir === 'asc' ? <ArrowUp size={12} aria-hidden="true" /> : <ArrowDown size={12} aria-hidden="true" />)}
@@ -437,7 +437,7 @@ export function Transactions() {
               aria-label={salesT('tx.searchAria')}
             />
           </label>
-          <div className={controls.segment} role="group" aria-label={salesT('tx.filterAria')}>
+          <div className={cn(controls.segment, styles.filterSeg)} role="group" aria-label={salesT('tx.filterAria')}>
             {FILTERS.filter((f) => f.id !== 'approval' || counts.approval > 0 || filter === 'approval').map((f) => (
               <button
                 key={f.id}
@@ -570,10 +570,10 @@ export function Transactions() {
                   </th>
                   {sortHead('number', salesT('tx.colDocument'))}
                   {sortHead('client', salesT('tx.colClient'))}
-                  {sortHead('date', salesT('tx.colDate'))}
+                  {sortHead('date', salesT('tx.colDate'), false, 3)}
                   <th>{salesT('tx.colStatus')}</th>
                   {sortHead('total', salesT('tx.colTotal'), true)}
-                  {sortHead('balance', salesT('tx.colBalance'), true)}
+                  {sortHead('balance', salesT('tx.colBalance'), true, 3)}
                   <th aria-label={salesT('actions')} />
                 </tr>
               </thead>
@@ -593,19 +593,22 @@ export function Transactions() {
                         <input type="checkbox" checked={selected.has(inv.id)} onChange={() => toggle(inv.id)} aria-label={salesT('tx.select', num)} />
                       </td>
                       <td className={styles.cDoc}>
-                        <Link to={`/invoice/${inv.id}`} className={styles.docLink}>
+                        <Link to={`/invoice/${inv.id}`} className={styles.docLink} title={inv.invoice_number}>
                           {inv.invoice_number}
                         </Link>
-                        {locked && <Lock size={12} aria-label={salesT('tx.lockedPeriod')} style={{ marginLeft: 6, verticalAlign: '-1px', color: 'var(--warning)' }} />}
+                        {locked && <Lock size={12} aria-label={salesT('tx.lockedPeriod')} className={styles.lockIcon} />}
                         <div className={styles.docType}>{docLabel(inv.doc_type in DOCUMENT_LABELS ? inv.doc_type : 'INVOICE')}</div>
+                        <div className={cn(surface.foldP3, styles.docType, styles.nowrap, status === 'Overdue' && styles.overdueText)}>
+                          {salesT(inv.doc_type === 'QUOTATION' ? 'tx.validUntil' : 'tx.due', { date: formatDate(inv.due_date) || '-' })}
+                        </div>
                       </td>
                       <td className={styles.cClient}>
                         <div className={styles.client}>
                           <Avatar name={inv.client?.name || '?'} size={28} square />
-                          <span>{inv.client?.name || '-'}</span>
+                          <span title={inv.client?.name || undefined}>{inv.client?.name || '-'}</span>
                         </div>
                       </td>
-                      <td className={cn(styles.nowrap, styles.cDate)}>
+                      <td className={cn(styles.nowrap, styles.cDate)} data-priority={3}>
                         {formatDate(inv.issue_date)}
                         <div className={cn(styles.docType, status === 'Overdue' && styles.overdueText)}>
                           {salesT(inv.doc_type === 'QUOTATION' ? 'tx.validUntil' : 'tx.due', { date: formatDate(inv.due_date) || '-' })}
@@ -630,8 +633,13 @@ export function Transactions() {
                           <StatusBadge status={status} />
                         )}
                       </td>
-                      <td className={cn(surface.numeric, styles.cTotal)}>{formatCurrency(inv.total, inv.currency)}</td>
-                      <td className={cn(surface.numeric, styles.cBal)}>
+                      <td className={cn(surface.numeric, styles.cTotal)}>
+                        {formatCurrency(inv.total, inv.currency)}
+                        {isRevenueDoc(inv) && due > 0 && (
+                          <div className={cn(surface.foldP3, styles.docType)}>{salesT('tx.colBalance')} {formatCurrency(due, inv.currency)}</div>
+                        )}
+                      </td>
+                      <td className={cn(surface.numeric, styles.cBal)} data-priority={3}>
                         {isRevenueDoc(inv) ? formatCurrency(due, inv.currency) : '-'}
                       </td>
                       <td className={styles.cAct}>

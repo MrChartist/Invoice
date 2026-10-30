@@ -3,7 +3,7 @@
 .screen {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4, 16px);
+  gap: var(--sp-4);
 }
 
 .head {
@@ -22,7 +22,7 @@
 
 .keys {
   font-size: 0.78rem;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .menu {
@@ -32,10 +32,11 @@
 }
 
 .menuBlock {
-  border: 1px solid var(--border);
-  border-radius: var(--radius, 10px);
-  padding: 12px;
-  background: var(--card);
+  composes: continuous from global;
+  --rc: var(--r-12);
+  border: var(--card-edge);
+  padding: var(--sp-3);
+  background: var(--bg-grouped-2);
 }
 
 .menuTitle {
@@ -55,12 +56,12 @@
   grid-template-columns: minmax(140px, 220px) 1fr;
   gap: 10px 16px;
   align-items: center;
-  max-width: 720px;
+  max-width: var(--form-max);
 }
 
 .form > label {
   font-size: 0.85rem;
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .inline {
@@ -100,7 +101,7 @@
   list-style: none;
   margin: 0;
   padding-left: 18px;
-  border-left: 1px dashed var(--border);
+  border-left: var(--hairline) solid var(--sep);
 }
 
 .treeItem {
@@ -108,7 +109,7 @@
 }
 
 .ledgerName {
-  color: var(--muted-foreground);
+  color: var(--label-2);
   font-size: 0.85rem;
 }
 
@@ -129,30 +130,28 @@
 .indent3 { padding-left: 48px !important; }
 
 .diffBad {
-  border: 1px solid color-mix(in srgb, var(--loss) 40%, transparent);
-  background: color-mix(in srgb, var(--loss) 10%, transparent);
-  color: var(--loss);
-  border-radius: var(--radius, 10px);
-  padding: 8px 12px;
+  background: var(--sys-red-soft);
+  color: var(--sys-red-ink);
+  border-radius: var(--r-10);
+  padding: var(--sp-2) var(--sp-3);
   font-weight: 600;
 }
 
 .diffOk {
-  border: 1px solid color-mix(in srgb, var(--profit) 40%, transparent);
-  background: color-mix(in srgb, var(--profit) 10%, transparent);
-  color: var(--profit);
-  border-radius: var(--radius, 10px);
-  padding: 8px 12px;
+  background: var(--sys-green-soft);
+  color: var(--sys-green-ink);
+  border-radius: var(--r-10);
+  padding: var(--sp-2) var(--sp-3);
   font-weight: 600;
 }
 
 .note {
   font-size: 0.8rem;
-  color: var(--muted-foreground);
+  color: var(--label-2);
   margin: 0;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 37.4375em) {
   .form {
     grid-template-columns: 1fr;
   }

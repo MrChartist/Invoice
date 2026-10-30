@@ -1,0 +1,86 @@
+/* Underline tab strip (IOS-UI.md 2.4; owner: P2). Lazy: imported by the screens that use it.
+   <div role="tablist" class={tabs.tabStrip}><button role="tab" aria-selected class={tabs.tabItem}>…</button></div> */
+
+@property --tab-fade-l {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --tab-fade-r {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes tabFade {
+  0% { --tab-fade-l: 0px; --tab-fade-r: 24px; }
+  4%, 96% { --tab-fade-l: 24px; --tab-fade-r: 24px; }
+  100% { --tab-fade-l: 24px; --tab-fade-r: 0px; }
+}
+
+.tabStrip {
+  display: flex;
+  align-items: stretch;
+  gap: var(--sp-5);
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  border-bottom: var(--hairline) solid var(--sep);
+  mask-image: linear-gradient(to right, transparent 0, black var(--tab-fade-l), black calc(100% - var(--tab-fade-r)), transparent 100%);
+  animation: tabFade linear both;
+  animation-timeline: scroll(self inline);
+}
+
+.tabStrip::-webkit-scrollbar {
+  display: none;
+}
+
+.tabItem {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 2.75rem;
+  position: relative;
+  padding: 0 var(--sp-0-5);
+  border: 0;
+  background: none;
+  color: var(--label-2);
+  font: inherit;
+  font-size: var(--text-md);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--dur-1) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .tabItem:hover {
+    color: var(--label);
+  }
+}
+
+.tabItem[aria-selected='true'] {
+  color: var(--label);
+  font-weight: 600;
+}
+
+/* The selected bar: 2px tint (one of the three allowed accents, spec 1.6), drawn over the strip's hairline. */
+.tabItem[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  border-radius: var(--r-full);
+  background-color: var(--tint);
+}
+
+.tabItem:focus-visible {
+  outline: 2px solid var(--tint);
+  outline-offset: -2px;
+}

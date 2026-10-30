@@ -264,9 +264,9 @@ export function Clients() {
               <thead>
                 <tr>
                   <th>{salesT('cl.colClient')}</th>
-                  <th>{salesT('cl.colContact')}</th>
-                  <th>{salesT('cl.colLocation')}</th>
-                  <th>{salesT('cl.colGstin')}</th>
+                  <th data-priority={3}>{salesT('cl.colContact')}</th>
+                  <th data-priority={3}>{salesT('cl.colLocation')}</th>
+                  <th data-priority={2}>{salesT('cl.colGstin')}</th>
                   <th className={surface.numeric}>{khataT('colBalance')}</th>
                   <th aria-label={salesT('actions')} />
                 </tr>
@@ -283,12 +283,18 @@ export function Clients() {
                         <div className={styles.who}>
                           <Avatar name={c.name} size={34} square />
                           <div>
-                            <div className={styles.name}>{c.name}</div>
-                            {c.company && <div className={styles.sub}>{c.company}</div>}
+                            <div className={styles.name} title={c.name}>{c.name}</div>
+                            {c.company && <div className={`${styles.sub} ${styles.oneLine}`}>{c.company}</div>}
+                            {(c.phone || c.city) && (
+                              <div className={`${surface.foldP3} ${styles.sub} ${styles.oneLine}`}>
+                                {[c.phone, c.city].filter(Boolean).join(' · ')}
+                              </div>
+                            )}
+                            {c.gstin && <div className={`${surface.foldP2} ${styles.sub} ${styles.oneLine}`}>{c.gstin}</div>}
                           </div>
                         </div>
                       </td>
-                      <td className={styles.cContact} data-empty={!c.email && !c.phone ? 'true' : undefined}>
+                      <td className={styles.cContact} data-priority={3}>
                         <div className={styles.contact}>
                           {c.email ? (
                             <span>
@@ -304,7 +310,7 @@ export function Clients() {
                           {c.contacts?.length ? <span className={styles.sub}>{s2T('c.nContacts', { n: c.contacts.length })}</span> : null}
                         </div>
                       </td>
-                      <td className={styles.cLoc} data-empty={!c.city && !c.state ? 'true' : undefined}>
+                      <td className={styles.cLoc} data-priority={3}>
                         {c.city || c.state ? (
                           <span className={styles.contact}>
                             <span>
@@ -315,8 +321,8 @@ export function Clients() {
                           <span className={styles.sub}>-</span>
                         )}
                       </td>
-                      <td className={`${surface.mono} ${styles.cGst}`} data-empty={!c.gstin && !c.pan && !c.tan ? 'true' : undefined}>
-                        {c.gstin || (!c.pan && !c.tan && <span className={styles.sub}>-</span>)}
+                      <td className={`${surface.mono} ${styles.cGst}`} data-priority={2}>
+                        {c.gstin ? <span className={styles.gstin}>{c.gstin}</span> : !c.pan && !c.tan && <span className={styles.sub}>-</span>}
                         {(c.pan || c.tan) && (
                           <div className={styles.sub}>{[c.pan && `PAN ${c.pan}`, c.tan && `TAN ${c.tan}`].filter(Boolean).join(' · ')}</div>
                         )}

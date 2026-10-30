@@ -380,14 +380,14 @@ export function DataPanel({ notify }: Props) {
           <span className={surface.cardHeadIcon}>
             <Package size={16} /> {setT('itemCatalogue')}
           </span>
-          <span className={styles.defaultTag}>{setT('nSaved', { n: catalog.length })}</span>
+          <span className={styles.countTag}>{setT('nSaved', { n: catalog.length })}</span>
         </div>
         {catalog.length === 0 ? (
-          <p className={surface.sectionNote} style={{ padding: '1.25rem' }}>
+          <p className={`${surface.sectionNote} ${styles.catalogEmpty}`}>
             {setT('catalogueEmpty')}
           </p>
         ) : (
-          <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+          <div className={styles.catalogScroll}>
             {catalog.map((item) => (
               <div key={item.id} className={styles.catalogRow}>
                 <div>
@@ -415,7 +415,7 @@ export function DataPanel({ notify }: Props) {
 
       <section className={`${surface.card} ${styles.danger}`}>
         <div className={surface.cardHead}>
-          <span className={surface.cardHeadIcon} style={{ color: 'var(--destructive)' }}>
+          <span className={`${surface.cardHeadIcon} ${styles.dangerTitle}`}>
             <FolderUp size={16} /> {setT('dangerZone')}
           </span>
         </div>
@@ -450,7 +450,7 @@ export function DataPanel({ notify }: Props) {
           </>
         }
       >
-        <p style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--muted-foreground)', margin: 0 }}>
+        <p className={surface.sectionNote}>
           {restoreSummaryText(pending)}
           {' '}{attachmentRestoreNote(pending?.summary)}{' '}
           {setT('restoreWarn')}

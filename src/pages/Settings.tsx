@@ -29,6 +29,7 @@ import type { SenderProfile } from '../types/invoice';
 import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from '../components/settings/Settings.module.css';
+import tabs from '../styles/tabs.module.css';
 import { errText } from '../i18n/lib-msg';
 
 // The activity log is only needed on its own tab, so it stays out of the Settings chunk.
@@ -203,7 +204,7 @@ export function Settings() {
       />
 
 
-      <div className={controls.segment} role="tablist" aria-label={setT('sections')} style={{ alignSelf: 'flex-start', maxWidth: '100%', flexWrap: 'wrap' }} onKeyDown={onTabKey}>
+      <div className={tabs.tabStrip} role="tablist" aria-label={setT('sections')} onKeyDown={onTabKey}>
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -213,16 +214,15 @@ export function Settings() {
             aria-selected={tab === id}
             aria-controls="settings-panel"
             tabIndex={tab === id ? 0 : -1}
-            className={tab === id ? controls.segmentBtnActive : controls.segmentBtn}
+            className={tabs.tabItem}
             onClick={() => setTab(id)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap', minHeight: 40 }}
           >
-            <Icon size={14} aria-hidden="true" /> {label()}
+            <Icon size={16} aria-hidden="true" /> {label()}
           </button>
         ))}
       </div>
 
-      <div id="settings-panel" role="tabpanel" aria-labelledby={`settings-tab-${tab}`} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div id="settings-panel" role="tabpanel" aria-labelledby={`settings-tab-${tab}`} className={styles.panel}>
       {tab === 'business' && editing && (
         <div className={styles.layout}>
           <section className={surface.card}>
@@ -234,13 +234,13 @@ export function Settings() {
             </div>
             <div className={styles.profileList}>
               {settings.profiles.map((p) => (
-                <button key={p.id} type="button" className={`${styles.profileBtn} ${p.id === editing.id ? styles.profileBtnActive : ''}`} onClick={() => setEditingId(p.id!)}>
-                  <Avatar name={p.companyName || setT('newProfile')} size={32} square src={p.logo} />
+                <button key={p.id} type="button" className={styles.profileRow} aria-current={p.id === editing.id ? 'true' : undefined} onClick={() => setEditingId(p.id!)}>
+                  <Avatar name={p.companyName || setT('newProfile')} size={29} square src={p.logo} />
                   <span className={styles.profileText}>
                     <strong>{p.companyName || setT('untitled')}</strong>
                     <span>{p.companyGstin || setT('noGstin')}</span>
                   </span>
-                  {p.id === settings.activeProfileId && <Star size={13} fill="currentColor" color="var(--brand)" aria-label={setT('defaultProfile')} />}
+                  {p.id === settings.activeProfileId && <Star size={14} fill="currentColor" color="var(--tint)" aria-label={setT('defaultProfile')} />}
                 </button>
               ))}
             </div>
@@ -248,11 +248,11 @@ export function Settings() {
 
           <section className={surface.card}>
             <div className={surface.cardHead}>
-              <div className={styles.editorHead} style={{ width: '100%' }}>
+              <div className={styles.editorHead}>
                 <span>{editing.companyName || setT('untitled')}</span>
                 <div className={surface.pageActions}>
                   {editing.id === settings.activeProfileId ? (
-                    <span className={styles.defaultTag}><Check size={12} /> {setT('defaultProfile')}</span>
+                    <span className={styles.defaultTag}><Check size={12} aria-hidden="true" /> {setT('defaultProfile')}</span>
                   ) : (
                     <button type="button" className={`${controls.btnOutline} ${controls.btnSm}`} onClick={() => patchSettings({ activeProfileId: editing.id! })}>
                       <Star size={14} /> {setT('makeDefault')}

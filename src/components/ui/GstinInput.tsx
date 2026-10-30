@@ -46,11 +46,11 @@ export function GstinInput({ value, onChange, onStateCode, placeholder = '22AAAA
       {showResult &&
         (result.valid ? (
           <span className={controls.ok}>
-            <CheckCircle2 size={13} /> {t('common.validGstin')}
+            <CheckCircle2 size={14} /> {t('common.validGstin')}
           </span>
         ) : (
           <span className={controls.error}>
-            <XCircle size={13} /> {result.message}
+            <XCircle size={14} /> {result.message}
           </span>
         ))}
     </>

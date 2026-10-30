@@ -97,7 +97,7 @@ export function ProfileEditor({ profile, onChange, onError }: Props) {
   const panBad = !!profile.pan && !isValidPan(profile.pan);
 
   return (
-    <div className={styles.editor}>
+    <div className={`${styles.editor} ${styles.form}`}>
       <fieldset className={styles.group}>
         <legend>{setT('identity')}</legend>
         <div className={controls.row}>

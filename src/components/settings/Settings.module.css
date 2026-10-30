@@ -1,7 +1,17 @@
+/* Settings (IOS-UI.md 2.1, 2.4; owner: P2): tokens only. Sections are an underline tab strip; lists are grouped rows. */
+
+/* The tab panel: one column of cards at the page's section gap. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--section-gap);
+  min-width: 0;
+}
+
 .layout {
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
-  gap: 1.25rem;
+  grid-template-columns: 16rem minmax(0, 1fr);
+  gap: var(--section-gap);
   align-items: start;
 }
 
@@ -10,32 +20,16 @@
   min-width: 0;
 }
 
+/* Business profiles: an inset grouped list inside the card. */
 .profileList {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem;
+  padding: 0 0 var(--sp-2);
 }
 
-.profileBtn {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  width: 100%;
-  text-align: left;
-  padding: 0.625rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--card);
-  color: var(--foreground);
-  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+.profileRow {
+  composes: row from '../../styles/surface.module.css';
 }
-
-.profileBtn:hover {
-  border-color: var(--muted-foreground);
-}
-
-.profileBtnActive { border-color: var(--foreground); box-shadow: inset 0 0 0 1px var(--foreground); }
 
 .profileText {
   display: flex;
@@ -47,73 +41,107 @@
 
 .profileText strong {
   font-size: var(--text-md);
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .profileText span {
-  font-size: var(--text-xs);
-  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  color: var(--label-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* "Default" pill: green soft with a check glyph, sentence case. */
 .defaultTag {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--brand-text);
+  gap: var(--sp-1);
+  padding: var(--sp-0-5) var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--sys-green-soft);
+  color: var(--sys-green-ink);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* A neutral count ("12 saved"): gray tag, sentence case. */
+.countTag {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--sp-0-5) var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--fill-3);
+  color: var(--label-2);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .editorHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--sp-3);
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .editor {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: var(--section-gap);
 }
 
+/* A long form (business profile) stays stacked fields at the form width (spec 3.2). */
+.form {
+  max-width: var(--form-max);
+}
+
+/* A form section: no frame, a group header above, a hairline between sections. */
 .group {
   display: flex;
   flex-direction: column;
-  gap: 0.875rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 1.125rem 1rem 1rem;
+  gap: var(--sp-3);
   min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
+.group + .group {
+  padding-top: var(--sp-5);
+  border-top: var(--hairline) solid var(--sep);
+}
+
+/* A floated legend is laid out like any child (no notch in the section's top hairline). */
 .group legend {
-  padding: 0 0.5rem;
-  font-family: var(--font-display);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
+  float: left;
+  width: 100%;
+  padding: 0;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--label-2);
 }
 
 .slots {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--sp-4);
 }
 
 .slot {
   display: flex;
-  gap: 0.875rem;
+  gap: var(--sp-3);
   align-items: flex-start;
 }
 
+/* Logo / signature preview: shown on paper white in both themes, as it prints. */
 .slotPreview {
   width: 84px;
   height: 84px;
@@ -121,10 +149,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
-  border: 1px dashed var(--input-border);
-  border-radius: var(--radius-md);
-  color: var(--muted-foreground);
+  background: white;
+  border: var(--hairline) dashed var(--field-edge);
+  border-radius: var(--r-12);
+  color: var(--sys-gray-ink);
   overflow: hidden;
 }
 
@@ -137,32 +165,38 @@
 .slotBody {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: var(--sp-2);
   min-width: 0;
 }
 
 .slotActions {
   display: flex;
-  gap: 0.375rem;
+  gap: var(--sp-2);
   flex-wrap: wrap;
 }
 
-/* ── Sticky save bar ─────────────────────────────────────────── */
+/* ── Sticky save bar: floats over the content (elevated surface, --elev-2) ── */
+@keyframes barIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
 .saveBar {
+  composes: continuous from global;
+  --rc: var(--r-16);
   position: sticky;
-  bottom: 1rem;
-  z-index: 5;
+  bottom: calc(var(--sp-4) + var(--tab-bar-h, 0px));
+  z-index: var(--z-sticky);
   display: flex;
   align-items: center;
   justify-content: flex-start; /* actions stay left so the bottom-right toast never covers Save */
   flex-wrap: wrap;
-  gap: 0.75rem 1.25rem;
-  padding: 0.75rem 1rem;
-  background: var(--card);
-  border: 1px solid var(--brand);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  animation: fadeInUp 220ms ease both;
+  gap: var(--sp-3) var(--sp-5);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-elevated);
+  border: var(--card-edge);
+  box-shadow: var(--elev-2);
+  animation: barIn var(--dur-3) var(--spring-soft) both;
 }
 
 .saveBar span {
@@ -172,142 +206,183 @@
 
 .saveActions {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--sp-2);
 }
 
-/* ── Data panel ──────────────────────────────────────────────── */
+/* ── Data panel: actions are rows of a grouped list in a well ── */
 .actionGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 0.75rem;
+  composes: continuous from global;
+  --rc: var(--r-12);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-grouped-3);
+  border: var(--card-edge);
 }
 
 .action {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.375rem;
-  padding: 1rem;
-  background: var(--card-inner);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  gap: var(--sp-0-5);
+  width: 100%;
+  min-height: var(--row-h);
+  padding: var(--sp-3) var(--sp-4);
+  border: 0;
+  background: transparent;
   text-align: left;
-  color: var(--foreground);
-  transition: border-color var(--transition-fast);
+  color: var(--label);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease-out);
 }
 
-.action:hover {
-  border-color: var(--muted-foreground);
+.action + .action::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: var(--row-inset);
+  border-top: var(--hairline) solid var(--sep);
+}
+
+@media (hover: hover) {
+  .action:hover:not(:disabled) {
+    background: var(--fill-4);
+  }
+}
+
+.action:active:not(:disabled) {
+  background: var(--fill-2);
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--tint);
+  outline-offset: -2px;
+}
+
+.action:disabled {
+  cursor: not-allowed;
+  color: var(--label-3);
 }
 
 .action strong {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--sp-2);
   font-size: var(--text-md);
+  font-weight: 500;
 }
 
 .action span {
+  padding-left: var(--sp-6);
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
   line-height: 1.5;
 }
 
 .meter {
   height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--muted);
+  border-radius: var(--r-full);
+  background: var(--fill);
   overflow: hidden;
 }
 
 .meterFill {
   height: 100%;
   border-radius: inherit;
-  background: var(--brand);
-  transition: width var(--transition-smooth);
+  background: var(--tint);
+  transition: width var(--dur-3);
 }
 
 .meterWarn {
-  background: var(--loss);
+  background: var(--sys-red);
 }
 
 .health {
   list-style: none;
-  margin: 0.75rem 0 0;
+  margin: var(--sp-3) 0 0;
   padding: 0;
   display: grid;
-  gap: 0.5rem;
+  gap: var(--sp-2);
 }
 
 .health li {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 0.5rem;
+  gap: var(--sp-2);
   font-size: var(--text-sm);
   line-height: 1.5;
 }
 
 .health strong {
   display: block;
-  color: var(--foreground);
+  color: var(--label);
 }
 
 .health span {
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .healthWarn {
-  color: var(--warning);
+  color: var(--sys-orange-ink);
 }
 
 .healthCritical {
-  color: var(--destructive);
+  color: var(--sys-red-ink);
 }
 
 .healthOk {
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
+/* Danger zone card: a red title; in high contrast its frame turns red too. */
 .danger {
-  border-color: color-mix(in srgb, var(--destructive) 40%, var(--border));
+  border-color: var(--sys-red);
+}
+
+.dangerTitle {
+  color: var(--sys-red-ink);
 }
 
 .catalogRow {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.625rem 1.25rem;
-  border-bottom: 1px solid var(--border);
+  gap: var(--sp-3);
+  min-height: var(--row-h);
+  padding: var(--sp-2) var(--card-pad);
 }
 
-.catalogRow:last-child {
-  border-bottom: none;
+.catalogRow + .catalogRow::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: var(--card-pad);
+  border-top: var(--hairline) solid var(--sep);
 }
 
 .catalogRow strong {
   font-size: var(--text-md);
+  font-weight: 500;
 }
 
 .catalogRow span {
   display: block;
   font-size: var(--text-sm);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
-@media (max-width: 900px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
+.catalogScroll {
+  max-height: 17.5rem;
+  overflow-y: auto;
+}
 
-  .profileList {
-    flex-direction: row;
-    overflow-x: auto;
-  }
-
-  .profileBtn {
-    min-width: 200px;
-  }
+.catalogEmpty {
+  padding: var(--card-pad);
 }
 
 .attachRow {
@@ -315,19 +390,25 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
 }
 
 /* Interface language (5.4) in the page header: device-level, visible to every role. */
 .langBox {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--sp-2);
 }
 
 .langLabel {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--muted-foreground);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--label-2);
+}
+
+@media (max-width: 52.0625em) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
