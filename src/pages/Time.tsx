@@ -42,6 +42,7 @@ import { BillClientModal } from '../components/time/BillClientModal';
 import surface from '../styles/surface.module.css';
 import controls from '../styles/controls.module.css';
 import styles from '../components/time/time.module.css';
+import tabs from '../styles/tabs.module.css';
 import { dateLocale, useT } from '../i18n';
 import { timeT } from '../i18n/areas/time';
 import { areaNodes } from '../i18n/areas/nodes';
@@ -49,8 +50,8 @@ import { svcT } from '../i18n/areas/service-r3'; // R3-B
 import { WorkTypesCard } from '../components/time/WorkTypesCard';
 import { visiblePackTabs, type PackId } from '../lib/industry-packs'; // R5-B; R10: tabs shared by packs (`alsoPacks`)
 import { defineArea } from '../i18n/area';
-import { TIME_TABS, type TimeTab } from './page-tabs'; import { SelectField } from '../components/ui/SelectField';
-// R6-B1
+import { TIME_TABS, type TimeTab } from './page-tabs'; // R6-B1
+import { SelectField } from '../components/ui/SelectField';
 
 // R3-B2 / B3: the projects board and retainers are their own lazy tab chunks.
 const ProjectsBoard = lazy(() => import('../components/time/ProjectsBoard'));
@@ -284,10 +285,10 @@ export function Time() {
         <StatCard label={timeT('kmMonth')} value={String(stats.km)} icon={Car} />
       </div>
 
-      <div className={controls.segment} role="tablist" aria-label={timeT('sections')}>
+      <div className={tabs.tabStrip} role="tablist" aria-label={timeT('sections')}>
         {visiblePackTabs(TABS, localDb.settings.get(), tab).map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id}
-            className={tab === t.id ? controls.segmentBtnActive : controls.segmentBtn}
+            className={tabs.tabItem}
             onClick={() => setParams(t.id === 'timesheet' ? {} : { tab: t.id }, { replace: true })}>
             {t.label()}
           </button>

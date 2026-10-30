@@ -293,7 +293,7 @@ export function Reconcile() {
           title={discoverT('reconTitle')}
           text={discoverT('reconText')}
           action={
-            <div className={surface.pageActions} style={{ justifyContent: 'center' }} data-recon-empty>
+            <div className={surface.pageActions} style={{ justifyContent: 'center', flexWrap: 'wrap' }} data-recon-empty>
               <button type="button" className={controls.btnPrimary} onClick={() => document.querySelector<HTMLElement>('[data-recon-import] input, [data-recon-import] button')?.focus()}>
                 {bankT('importStatement')}
               </button>

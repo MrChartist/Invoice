@@ -137,6 +137,21 @@
   width: 2rem;
 }
 
+/* QA: a laptop frame (table 52 to 75em, e.g. 1280px with the sidebar) fits every p1 column at comfortable density.
+   Total folds under Balance (the cell's second line), cells take the compact inset, a mouse gets 32px row buttons
+   (touch keeps 44px). No JS: the fold line is already rendered for the narrower band. */
+@media (min-width: 37.5em) {
+  @container table (52.125em <= width < 74.6875em) {
+    table.ledger :is(th, td)[data-priority='3'] { display: none; }
+    table.ledger td.cBal > div { display: block; }
+    table.ledger :is(th, td) { padding-inline: var(--sp-2); }
+    table.ledger .client > span { max-width: 8.5rem; }
+  }
+}
+@media (pointer: fine) {
+  table.ledger td.cAct button { --b-h: 2rem; --b-pad: 0.5rem; }
+}
+
 /* 8I quick win: phones show a visible label on the record-payment (Banknote) row button. */
 .payLabel { display: none; }
 

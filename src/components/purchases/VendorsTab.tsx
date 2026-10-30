@@ -29,9 +29,9 @@ import surface from '../../styles/surface.module.css';
 import styles from './purchases.module.css';
 import tabStyles from './VendorsTab.module.css';
 import { errText, libMsg } from '../../i18n/lib-msg';
-import { useListKeys } from '../../lib/keys/use-list-keys'; import { SelectField } from '../ui/SelectField';
+import { useListKeys } from '../../lib/keys/use-list-keys'; // R20-D5
+import { SelectField } from '../ui/SelectField';
 import { DateField } from '../ui/DateField';
-// R20-D5
 
 // R14 (PS-B2): "advocate / firm of advocates" tick (inward reverse charge on legal services) — one lazy row.
 const NettingLinkRow = lazy(() => import('../receivables/NettingDialog').then((m) => ({ default: m.NettingLinkRow }))); // R15-A3

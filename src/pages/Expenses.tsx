@@ -49,9 +49,9 @@ import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Expenses.module.css';
 import { errText } from '../i18n/lib-msg';
-import { EXPENSES_TABS, type ExpensesTab } from './page-tabs'; import { SelectField } from '../components/ui/SelectField';
+import { EXPENSES_TABS, type ExpensesTab } from './page-tabs'; // R6-B1
+import { SelectField } from '../components/ui/SelectField';
 import { DateField } from '../components/ui/DateField';
-// R6-B1
 // R4-C4: "Deleted · Undo" for deletes on this page (restores from the recycle bin) — lazy.
 const UndoDeleted = lazy(() => import('../components/trust/UndoDeleted'));
 const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip

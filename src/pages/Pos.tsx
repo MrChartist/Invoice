@@ -72,8 +72,8 @@ import { cleanAltUnits, lineUnitPatch, roundTypedQty, unitChoices, unitsDb } fro
 import { canOverrideCredit, creditStatus, recordCreditOverride } from '../lib/credit-policy'; // 8.80
 import { saltIndex, saltOf } from '../lib/salt-search'; // 8.84
 import { crT } from '../i18n/areas/credit';
-import { rPosT } from '../i18n/areas/restaurant-pos'; import { SelectField } from '../components/ui/SelectField';
-// R3-A
+import { rPosT } from '../i18n/areas/restaurant-pos'; // R3-A
+import { SelectField } from '../components/ui/SelectField';
 
 const ScreenTip = lazy(() => import('../components/help/ScreenTip')); // R6-A6 one-time tip
 const ZReportModal = lazy(() => import('../components/pos/ZReportModal').then((m) => ({ default: m.ZReportModal })));

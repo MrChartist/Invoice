@@ -171,14 +171,10 @@
   cursor: pointer;
 }
 
-/* Zero / negative stock: red in search and tiles. */
+/* Zero / negative stock: red text in search and tiles (the tile keeps its plain fill: no tinted buttons). */
 .noStock,
 .noStock .tileMeta {
   color: var(--sys-red-ink);
-}
-
-.tileBtn.noStock {
-  background: var(--sys-red-soft);
 }
 
 /* QA-3 F26: the POS header tools. Desktop: they wrap as before. Phone: one row that scrolls sideways

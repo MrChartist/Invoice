@@ -41,9 +41,9 @@ import styles from './hotel.module.css';
 import FormCView from './FormCView';
 import ReportsView from './ReportsView';
 import { escHtml as esc } from '../../lib/html-esc';
-import FolioView from './FolioView'; import { SelectField } from '../ui/SelectField';
+import FolioView from './FolioView'; // R7-B: in this chunk (a lazy view chunk cost ~2.8 kB gz of split overhead)
+import { SelectField } from '../ui/SelectField';
 import { TypedInput } from '../ui/TypedInput';
-// R7-B: in this chunk (a lazy view chunk cost ~2.8 kB gz of split overhead)
 
 /* ── Small kit ─────────────────────────────────────────────────── */
 

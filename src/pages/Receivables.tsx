@@ -46,9 +46,9 @@ import controls from '../styles/controls.module.css';
 import styles from './Receivables.module.css';
 import { defineArea } from '../i18n/area';
 import { visibleTabs, type PackId } from '../lib/industry-packs'; // R5-A
-import { RECEIVABLES_TABS, type ReceivablesTab } from './page-tabs'; import { SelectField } from '../components/ui/SelectField';
+import { RECEIVABLES_TABS, type ReceivablesTab } from './page-tabs'; // R6-B1
+import { SelectField } from '../components/ui/SelectField';
 import { DateField } from '../components/ui/DateField';
-// R6-B1
 
 // The TDS register, its 26AS parser and Form 16A tracking load only when opened.
 // Bulk statements / confirmation letters (WP-4): loaded with the PDF stack only when opened.

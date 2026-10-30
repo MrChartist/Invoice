@@ -364,6 +364,14 @@ export function InvoiceCreator() {
           onSaveDraft={() => save(true)}
           onSave={() => save()}
           onClose={exitCreator}
+          paneToggle={
+            pane.wide && (
+              // The label names the action (Show / Hide), so no aria-pressed: a pressed quiet button paints ink-on-ink.
+              <button type="button" className={controls.btnGhost} aria-expanded={pane.on} onClick={pane.toggle} data-live-preview-toggle>
+                <Eye size={16} /> {pane.on ? pane.hideLabel : pane.showLabel}
+              </button>
+            )
+          }
         />
       }
       notices={<Suspense fallback={null}><ScreenTip id="editor" /></Suspense>}
@@ -414,14 +422,6 @@ export function InvoiceCreator() {
         </div>
       )}
 
-      {pane.wide && (
-        <div className={styles.paneBar}>
-          {/* The label names the action (Show / Hide), so no aria-pressed: a pressed quiet button paints ink-on-ink. */}
-          <button type="button" className={cn(controls.btnGhost, controls.btnSm)} aria-expanded={pane.on} onClick={pane.toggle} data-live-preview-toggle>
-            <Eye size={16} /> {pane.on ? pane.hideLabel : pane.showLabel}
-          </button>
-        </div>
-      )}
       <div className={cn(styles.layout, pane.on && styles.layoutWithPane)}>
         <fieldset className={cn(styles.main, styles.fieldset, readOnly && styles.frozen)} disabled={readOnly}>
           <legend className={surface.srOnly}>{readOnly ? t('editor.docLegendLocked') : t('editor.docLegend')}</legend>

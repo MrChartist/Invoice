@@ -119,7 +119,11 @@ export function useDrillRows(count: number, onActivate: (index: number) => void,
     self.current = snap;
   });
 
+  // Keep the cursor row in view when it moves; never on first show (a phone would open Books scrolled past its title).
+  const shownSel = useRef(sel);
   useEffect(() => {
+    if (shownSel.current === sel) return;
+    shownSel.current = sel;
     const el = document.getElementById(bodyId)?.querySelector<HTMLElement>('[data-selected="true"]');
     el?.scrollIntoView?.({ block: 'nearest' });
   }, [sel, bodyId]);

@@ -66,9 +66,9 @@ import controls from '../styles/controls.module.css';
 import surface from '../styles/surface.module.css';
 import styles from './Transactions.module.css';
 import { receivableBalance, receivableTotal } from '../lib/rcm';
-import { useListKeys } from '../lib/keys/use-list-keys'; import { SelectField } from '../components/ui/SelectField';
+import { useListKeys } from '../lib/keys/use-list-keys'; // R20-D5
+import { SelectField } from '../components/ui/SelectField';
 import { DateField } from '../components/ui/DateField';
-// R20-D5
 
 // QA10: release a retail bill's exchange receipts / finance DO on delete or cancel, even before any retail screen opened.
 ensureRetailHooks();

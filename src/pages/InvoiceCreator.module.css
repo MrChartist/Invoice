@@ -280,12 +280,6 @@ fieldset.main {
 }
 
 /* R3-C1: the live preview switch, trailing above the form + preview split. */
-.paneBar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: calc(var(--sp-2) * -1);
-}
-
 .paneSlot {
   min-height: 20rem;
 }

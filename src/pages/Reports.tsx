@@ -191,7 +191,7 @@ export function Reports() {
           title={discoverT('reportsTitle')}
           text={discoverT('reportsText')}
           action={
-            <div className={surface.pageActions} style={{ justifyContent: 'center' }} data-reports-empty>
+            <div className={surface.pageActions} style={{ justifyContent: 'center', flexWrap: 'wrap' }} data-reports-empty>
               <button type="button" className={controls.btnPrimary} onClick={() => periodRef.current?.querySelector<HTMLElement>('select, button, input')?.focus()}>
                 {discoverT('changePeriod')}
               </button>

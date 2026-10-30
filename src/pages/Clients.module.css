@@ -96,6 +96,18 @@
   white-space: nowrap;
 }
 
+/* QA: a laptop frame (table 52 to 75em, e.g. 1280px with the sidebar) drops Location and GSTIN (p3) as narrower
+   frames do, and the row buttons wrap in two short lines instead of one per line; a mouse gets 32px buttons. */
+@media (min-width: 37.5em) {
+  @container table (52.125em <= width < 74.6875em) {
+    table.directory :is(th, td)[data-priority='3'] { display: none; }
+  }
+  table.directory td.cAct { min-width: 12rem; }
+}
+@media (pointer: fine) {
+  table.directory td.cAct :is(a, button) { --b-h: 2rem; }
+}
+
 /* ── Phones (page.module.css shows every cell under 37.5em): each party becomes a compact card ── */
 @media (max-width: 37.4375em) {
   table.directory { display: block; }
