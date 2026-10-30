@@ -2,94 +2,87 @@
 .caps {
   display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
+  gap: var(--sp-1);
   flex-shrink: 0;
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .kbd {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.4rem;
-  height: 1.4rem;
-  padding: 0 0.3rem;
+  min-width: 1.375rem;
+  height: 1.375rem;
+  padding: 0 var(--sp-1);
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
   font-weight: 600;
-  color: var(--foreground);
-  background: var(--muted);
-  border: 1px solid var(--border);
-  border-bottom-width: 2px;
-  border-radius: var(--radius-xs);
+  color: var(--label);
+  background: var(--fill-2);
+  border-radius: var(--r-4);
 }
 
-/* The Key bar: after the main content, stuck to the bottom of the scrolling area. */
+/* The Key bar: after the main content, stuck to the bottom of the scrolling area, on the chrome material. */
 .bar {
+  composes: material from global;
   position: sticky;
   bottom: 0;
-  z-index: 5;
+  z-index: var(--z-bar);
   display: flex;
-  gap: 0.375rem;
+  gap: var(--sp-1);
   overflow-x: auto;
   margin-top: auto;
-  padding: 0.375rem 1rem;
-  border-top: 1px solid var(--border);
-  background: var(--card);
+  padding: var(--sp-1) var(--gutter);
+  border-top: var(--hairline) solid var(--sep);
   scrollbar-width: thin;
 }
 
 .barBtn { composes: btn xs from global; flex: 0 0 auto; }
 
-.item:hover,
-.item:focus-visible {
-  border-color: var(--ring);
-  outline: none;
-}
-
+/* The floating "Keys" pill: a secondary capsule of the button rulebook (44px; `sm` on a desktop). */
 .pill {
+  composes: btn from global;
   position: fixed;
-  right: 1rem;
-  bottom: calc(var(--tab-bar-h, 0px) + 1rem);
-  z-index: 24;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-height: 44px;
-  padding: 0 1rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--card);
-  color: var(--foreground);
-  font: inherit;
-  font-size: var(--text-sm);
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
+  right: var(--sp-4);
+  bottom: calc(var(--tab-bar-h, 0px) + var(--sp-4));
+  z-index: var(--z-bar);
 }
 
 .pillDesk {
-  min-height: 2rem;
+  composes: sm from global;
 }
 
 .menu {
   display: grid;
-  gap: 0.25rem;
+  gap: var(--sp-0-5);
 }
 
+/* Sheet rows: plain rows on --r-8, a fill on hover / press, the app's focus ring. */
 .item {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: var(--sp-3);
   min-height: 44px;
-  padding: 0.35rem 0.6rem;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  padding: var(--sp-1) var(--sp-3);
+  border: 0;
+  border-radius: var(--r-8);
   background: transparent;
-  color: var(--foreground);
+  color: var(--label);
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease-out);
+}
+
+@media (hover: hover) {
+  .item:hover {
+    background: var(--fill-4);
+  }
+}
+
+.item:active {
+  background: var(--fill-2);
 }
 
 .itemText {
@@ -98,14 +91,14 @@
 }
 
 .itemText small {
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .letter {
   width: 1.5rem;
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-weight: 600;
-  color: var(--brand-text);
+  color: var(--tint);
   text-decoration: underline;
 }
 
@@ -113,13 +106,13 @@
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--sp-2);
 }
 
 .toggle {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: var(--sp-2);
   font-size: var(--text-sm);
   cursor: pointer;
 }
@@ -127,17 +120,18 @@
 .select {
   font: inherit;
   font-size: var(--text-sm);
-  padding: 0.2rem 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--card);
-  color: var(--foreground);
+  min-height: 2.25rem;
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--r-10);
+  background: var(--fill-3);
+  color: var(--label);
 }
 
 .hint {
   flex-basis: 100%;
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
+  color: var(--label-2);
 }
 
 .sr {
@@ -152,11 +146,11 @@
 /* Chips on screens' own buttons (`data-key-row`), drawn while Tally keys are on. */
 :global(html[data-tally-keys]) [data-key-chip]::after {
   content: attr(data-key-chip);
-  margin-left: 0.35rem;
-  padding: 0 0.3rem;
+  margin-left: var(--sp-1);
+  padding: 0 var(--sp-1);
   font-family: var(--font-num); font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
-  color: var(--muted-foreground);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
+  color: var(--label-2);
+  background: var(--fill-3);
+  border-radius: var(--r-4);
 }
